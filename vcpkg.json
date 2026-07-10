@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "description": "Engine-agnostic projection mapping SDK core library",
   "builtin-baseline": "97b19caab97ab0c8d36c93230046c8c45fcd41d0",
-  "dependencies": [],
+  "dependencies": [
+    "nlohmann-json"
+  ],
   "features": {
     "tests": {
       "description": "Build the PMSDK unit test suite",

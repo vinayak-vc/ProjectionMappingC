@@ -44,3 +44,7 @@
 #include "PMSDK/Blend/EdgeBlend.h"
 #include "PMSDK/Blend/BlendConfig.h"
 #include "PMSDK/Blend/MaskGenerator.h"
+
+#include "PMSDK/Serialization/GeometrySerializer.h"
+#include "PMSDK/Serialization/WarpSerializer.h"
+#include "PMSDK/Serialization/BlendSerializer.h"

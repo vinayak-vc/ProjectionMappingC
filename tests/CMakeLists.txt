@@ -31,6 +31,9 @@ add_executable(pmsdk_tests
     Blend/EdgeBlendTests.cpp
     Blend/BlendConfigTests.cpp
     Blend/MaskGeneratorTests.cpp
+    Serialization/GeometrySerializerTests.cpp
+    Serialization/WarpSerializerTests.cpp
+    Serialization/BlendSerializerTests.cpp
     # Internal (non-exported) code under test is compiled into the test binary
     # directly — its symbols are hidden inside the SDK DLL.
     ${PROJECT_SOURCE_DIR}/src/Core/LastError.cpp)

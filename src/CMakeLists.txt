@@ -1,6 +1,8 @@
 add_library(pmsdk)
 add_library(PMSDK::pmsdk ALIAS pmsdk)
 
+find_package(nlohmann_json CONFIG REQUIRED)
+
 target_sources(pmsdk PRIVATE
     Core/Config.cpp
     Core/Context.cpp
@@ -23,7 +25,10 @@ target_sources(pmsdk PRIVATE
     Warp/Sampler.cpp
     Blend/EdgeBlend.cpp
     Blend/BlendConfig.cpp
-    Blend/MaskGenerator.cpp)
+    Blend/MaskGenerator.cpp
+    Serialization/GeometrySerializer.cpp
+    Serialization/WarpSerializer.cpp
+    Serialization/BlendSerializer.cpp)
 
 # Internal headers (src/…) are visible to the SDK only, never installed.
 target_include_directories(pmsdk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -31,6 +36,8 @@ target_include_directories(pmsdk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(pmsdk PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
+
+target_link_libraries(pmsdk PRIVATE nlohmann_json::nlohmann_json)
 
 pmsdk_apply_compiler_options(pmsdk)
 

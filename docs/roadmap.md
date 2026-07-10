@@ -12,8 +12,8 @@ before the next begins.
 | 5 | Mesh data structures | ✅ done (2026-07-10) |
 | 6 | Warp engine | ✅ done (2026-07-10) |
 | 7 | Blend engine | ✅ done (2026-07-10) |
-| 8 | Serialization | next |
-| 9 | Calibration (OpenCV) | pending |
+| 8 | Serialization | ✅ done (2026-07-10) |
+| 9 | Calibration (OpenCV) | next |
 | 10 | Public C API | pending |
 | 11 | Unit tests (full sweep to 90% coverage) | pending |
 | 12 | Documentation (Doxygen) | pending |

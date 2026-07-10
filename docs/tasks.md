@@ -66,10 +66,16 @@
 - [x] Luminance compensation structures
 - [x] Black level matching variables
 
-## Milestone 8 — Serialization (next)
+## Milestone 8 — Serialization (2026-07-10) ✅
 
-- [ ] Save/Load SDK state to JSON or XML
-- [ ] Implement serialization for `WarpNode` hierarchy, `Mesh`, `BlendConfig`
+- [x] Save/Load SDK state to JSON or XML
+- [x] Implement serialization for `WarpNode` hierarchy, `Mesh`, `BlendConfig`
+
+## Milestone 9 — Calibration (OpenCV) (next)
+
+- [ ] Incorporate OpenCV (via vcpkg)
+- [ ] Implement camera intrinsic/extrinsic calibration helpers
+- [ ] Implement structured light pattern generation (Gray code)
 
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Doxygen config (Milestone 12, may land earlier)

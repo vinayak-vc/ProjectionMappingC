@@ -67,3 +67,14 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# IDE
+.vs/
+.idea/
+out/
+
+# CMake user-local presets
+CMakeUserPresets.json
+
+# generated docs
+docs/doxygen/

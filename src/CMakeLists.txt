@@ -12,7 +12,11 @@ target_sources(pmsdk PRIVATE
     Geometry/MeshSubdivision.cpp
     Geometry/UVMapping.cpp
     Geometry/BVH.cpp
-    Geometry/KDTree.cpp)
+    Geometry/KDTree.cpp
+    Geometry/DynamicMesh.cpp
+    Geometry/BezierPatch.cpp
+    Geometry/GridWarp.cpp
+    Geometry/MeshOptimizer.cpp)
 
 # Internal headers (src/…) are visible to the SDK only, never installed.
 target_include_directories(pmsdk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

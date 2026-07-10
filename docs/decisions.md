@@ -83,3 +83,7 @@ To keep the initial scope manageable while avoiding complex flexible vertex form
 ## D-015 2026-07-10 — PImpl in Geometry Classes
 
 Complex Geometry classes (`Mesh`, `BVH`, `KDTree`) utilize the PImpl (Pointer to Implementation) idiom to hide dynamically sized STL containers like `std::vector` from the ABI boundary, adhering strictly to D-009 to avoid MSVC C4251 warnings.
+
+## D-016 2026-07-10 — Separation of Static and Dynamic Meshes
+
+To balance rendering performance and editing flexibility, we provide two separate mesh representations: `Mesh` (highly optimized, linear buffers, ideal for rendering/drawing) and `DynamicMesh` (Topology-aware, allows vertex/face addition and removal, adjacency queries, ideal for interactive editing tools). Users manipulate the `DynamicMesh` and bake it to a `Mesh` for final rendering.

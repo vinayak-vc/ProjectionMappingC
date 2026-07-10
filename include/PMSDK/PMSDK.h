@@ -31,3 +31,7 @@
 #include "PMSDK/Geometry/BezierCurve.h"
 #include "PMSDK/Geometry/Spline.h"
 #include "PMSDK/Geometry/UVMapping.h"
+#include "PMSDK/Geometry/DynamicMesh.h"
+#include "PMSDK/Geometry/BezierPatch.h"
+#include "PMSDK/Geometry/GridWarp.h"
+#include "PMSDK/Geometry/MeshOptimizer.h"

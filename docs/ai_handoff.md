@@ -1,15 +1,15 @@
 # AI Handoff — ProjectionMappingSDK
 
-Updated: 2026-07-10 (Milestone 4)
+Updated: 2026-07-10 (Milestone 5)
 
 ## Current state
 
-Milestones 1–4 are complete! Library `pmsdk` (output `ProjectionMappingSDK`) now contains:
+Milestones 1–5 are complete! Library `pmsdk` (output `ProjectionMappingSDK`) now contains:
 - **Core module**: ErrorCode, Status, Logger, Config, Context.
 - **Math module**: Vector, Matrix, Quaternion, Ray, Plane, BoundingBox.
-- **Geometry module**: `Vertex`, `Mesh` (PImpl), `MeshBuilder` (Plane, Grid, Cylinder), `MeshSubdivision` (linear), `Intersection` (Möller–Trumbore Ray-Triangle), `BVH` and `KDTree` (PImpl acceleration structures), `BezierCurve`, `Spline`, `UVMapping`.
+- **Geometry module (M4 & M5)**: `Vertex`, `Mesh`, `DynamicMesh` (HEDS topology for editing), `MeshBuilder`, `MeshSubdivision`, `MeshOptimizer` (welding/smooth normals), `Intersection`, `BVH`, `KDTree`, `BezierCurve`, `Spline`, `UVMapping`, `BezierPatch`, `GridWarp`.
 
-78 unit tests are currently running and passing under strict `/W4 /WX` on MSVC.
+85 unit tests are currently running and passing under strict `/W4 /WX` on MSVC.
 
 ## How to build here
 
@@ -25,27 +25,22 @@ vcpkg bootstrapped in `third_party/vcpkg`. Dependency so far: gtest (`tests` fea
 ## Key files
 
 - [include/PMSDK/PMSDK.h](../include/PMSDK/PMSDK.h) — umbrella header
-- [include/PMSDK/Geometry/](../include/PMSDK/Geometry/) — newly added geometry features
-- [src/Geometry/](../src/Geometry/) — PImpl classes (`Mesh`, `BVH`, `KDTree`) hiding STL allocations.
+- [include/PMSDK/Geometry/](../include/PMSDK/Geometry/) — newly added mesh structures
+- [src/Geometry/](../src/Geometry/) — PImpl classes (`DynamicMesh`, `BezierPatch`, `GridWarp`) hiding STL allocations.
 - [tests/Geometry/](../tests/Geometry/) — unit tests for the geometry structures.
 
-## Conventions locked in (see decisions.md D-001…D-015)
+## Conventions locked in (see decisions.md D-001…D-016)
 
 - Namespace `pmsdk` (internal: `pmsdk::detail`).
-- Export pattern: classes NOT dllexported; each public method carries `PMSDK_API` (avoids MSVC C4251 warnings). PImpl members stay private. This rule was strictly enforced in Milestone 4 (`Mesh.h`, `KDTree.h`, `BVH.h`).
-- `Vertex` uses a fixed layout (Position, Normal, UV, Color) for simplicity and performance (D-014).
-- Internal-only code lives in `src/`, tests compile such .cpp files directly (symbols hidden in DLL) when needed.
-- `pmsdk_apply_compiler_options()` on every target; builds must stay clean under `/W4 /WX` and `-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror`.
-- Update `docs/tasks.md` + `docs/decisions.md` during work; this file after.
+- Export pattern: classes NOT dllexported; each public method carries `PMSDK_API` (avoids MSVC C4251 warnings). PImpl members stay private. 
+- Separation of concerns between `Mesh` (render-optimized buffers) and `DynamicMesh` (topology-aware structures for editing) (D-016).
+- `pmsdk_apply_compiler_options()` on every target; builds must stay clean under `/W4 /WX`.
 
-## Next recommended task — Milestone 5 (Mesh Data Structures / Serialization) & Milestone 6 (Warp Engine)
+## Next recommended task — Milestone 6 (Warp Engine)
 
-Milestone 4 fulfilled most of the "Mesh data structures" (Milestone 5) requirements. 
-The next logical step is either:
-1. **Mesh I/O**: Implement OBJ or GLTF loaders to serialize/deserialize the `Mesh` object.
-2. **Warp Engine**: Begin the core projection mapping algorithm. Use the `BezierCurve` and `Mesh` structures to implement a Bezier Surface Warper or Grid Warper.
+With the advanced control grid structures (`BezierPatch`, `GridWarp`) built in M5, we are fully prepared to build the **Warp Engine** (Milestone 6). The Warp Engine should expose a high-level interactive API for managing deformation layers over a base mesh, applying non-linear transformations using the grids we just created.
 
-## Modified files (Milestone 4)
+## Modified files (Milestone 5)
 
-New: `include/PMSDK/Geometry/*.h`, `src/Geometry/*.cpp`, `tests/Geometry/*Tests.cpp`.
+New: `DynamicMesh`, `BezierPatch`, `GridWarp`, `MeshOptimizer` headers, sources, and tests.
 Changed: `include/PMSDK/PMSDK.h`, `src/CMakeLists.txt`, `tests/CMakeLists.txt`, docs (roadmap, tasks, decisions, this file).

@@ -48,13 +48,17 @@
 - [x] Bezier Curves and Splines
 - [x] UV Mapping utilities
 
-## Milestone 5 — Mesh data structures (next)
+## Milestone 5 — Mesh data structures (2026-07-10) ✅
 
-- [ ] Further extensions to Mesh (OBJ/GLTF I/O) (if required, or merge into Geometry)
-- [ ] Support for dynamic topology updates
-- [ ] Wait, Mesh data structures is somewhat covered by Milestone 4. Will re-evaluate backlog.
+- [x] Topology-Aware Mesh (`DynamicMesh`)
+- [x] Control Grids (`BezierPatch`, `GridWarp`)
+- [x] Mesh Optimization (`MeshOptimizer`: Welding and smooth normals)
 
-## Backlog / follow-ups
+## Milestone 6 — Warp engine (next)
+
+- [ ] Interactive warping API using control grids
+- [ ] Deformation logic for projecting points on mesh
+- [ ] Integration of Bezier patches into a global Warp field
 
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Doxygen config (Milestone 12, may land earlier)

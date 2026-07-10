@@ -9,8 +9,8 @@ before the next begins.
 | 2 | Core module (logging, errors, versioning, handles) | ✅ done (2026-07-10) |
 | 3 | Math library | ✅ done (2026-07-10) |
 | 4 | Geometry library | ✅ done (2026-07-10) |
-| 5 | Mesh data structures | next |
-| 6 | Warp engine | pending |
+| 5 | Mesh data structures | ✅ done (2026-07-10) |
+| 6 | Warp engine | next |
 | 7 | Blend engine | pending |
 | 8 | Serialization | pending |
 | 9 | Calibration (OpenCV) | pending |

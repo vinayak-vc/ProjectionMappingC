@@ -83,14 +83,8 @@
 - [x] Wrap `pmsdk::Warp` operations into `pmsdk_warp_*` functions
 - [x] Ensure C-linkage (`extern "C"`) is completely PImpl-based to allow Python/C#/Unity consumption
 
-## Milestone 12: Documentation (Doxygen)
-- [ ] Configure Doxygen (`Doxyfile`)
-- [ ] Add standard C++ doxygen blocks to all `pmsdk::` classes
-- [ ] Add detailed C-API doxygen blocks for the `pmsdk_*` exported functions
-- [ ] Generate HTML documentation and configure GitHub Pages / Action (optional)
-- [ ] Add `docs/api.md` outlining the general concepts
-
 ## Done
+- Milestone 12: Documentation (Doxygen)
 - Milestone 11: Unit tests (full sweep to 90% coverage)
 - Milestone 10: Public C API
 

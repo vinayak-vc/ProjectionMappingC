@@ -1,0 +1,55 @@
+PROJECT_NAME           = "Projection Mapping SDK"
+PROJECT_NUMBER         = 0.1.0
+PROJECT_BRIEF          = "Engine-agnostic Projection Mapping SDK"
+OUTPUT_DIRECTORY       = docs/html
+CREATE_SUBDIRS         = NO
+ALLOW_UNICODE_NAMES    = YES
+OUTPUT_LANGUAGE        = English
+
+# Input configuration
+INPUT                  = include/PMSDK docs/api.md
+RECURSIVE              = YES
+EXCLUDE_SYMLINKS       = NO
+USE_MDFILE_AS_MAINPAGE = docs/api.md
+
+# Build configuration
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+HIDE_FRIEND_COMPOUNDS  = NO
+HIDE_IN_BODY_DOCS      = NO
+
+# Output formats
+GENERATE_HTML          = YES
+HTML_OUTPUT            = .
+HTML_FILE_EXTENSION    = .html
+GENERATE_LATEX         = NO
+GENERATE_RTF           = NO
+GENERATE_MAN           = NO
+GENERATE_XML           = NO
+GENERATE_DOCBOOK       = NO
+GENERATE_AUTOGEN_DEF   = NO
+
+# Source browsing
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = YES
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+# Preprocessor
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = YES
+PREDEFINED             = PMSDK_API= \
+                         __declspec(dllexport)= \
+                         __declspec(dllimport)= \
+                         __cplusplus=202002L
+
+# Quiet output for CI
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES

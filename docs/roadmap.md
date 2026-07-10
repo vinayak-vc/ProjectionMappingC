@@ -16,7 +16,7 @@ before the next begins.
 | 9 | Calibration (OpenCV) | ✅ done (2026-07-10) |
 | 10 | Public C API | ✅ done (2026-07-10) |
 | 11 | Unit tests (full sweep to 90% coverage) | ✅ done (2026-07-10) |
-| 12 | Documentation (Doxygen) | next |
+| 12 | Documentation (Doxygen) | ✅ done (2026-07-10) |
 | 13 | Unity wrapper | pending |
 | 14 | Unreal wrapper | pending |
 | 15 | Sample applications | pending |

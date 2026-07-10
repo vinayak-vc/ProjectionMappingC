@@ -20,7 +20,10 @@ target_sources(pmsdk PRIVATE
     Warp/Projector.cpp
     Warp/DeformationField.cpp
     Warp/WarpNode.cpp
-    Warp/Sampler.cpp)
+    Warp/Sampler.cpp
+    Blend/EdgeBlend.cpp
+    Blend/BlendConfig.cpp
+    Blend/MaskGenerator.cpp)
 
 # Internal headers (src/…) are visible to the SDK only, never installed.
 target_include_directories(pmsdk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

@@ -28,6 +28,9 @@ add_executable(pmsdk_tests
     Warp/DeformationFieldTests.cpp
     Warp/WarpNodeTests.cpp
     Warp/SamplerTests.cpp
+    Blend/EdgeBlendTests.cpp
+    Blend/BlendConfigTests.cpp
+    Blend/MaskGeneratorTests.cpp
     # Internal (non-exported) code under test is compiled into the test binary
     # directly — its symbols are hidden inside the SDK DLL.
     ${PROJECT_SOURCE_DIR}/src/Core/LastError.cpp)

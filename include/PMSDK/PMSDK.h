@@ -40,3 +40,7 @@
 #include "PMSDK/Warp/DeformationField.h"
 #include "PMSDK/Warp/WarpNode.h"
 #include "PMSDK/Warp/Sampler.h"
+
+#include "PMSDK/Blend/EdgeBlend.h"
+#include "PMSDK/Blend/BlendConfig.h"
+#include "PMSDK/Blend/MaskGenerator.h"

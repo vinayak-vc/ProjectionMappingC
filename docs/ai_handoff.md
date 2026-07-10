@@ -1,16 +1,17 @@
 # AI Handoff — ProjectionMappingSDK
 
-Updated: 2026-07-10 (Milestone 6)
+Updated: 2026-07-10 (Milestone 7)
 
 ## Current state
 
-Milestones 1–6 are complete! Library `pmsdk` (output `ProjectionMappingSDK`) now contains:
+Milestones 1–7 are complete! Library `pmsdk` (output `ProjectionMappingSDK`) now contains:
 - **Core module**: ErrorCode, Status, Logger, Config, Context.
 - **Math module**: Vector, Matrix, Quaternion, Ray, Plane, BoundingBox, Transform.
 - **Geometry module**: `Vertex`, `Mesh`, `DynamicMesh`, `MeshBuilder`, `MeshSubdivision`, `MeshOptimizer`, `Intersection`, `BVH`, `KDTree`, `BezierCurve`, `Spline`, `UVMapping`, `BezierPatch`, `GridWarp`.
-- **Warp module (M6)**: `Projector`, `DeformationField`, `WarpNode`, `Sampler`.
+- **Warp module**: `Projector`, `DeformationField`, `WarpNode`, `Sampler`.
+- **Blend module (M7)**: `EdgeBlend`, `BlendConfig`, `MaskGenerator`.
 
-92 unit tests are currently running and passing under strict `/W4 /WX` on MSVC.
+99 unit tests are currently running and passing under strict `/W4 /WX` on MSVC.
 
 ## How to build here
 
@@ -26,9 +27,9 @@ vcpkg bootstrapped in `third_party/vcpkg`. Dependency so far: gtest (`tests` fea
 ## Key files
 
 - [include/PMSDK/PMSDK.h](../include/PMSDK/PMSDK.h) — umbrella header
-- [include/PMSDK/Warp/](../include/PMSDK/Warp/) — newly added warp structures
-- [src/Warp/](../src/Warp/) — PImpl classes (`WarpNode`, `DeformationField`) 
-- [tests/Warp/](../tests/Warp/) — unit tests for the warp structures.
+- [include/PMSDK/Blend/](../include/PMSDK/Blend/) — newly added blend structures
+- [src/Blend/](../src/Blend/) — implementations
+- [tests/Blend/](../tests/Blend/) — unit tests
 
 ## Conventions locked in (see decisions.md D-001…D-017)
 
@@ -37,11 +38,11 @@ vcpkg bootstrapped in `third_party/vcpkg`. Dependency so far: gtest (`tests` fea
 - Warp nodes use a scene-graph style hierarchy (`WarpNode`) for hierarchical slicing (D-017).
 - `pmsdk_apply_compiler_options()` on every target; builds must stay clean under `/W4 /WX`.
 
-## Next recommended task — Milestone 7 (Blend Engine)
+## Next recommended task — Milestone 8 (Serialization)
 
-With the Warp Engine complete, we are ready for **Milestone 7 (Blend Engine)**. This will involve the math required for edge blending between multiple projectors (gamma correction, soft-edge gradients, and black level matching).
+With the core math, geometry, warping, and blending complete, we are ready for **Milestone 8 (Serialization)**. This involves adding the ability to save and load all the configurations (WarpNode hierarchy, BlendConfig, Meshes, etc.) to a format like JSON or XML.
 
-## Modified files (Milestone 6)
+## Modified files (Milestone 7)
 
-New: `Projector`, `DeformationField`, `WarpNode`, `Sampler` headers, sources, and tests.
-Changed: `include/PMSDK/PMSDK.h`, `src/CMakeLists.txt`, `tests/CMakeLists.txt`, docs (roadmap, tasks, decisions, this file).
+New: `EdgeBlend`, `BlendConfig`, `MaskGenerator` headers, sources, and tests.
+Changed: `include/PMSDK/PMSDK.h`, `src/CMakeLists.txt`, `tests/CMakeLists.txt`, docs (roadmap, tasks, this file).

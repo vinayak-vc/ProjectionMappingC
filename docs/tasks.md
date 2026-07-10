@@ -60,11 +60,16 @@
 - [x] Deformation logic for projecting points on mesh (`WarpNode`, `Projector`)
 - [x] Integration of Bezier patches into a global Warp field
 
-## Milestone 7 — Blend engine (next)
+## Milestone 7 — Blend engine (2026-07-10) ✅
 
-- [ ] Edge blending math (gamma, soft-edge gradients)
-- [ ] Luminance compensation structures
-- [ ] Black level matching variables
+- [x] Edge blending math (gamma, soft-edge gradients)
+- [x] Luminance compensation structures
+- [x] Black level matching variables
+
+## Milestone 8 — Serialization (next)
+
+- [ ] Save/Load SDK state to JSON or XML
+- [ ] Implement serialization for `WarpNode` hierarchy, `Mesh`, `BlendConfig`
 
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Doxygen config (Milestone 12, may land earlier)

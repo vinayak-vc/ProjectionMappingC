@@ -9,7 +9,7 @@ using namespace pmsdk::Geometry;
 
 extern "C" {
 
-pmsdk_mesh_t* pmsdk_mesh_create(void) {
+PMSDK_API pmsdk_mesh_t* pmsdk_mesh_create(void) {
     try {
         return reinterpret_cast<pmsdk_mesh_t*>(new Mesh());
     } catch (...) {
@@ -17,17 +17,16 @@ pmsdk_mesh_t* pmsdk_mesh_create(void) {
     }
 }
 
-void pmsdk_mesh_destroy(pmsdk_mesh_t* mesh) {
+PMSDK_API void pmsdk_mesh_destroy(pmsdk_mesh_t* mesh) {
     if (mesh) {
         delete reinterpret_cast<Mesh*>(mesh);
     }
 }
 
-pmsdk_status_t pmsdk_mesh_set_vertices(pmsdk_mesh_t* mesh, const pmsdk_vertex_t* vertices, size_t count) {
+PMSDK_API pmsdk_status_t pmsdk_mesh_set_vertices(pmsdk_mesh_t* mesh, const pmsdk_vertex_t* vertices, size_t count) {
     if (!mesh || !vertices) return PMSDK_ERROR_INVALID_ARGUMENT;
     try {
         auto* cpp_mesh = reinterpret_cast<Mesh*>(mesh);
-        // We know that pmsdk_vertex_t has the exact same layout as pmsdk::Geometry::Vertex
         const auto* cpp_verts = reinterpret_cast<const Vertex*>(vertices);
         cpp_mesh->SetVertices(std::span<const Vertex>(cpp_verts, count));
         return PMSDK_SUCCESS;
@@ -38,7 +37,7 @@ pmsdk_status_t pmsdk_mesh_set_vertices(pmsdk_mesh_t* mesh, const pmsdk_vertex_t*
     }
 }
 
-pmsdk_status_t pmsdk_mesh_set_indices(pmsdk_mesh_t* mesh, const uint32_t* indices, size_t count) {
+PMSDK_API pmsdk_status_t pmsdk_mesh_set_indices(pmsdk_mesh_t* mesh, const uint32_t* indices, size_t count) {
     if (!mesh || !indices) return PMSDK_ERROR_INVALID_ARGUMENT;
     try {
         reinterpret_cast<Mesh*>(mesh)->SetIndices(std::span<const uint32_t>(indices, count));
@@ -50,17 +49,17 @@ pmsdk_status_t pmsdk_mesh_set_indices(pmsdk_mesh_t* mesh, const uint32_t* indice
     }
 }
 
-size_t pmsdk_mesh_get_vertex_count(const pmsdk_mesh_t* mesh) {
+PMSDK_API size_t pmsdk_mesh_get_vertex_count(const pmsdk_mesh_t* mesh) {
     if (!mesh) return 0;
     return reinterpret_cast<const Mesh*>(mesh)->GetVertexCount();
 }
 
-size_t pmsdk_mesh_get_index_count(const pmsdk_mesh_t* mesh) {
+PMSDK_API size_t pmsdk_mesh_get_index_count(const pmsdk_mesh_t* mesh) {
     if (!mesh) return 0;
     return reinterpret_cast<const Mesh*>(mesh)->GetIndexCount();
 }
 
-pmsdk_status_t pmsdk_mesh_recalculate_normals(pmsdk_mesh_t* mesh) {
+PMSDK_API pmsdk_status_t pmsdk_mesh_recalculate_normals(pmsdk_mesh_t* mesh) {
     if (!mesh) return PMSDK_ERROR_INVALID_ARGUMENT;
     try {
         reinterpret_cast<Mesh*>(mesh)->RecalculateNormals();
@@ -70,7 +69,7 @@ pmsdk_status_t pmsdk_mesh_recalculate_normals(pmsdk_mesh_t* mesh) {
     }
 }
 
-pmsdk_status_t pmsdk_mesh_clear(pmsdk_mesh_t* mesh) {
+PMSDK_API pmsdk_status_t pmsdk_mesh_clear(pmsdk_mesh_t* mesh) {
     if (!mesh) return PMSDK_ERROR_INVALID_ARGUMENT;
     try {
         reinterpret_cast<Mesh*>(mesh)->Clear();

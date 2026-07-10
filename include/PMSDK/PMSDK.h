@@ -10,3 +10,13 @@
 #include "PMSDK/Core/Log.h"
 #include "PMSDK/Core/Status.h"
 #include "PMSDK/Core/Version.h"
+
+#include "PMSDK/Math/Vector2.h"
+#include "PMSDK/Math/Vector3.h"
+#include "PMSDK/Math/Vector4.h"
+#include "PMSDK/Math/Quaternion.h"
+#include "PMSDK/Math/Matrix4.h"
+#include "PMSDK/Math/Transform.h"
+#include "PMSDK/Math/BoundingBox.h"
+#include "PMSDK/Math/Ray.h"
+#include "PMSDK/Math/Plane.h"

@@ -9,6 +9,11 @@ add_executable(pmsdk_tests
     Core/LoggerTests.cpp
     Core/StatusTests.cpp
     Core/VersionTests.cpp
+    Math/VectorTests.cpp
+    Math/QuaternionTests.cpp
+    Math/Matrix4Tests.cpp
+    Math/TransformTests.cpp
+    Math/GeometryMathTests.cpp
     # Internal (non-exported) code under test is compiled into the test binary
     # directly — its symbols are hidden inside the SDK DLL.
     ${PROJECT_SOURCE_DIR}/src/Core/LastError.cpp)

@@ -7,7 +7,12 @@ target_sources(pmsdk PRIVATE
     Core/LastError.cpp
     Core/Logger.cpp
     Core/Version.cpp
-)
+    Geometry/Mesh.cpp
+    Geometry/MeshBuilder.cpp
+    Geometry/MeshSubdivision.cpp
+    Geometry/UVMapping.cpp
+    Geometry/BVH.cpp
+    Geometry/KDTree.cpp)
 
 # Internal headers (src/…) are visible to the SDK only, never installed.
 target_include_directories(pmsdk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

@@ -14,6 +14,12 @@ add_executable(pmsdk_tests
     Math/Matrix4Tests.cpp
     Math/TransformTests.cpp
     Math/GeometryMathTests.cpp
+    Geometry/MeshTests.cpp
+    Geometry/MeshBuilderTests.cpp
+    Geometry/IntersectionTests.cpp
+    Geometry/BVHTests.cpp
+    Geometry/CurveTests.cpp
+    Geometry/KDTreeTests.cpp
     # Internal (non-exported) code under test is compiled into the test binary
     # directly — its symbols are hidden inside the SDK DLL.
     ${PROJECT_SOURCE_DIR}/src/Core/LastError.cpp)

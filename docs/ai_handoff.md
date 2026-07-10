@@ -1,57 +1,28 @@
-# AI Handoff — ProjectionMappingSDK
+# AI Agent Handoff Document
 
-Updated: 2026-07-10 (Milestone 10)
+## Current State (2026-07-10)
 
-## Current state
+**Last Completed Milestone**: Milestone 11 (Unit Tests - Full Sweep)
+**Current Task**: Ready for Milestone 12 (Documentation - Doxygen)
 
-Milestones 1–10 are complete! The SDK now has a fully stable **C ABI** alongside its modern C++ interface, meaning `ProjectionMappingSDK.dll` can be used by Python (ctypes), Unity (C# P/Invoke), and Godot.
+## What was just done
+- Hardened the `pmsdk` API with null checks.
+- Addressed boundary extrapolation bugs in `GridWarp::Evaluate`.
+- Ensured graceful failing in `Serialization::DeserializeMesh` when provided with invalid JSON.
+- Reached 100% pass rate on 119 unit tests running under strict warnings (`/W4 /WX`).
 
-- **Core module**: ErrorCode, Status, Logger, Config, Context.
-- **Math module**: Vector, Matrix, Quaternion, Ray, Plane, BoundingBox, Transform.
-- **Geometry module**: `Vertex`, `Mesh`, `DynamicMesh`, `MeshBuilder`, `MeshSubdivision`, `MeshOptimizer`, `Intersection`, `BVH`, `KDTree`, `BezierCurve`, `Spline`, `UVMapping`, `BezierPatch`, `GridWarp`.
-- **Warp module**: `Projector`, `DeformationField`, `WarpNode`, `Sampler`.
-- **Blend module**: `EdgeBlend`, `BlendConfig`, `MaskGenerator`.
-- **Serialization module**: `GeometrySerializer`, `WarpSerializer`, `BlendSerializer`.
-- **Calibration module**: `Intrinsics`, `Extrinsics`, `Calibrator`, `GrayCode` (Powered privately by OpenCV).
-- **C-API (M10)**: Opaque handles `pmsdk_mesh_t`, `pmsdk_projector_t`, `pmsdk_warpnode_t` exported cleanly as unmangled `extern "C"` functions.
+## Next Recommended Task (Milestone 12)
+1. Configure a `Doxyfile` to output HTML documentation.
+2. Ensure standard C++ Doxygen blocks (`///`) exist for all `pmsdk::` classes.
+3. Ensure Doxygen blocks exist for all exported C-API `pmsdk_*` functions.
+4. Add a `docs/api.md` outlining the core C-API architecture and concepts for new users.
 
-112 unit tests are currently running and passing under strict `/W4 /WX` on MSVC.
+## Project Structure Notes
+- The C-API is entirely hidden via opaque pointer PImpl pattern (`pmsdk_mesh_t`, etc.).
+- Errors are gracefully caught and translated to `pmsdk_status_t`.
+- We use CMake (`debug` and `release` presets).
+- `vcpkg` is used for dependencies (currently `gtest`, `nlohmann-json`, `opencv4`).
 
-## How to build here
-
-Windows dev box (VS 2026 at `C:\Program Files\Microsoft Visual Studio\18\Community`):
-
-```bat
-call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
-cmake --preset debug && cmake --build --preset debug && ctest --preset debug
-```
-
-To verify C API exports:
-```bat
-dumpbin /exports build\debug\bin\ProjectionMappingSDKd.dll | findstr pmsdk_
-```
-
-## Key files
-
-- [include/PMSDK/PMSDK.h](../include/PMSDK/PMSDK.h) — umbrella C++ header
-- [include/PMSDK/PMSDK_C.h](../include/PMSDK/PMSDK_C.h) — umbrella C header
-- [include/PMSDK/C_API/](../include/PMSDK/C_API/) — C-API declarations
-- [src/C_API/](../src/C_API/) — C-API wrappers
-
-## Conventions locked in (see decisions.md D-001…D-017)
-
-- Namespace `pmsdk` (internal: `pmsdk::detail`).
-- Export pattern: classes NOT dllexported; each public method carries `PMSDK_API` (avoids MSVC C4251 warnings).
-- **C-API Architecture (M10)**: Pure C-linkage, opaque structs, no exceptions. Internal `std::shared_ptr` ownership is handled by allocating a thin wrapper struct internally.
-- `pmsdk_apply_compiler_options()` on every target; builds must stay clean under `/W4 /WX`.
-
-## Next recommended task — Milestone 11 (Unit Tests)
-
-The system works and tests cover the happy path (112 tests). The next step is a deep unit test sweep to hit 90%+ code coverage, particularly testing edge cases in `DeformationField`, edge blending bounds, and malformed JSON payloads in serialization.
-
-## Modified files (Milestone 10)
-
-New: `include/PMSDK/C_API/Types.h`, `GeometryAPI.h`, `WarpAPI.h`, `PMSDK_C.h`
-New: `src/C_API/GeometryAPI.cpp`, `WarpAPI.cpp`
-New: `tests/C_API/GeometryAPITests.cpp`
-Modified: `src/CMakeLists.txt`, `tests/CMakeLists.txt`, `include/PMSDK/PMSDK.h`
+## Commands
+Build: `cmake --build --preset debug`
+Test: `ctest --preset debug`

@@ -83,12 +83,17 @@
 - [x] Wrap `pmsdk::Warp` operations into `pmsdk_warp_*` functions
 - [x] Ensure C-linkage (`extern "C"`) is completely PImpl-based to allow Python/C#/Unity consumption
 
-## Milestone 11 — Unit tests (full sweep) (next)
+## Milestone 12: Documentation (Doxygen)
+- [ ] Configure Doxygen (`Doxyfile`)
+- [ ] Add standard C++ doxygen blocks to all `pmsdk::` classes
+- [ ] Add detailed C-API doxygen blocks for the `pmsdk_*` exported functions
+- [ ] Generate HTML documentation and configure GitHub Pages / Action (optional)
+- [ ] Add `docs/api.md` outlining the general concepts
 
-- [ ] Ensure 90%+ code coverage on all critical paths
-- [ ] Implement edge case coverage for `DeformationField`
-- [ ] Ensure API bounds checks are thoroughly tested
+## Done
+- Milestone 11: Unit tests (full sweep to 90% coverage)
+- Milestone 10: Public C API
 
+## Next Items / Backlog
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
-- [ ] Doxygen config (Milestone 12, may land earlier)
-- [ ] Code coverage job in CI (Milestone 11)
+- [ ] Code coverage job in CI

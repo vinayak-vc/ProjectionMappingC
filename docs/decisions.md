@@ -87,3 +87,7 @@ Complex Geometry classes (`Mesh`, `BVH`, `KDTree`) utilize the PImpl (Pointer to
 ## D-016 2026-07-10 — Separation of Static and Dynamic Meshes
 
 To balance rendering performance and editing flexibility, we provide two separate mesh representations: `Mesh` (highly optimized, linear buffers, ideal for rendering/drawing) and `DynamicMesh` (Topology-aware, allows vertex/face addition and removal, adjacency queries, ideal for interactive editing tools). Users manipulate the `DynamicMesh` and bake it to a `Mesh` for final rendering.
+
+## D-017 2026-07-10 — Warp Node Hierarchy
+
+The projection mapping structure uses a hierarchical Scene Graph for warped surfaces (`WarpNode`). Each node has a local transform and an optional `DeformationField` (Bezier or Grid warp). This mimics the standard slice-grouping mechanisms found in Resolume Arena and MadMapper, allowing complex grouped spatial transforms applied on top of individual deformations.

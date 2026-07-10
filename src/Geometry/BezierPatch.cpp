@@ -45,6 +45,10 @@ void BezierPatch::SetControlPoints(const std::vector<Math::Vector3>& points) {
     }
 }
 
+Math::Vector3 BezierPatch::Evaluate(float u, float v) const {
+    return m_impl->Evaluate(u, v);
+}
+
 std::unique_ptr<Mesh> BezierPatch::GenerateMesh(int resolutionX, int resolutionY) const {
     auto mesh = std::make_unique<Mesh>();
     if (resolutionX < 1) resolutionX = 1;

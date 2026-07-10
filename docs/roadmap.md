@@ -10,8 +10,8 @@ before the next begins.
 | 3 | Math library | ✅ done (2026-07-10) |
 | 4 | Geometry library | ✅ done (2026-07-10) |
 | 5 | Mesh data structures | ✅ done (2026-07-10) |
-| 6 | Warp engine | next |
-| 7 | Blend engine | pending |
+| 6 | Warp engine | ✅ done (2026-07-10) |
+| 7 | Blend engine | next |
 | 8 | Serialization | pending |
 | 9 | Calibration (OpenCV) | pending |
 | 10 | Public C API | pending |

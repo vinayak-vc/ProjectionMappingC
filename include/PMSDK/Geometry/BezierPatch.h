@@ -22,6 +22,9 @@ public:
     // Generates a mesh with resolution x resolution quads (converted to triangles)
     PMSDK_API std::unique_ptr<Mesh> GenerateMesh(int resolutionX, int resolutionY) const;
 
+    // Evaluates the bezier surface at normalized coordinates (u, v) in [0, 1]
+    PMSDK_API Math::Vector3 Evaluate(float u, float v) const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> m_impl;

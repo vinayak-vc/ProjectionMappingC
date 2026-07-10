@@ -43,6 +43,10 @@ void GridWarp::SetControlPoints(int columns, int rows, const std::vector<Math::V
     m_impl->controlPoints = points;
 }
 
+Math::Vector3 GridWarp::Evaluate(float u, float v) const {
+    return m_impl->Evaluate(u, v);
+}
+
 std::unique_ptr<Mesh> GridWarp::GenerateMesh(int resolutionX, int resolutionY) const {
     auto mesh = std::make_unique<Mesh>();
     if (m_impl->cols < 2 || m_impl->rows < 2) return mesh;

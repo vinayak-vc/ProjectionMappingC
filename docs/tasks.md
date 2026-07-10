@@ -54,11 +54,17 @@
 - [x] Control Grids (`BezierPatch`, `GridWarp`)
 - [x] Mesh Optimization (`MeshOptimizer`: Welding and smooth normals)
 
-## Milestone 6 — Warp engine (next)
+## Milestone 6 — Warp engine (2026-07-10) ✅
 
-- [ ] Interactive warping API using control grids
-- [ ] Deformation logic for projecting points on mesh
-- [ ] Integration of Bezier patches into a global Warp field
+- [x] Interactive warping API using control grids (`DeformationField`)
+- [x] Deformation logic for projecting points on mesh (`WarpNode`, `Projector`)
+- [x] Integration of Bezier patches into a global Warp field
+
+## Milestone 7 — Blend engine (next)
+
+- [ ] Edge blending math (gamma, soft-edge gradients)
+- [ ] Luminance compensation structures
+- [ ] Black level matching variables
 
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Doxygen config (Milestone 12, may land earlier)

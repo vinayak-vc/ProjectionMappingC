@@ -1,15 +1,16 @@
 # AI Handoff — ProjectionMappingSDK
 
-Updated: 2026-07-10 (Milestone 5)
+Updated: 2026-07-10 (Milestone 6)
 
 ## Current state
 
-Milestones 1–5 are complete! Library `pmsdk` (output `ProjectionMappingSDK`) now contains:
+Milestones 1–6 are complete! Library `pmsdk` (output `ProjectionMappingSDK`) now contains:
 - **Core module**: ErrorCode, Status, Logger, Config, Context.
-- **Math module**: Vector, Matrix, Quaternion, Ray, Plane, BoundingBox.
-- **Geometry module (M4 & M5)**: `Vertex`, `Mesh`, `DynamicMesh` (HEDS topology for editing), `MeshBuilder`, `MeshSubdivision`, `MeshOptimizer` (welding/smooth normals), `Intersection`, `BVH`, `KDTree`, `BezierCurve`, `Spline`, `UVMapping`, `BezierPatch`, `GridWarp`.
+- **Math module**: Vector, Matrix, Quaternion, Ray, Plane, BoundingBox, Transform.
+- **Geometry module**: `Vertex`, `Mesh`, `DynamicMesh`, `MeshBuilder`, `MeshSubdivision`, `MeshOptimizer`, `Intersection`, `BVH`, `KDTree`, `BezierCurve`, `Spline`, `UVMapping`, `BezierPatch`, `GridWarp`.
+- **Warp module (M6)**: `Projector`, `DeformationField`, `WarpNode`, `Sampler`.
 
-85 unit tests are currently running and passing under strict `/W4 /WX` on MSVC.
+92 unit tests are currently running and passing under strict `/W4 /WX` on MSVC.
 
 ## How to build here
 
@@ -25,22 +26,22 @@ vcpkg bootstrapped in `third_party/vcpkg`. Dependency so far: gtest (`tests` fea
 ## Key files
 
 - [include/PMSDK/PMSDK.h](../include/PMSDK/PMSDK.h) — umbrella header
-- [include/PMSDK/Geometry/](../include/PMSDK/Geometry/) — newly added mesh structures
-- [src/Geometry/](../src/Geometry/) — PImpl classes (`DynamicMesh`, `BezierPatch`, `GridWarp`) hiding STL allocations.
-- [tests/Geometry/](../tests/Geometry/) — unit tests for the geometry structures.
+- [include/PMSDK/Warp/](../include/PMSDK/Warp/) — newly added warp structures
+- [src/Warp/](../src/Warp/) — PImpl classes (`WarpNode`, `DeformationField`) 
+- [tests/Warp/](../tests/Warp/) — unit tests for the warp structures.
 
-## Conventions locked in (see decisions.md D-001…D-016)
+## Conventions locked in (see decisions.md D-001…D-017)
 
 - Namespace `pmsdk` (internal: `pmsdk::detail`).
 - Export pattern: classes NOT dllexported; each public method carries `PMSDK_API` (avoids MSVC C4251 warnings). PImpl members stay private. 
-- Separation of concerns between `Mesh` (render-optimized buffers) and `DynamicMesh` (topology-aware structures for editing) (D-016).
+- Warp nodes use a scene-graph style hierarchy (`WarpNode`) for hierarchical slicing (D-017).
 - `pmsdk_apply_compiler_options()` on every target; builds must stay clean under `/W4 /WX`.
 
-## Next recommended task — Milestone 6 (Warp Engine)
+## Next recommended task — Milestone 7 (Blend Engine)
 
-With the advanced control grid structures (`BezierPatch`, `GridWarp`) built in M5, we are fully prepared to build the **Warp Engine** (Milestone 6). The Warp Engine should expose a high-level interactive API for managing deformation layers over a base mesh, applying non-linear transformations using the grids we just created.
+With the Warp Engine complete, we are ready for **Milestone 7 (Blend Engine)**. This will involve the math required for edge blending between multiple projectors (gamma correction, soft-edge gradients, and black level matching).
 
-## Modified files (Milestone 5)
+## Modified files (Milestone 6)
 
-New: `DynamicMesh`, `BezierPatch`, `GridWarp`, `MeshOptimizer` headers, sources, and tests.
+New: `Projector`, `DeformationField`, `WarpNode`, `Sampler` headers, sources, and tests.
 Changed: `include/PMSDK/PMSDK.h`, `src/CMakeLists.txt`, `tests/CMakeLists.txt`, docs (roadmap, tasks, decisions, this file).

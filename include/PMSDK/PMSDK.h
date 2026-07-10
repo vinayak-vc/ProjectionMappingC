@@ -35,3 +35,8 @@
 #include "PMSDK/Geometry/BezierPatch.h"
 #include "PMSDK/Geometry/GridWarp.h"
 #include "PMSDK/Geometry/MeshOptimizer.h"
+
+#include "PMSDK/Warp/Projector.h"
+#include "PMSDK/Warp/DeformationField.h"
+#include "PMSDK/Warp/WarpNode.h"
+#include "PMSDK/Warp/Sampler.h"

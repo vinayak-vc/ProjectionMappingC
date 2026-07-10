@@ -84,6 +84,7 @@
 - [x] Ensure C-linkage (`extern "C"`) is completely PImpl-based to allow Python/C#/Unity consumption
 
 ## Done
+- Milestone 13: Unity Wrapper (`vxpmsdk`)
 - Milestone 12: Documentation (Doxygen)
 - Milestone 11: Unit tests (full sweep to 90% coverage)
 - Milestone 10: Public C API

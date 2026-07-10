@@ -17,7 +17,7 @@ before the next begins.
 | 10 | Public C API | ✅ done (2026-07-10) |
 | 11 | Unit tests (full sweep to 90% coverage) | ✅ done (2026-07-10) |
 | 12 | Documentation (Doxygen) | ✅ done (2026-07-10) |
-| 13 | Unity wrapper | pending |
+| 13 | Unity wrapper | ✅ done (2026-07-11) |
 | 14 | Unreal wrapper | pending |
 | 15 | Sample applications | pending |
 | 16 | Performance optimization | pending |

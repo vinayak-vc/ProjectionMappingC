@@ -47,6 +47,10 @@ jobs:
         if: runner.os == 'Windows'
         run: .\third_party\vcpkg\bootstrap-vcpkg.bat -disableMetrics
 
+      - name: Install dependencies (Unix)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build autoconf autoconf-archive automake libtool
+
       - name: Bootstrap vcpkg (Unix)
         if: runner.os != 'Windows'
         run: ./third_party/vcpkg/bootstrap-vcpkg.sh -disableMetrics

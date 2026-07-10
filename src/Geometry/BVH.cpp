@@ -51,14 +51,17 @@ struct BVH::Impl {
         if (axis == 1) splitPos = node.bounds.min.y + extent.y * 0.5f;
         if (axis == 2) splitPos = node.bounds.min.z + extent.z * 0.5f;
 
-        int i = node.firstTriangle;
-        int j = i + node.triangleCount - 1;
+        uint32_t i = node.firstTriangle;
+        uint32_t j = i + node.triangleCount - 1;
+
         while (i <= j) {
             float val = (axis == 0) ? triangles[i].center.x : (axis == 1 ? triangles[i].center.y : triangles[i].center.z);
             if (val < splitPos) {
                 i++;
             } else {
-                std::swap(triangles[i], triangles[j--]);
+                std::swap(triangles[i], triangles[j]);
+                if (j == 0) break;
+                j--;
             }
         }
 

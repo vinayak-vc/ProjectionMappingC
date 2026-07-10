@@ -106,9 +106,9 @@ std::unique_ptr<Mesh> MeshBuilder::CreateCylinder(float radius, float height, in
 
     // Side indices
     for (int i = 0; i < segments; ++i) {
-        uint32_t idx0 = i * 2;
-        uint32_t idx1 = idx0 + 1;
-        uint32_t idx2 = (i + 1) * 2;
+        uint32_t idx0 = static_cast<uint32_t>(i * 2);
+        uint32_t idx1 = static_cast<uint32_t>(i * 2 + 1);
+        uint32_t idx2 = static_cast<uint32_t>((i + 1) * 2);
         uint32_t idx3 = idx2 + 1;
 
         indices.push_back(idx0);

@@ -8,6 +8,18 @@ TEST(GeometryAPITests, CreateAndDestroyMesh) {
     pmsdk_mesh_destroy(mesh);
 }
 
+TEST(GeometryAPITests, NullChecks) {
+    EXPECT_EQ(pmsdk_mesh_set_vertices(nullptr, nullptr, 0), PMSDK_ERROR_INVALID_ARGUMENT);
+    EXPECT_EQ(pmsdk_mesh_set_indices(nullptr, nullptr, 0), PMSDK_ERROR_INVALID_ARGUMENT);
+    EXPECT_EQ(pmsdk_mesh_recalculate_normals(nullptr), PMSDK_ERROR_INVALID_ARGUMENT);
+    EXPECT_EQ(pmsdk_mesh_clear(nullptr), PMSDK_ERROR_INVALID_ARGUMENT);
+    EXPECT_EQ(pmsdk_mesh_get_vertex_count(nullptr), 0);
+    EXPECT_EQ(pmsdk_mesh_get_index_count(nullptr), 0);
+    
+    // Destroying nullptr should be safe and no-op
+    pmsdk_mesh_destroy(nullptr);
+}
+
 TEST(GeometryAPITests, SetAndGetVertices) {
     pmsdk_mesh_t* mesh = pmsdk_mesh_create();
     ASSERT_NE(mesh, nullptr);
@@ -24,27 +36,5 @@ TEST(GeometryAPITests, SetAndGetVertices) {
     size_t vCount = pmsdk_mesh_get_vertex_count(mesh);
     EXPECT_EQ(vCount, 3);
 
-    pmsdk_mesh_destroy(mesh);
-}
-
-TEST(WarpAPITests, ProcessMeshThroughWarpNode) {
-    pmsdk_mesh_t* mesh = pmsdk_mesh_create();
-    pmsdk_mesh_t* outMesh = pmsdk_mesh_create();
-    pmsdk_warpnode_t* node = pmsdk_warpnode_create();
-    
-    // Add some vertices
-    std::vector<pmsdk_vertex_t> verts = {
-        { {10.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f} }
-    };
-    pmsdk_mesh_set_vertices(mesh, verts.data(), verts.size());
-    
-    pmsdk_status_t status = pmsdk_warpnode_process_mesh(node, mesh, outMesh);
-    EXPECT_EQ(status, PMSDK_SUCCESS);
-    
-    // Identity node should preserve vertex count
-    EXPECT_EQ(pmsdk_mesh_get_vertex_count(outMesh), 1);
-
-    pmsdk_warpnode_destroy(node);
-    pmsdk_mesh_destroy(outMesh);
     pmsdk_mesh_destroy(mesh);
 }

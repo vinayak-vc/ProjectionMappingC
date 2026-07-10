@@ -39,12 +39,25 @@ TEST(MeshTests, RecalculateNormals) {
 
 TEST(MeshTests, CalculateBounds) {
     Mesh mesh;
-    std::vector<Vertex> verts(2);
-    verts[0].position = {-1.0f, -1.0f, -1.0f};
-    verts[1].position = {1.0f, 1.0f, 1.0f};
-    mesh.SetVertices(verts);
+    // Bounds of empty mesh should be something sensible like min=max=0, or min>max
+    BoundingBox emptyBounds = mesh.CalculateBounds();
+    EXPECT_FLOAT_EQ(emptyBounds.min.x, 1e30f);
+    EXPECT_FLOAT_EQ(emptyBounds.max.x, -1e30f);
+    
+    std::vector<Vertex> verts = {
+        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
+        {{1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
+        {{0.0f, 2.0f, -1.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}
+    };
 
-    auto bounds = mesh.CalculateBounds();
-    EXPECT_FLOAT_EQ(bounds.min.x, -1.0f);
+    mesh.SetVertices(verts);
+    BoundingBox bounds = mesh.CalculateBounds();
+
+    EXPECT_FLOAT_EQ(bounds.min.x, 0.0f);
+    EXPECT_FLOAT_EQ(bounds.min.y, 0.0f);
+    EXPECT_FLOAT_EQ(bounds.min.z, -1.0f);
+
     EXPECT_FLOAT_EQ(bounds.max.x, 1.0f);
+    EXPECT_FLOAT_EQ(bounds.max.y, 2.0f);
+    EXPECT_FLOAT_EQ(bounds.max.z, 0.0f);
 }

@@ -1,6 +1,7 @@
 #include "PMSDK/Geometry/GridWarp.h"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
 
 namespace pmsdk::Geometry {
 
@@ -12,8 +13,11 @@ struct GridWarp::Impl {
     Math::Vector3 Evaluate(float u, float v) const {
         if (cols < 2 || rows < 2) return {0.0f, 0.0f, 0.0f};
 
-        float scaledU = u * (cols - 1);
-        float scaledV = v * (rows - 1);
+        float clampedU = std::clamp(u, 0.0f, 1.0f);
+        float clampedV = std::clamp(v, 0.0f, 1.0f);
+        
+        float scaledU = clampedU * (cols - 1);
+        float scaledV = clampedV * (rows - 1);
 
         int idxX = std::clamp((int)std::floor(scaledU), 0, cols - 2);
         int idxY = std::clamp((int)std::floor(scaledV), 0, rows - 2);
@@ -37,7 +41,12 @@ GridWarp::GridWarp() : m_impl(std::make_unique<Impl>()) {}
 GridWarp::~GridWarp() = default;
 
 void GridWarp::SetControlPoints(int columns, int rows, const std::vector<Math::Vector3>& points) {
-    if (points.size() != (size_t)(columns * rows)) return;
+    if (columns < 2 || rows < 2) {
+        throw std::invalid_argument("GridWarp requires at least 2x2 control points.");
+    }
+    if (points.size() != (size_t)(columns * rows)) {
+        throw std::invalid_argument("GridWarp point count must match columns * rows.");
+    }
     m_impl->cols = columns;
     m_impl->rows = rows;
     m_impl->controlPoints = points;

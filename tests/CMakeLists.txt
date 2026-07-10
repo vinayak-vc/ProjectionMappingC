@@ -38,6 +38,9 @@ add_executable(pmsdk_tests
     Calibration/ExtrinsicsTests.cpp
     Calibration/GrayCodeTests.cpp
     C_API/GeometryAPITests.cpp
+    C_API/WarpAPITests.cpp
+    Warp/DeformationFieldEdgeTests.cpp
+    Serialization/ErrorHandlingTests.cpp
     # Internal (non-exported) code under test is compiled into the test binary
     # directly — its symbols are hidden inside the SDK DLL.
     ${PROJECT_SOURCE_DIR}/src/Core/LastError.cpp)

@@ -48,3 +48,8 @@
 #include "PMSDK/Serialization/GeometrySerializer.h"
 #include "PMSDK/Serialization/WarpSerializer.h"
 #include "PMSDK/Serialization/BlendSerializer.h"
+
+#include "PMSDK/Calibration/Intrinsics.h"
+#include "PMSDK/Calibration/Extrinsics.h"
+#include "PMSDK/Calibration/Calibrator.h"
+#include "PMSDK/Calibration/GrayCode.h"

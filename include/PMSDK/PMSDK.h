@@ -53,3 +53,6 @@
 #include "PMSDK/Calibration/Extrinsics.h"
 #include "PMSDK/Calibration/Calibrator.h"
 #include "PMSDK/Calibration/GrayCode.h"
+
+// Public C API
+#include "PMSDK/PMSDK_C.h"

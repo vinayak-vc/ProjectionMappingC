@@ -33,7 +33,9 @@ target_sources(pmsdk PRIVATE
     Calibration/Intrinsics.cpp
     Calibration/Extrinsics.cpp
     Calibration/Calibrator.cpp
-    Calibration/GrayCode.cpp)
+    Calibration/GrayCode.cpp
+    C_API/GeometryAPI.cpp
+    C_API/WarpAPI.cpp)
 
 # Internal headers (src/…) are visible to the SDK only, never installed.
 target_include_directories(pmsdk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

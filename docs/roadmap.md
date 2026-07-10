@@ -14,8 +14,8 @@ before the next begins.
 | 7 | Blend engine | ✅ done (2026-07-10) |
 | 8 | Serialization | ✅ done (2026-07-10) |
 | 9 | Calibration (OpenCV) | ✅ done (2026-07-10) |
-| 10 | Public C API | next |
-| 11 | Unit tests (full sweep to 90% coverage) | pending |
+| 10 | Public C API | ✅ done (2026-07-10) |
+| 11 | Unit tests (full sweep to 90% coverage) | next |
 | 12 | Documentation (Doxygen) | pending |
 | 13 | Unity wrapper | pending |
 | 14 | Unreal wrapper | pending |

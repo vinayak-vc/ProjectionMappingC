@@ -77,11 +77,17 @@
 - [x] Implement camera intrinsic/extrinsic calibration helpers
 - [x] Implement structured light pattern generation (Gray code)
 
-## Milestone 10 — Public C API (next)
+## Milestone 10 — Public C API (2026-07-10) ✅
 
-- [ ] Create `include/PMSDK/C_API.h` exposing core types (mesh, warp nodes)
-- [ ] Wrap `pmsdk::Warp` operations into `pmsdk_warp_*` functions
-- [ ] Ensure C-linkage (`extern "C"`) is completely PImpl-based to allow Python/C#/Unity consumption
+- [x] Create `include/PMSDK/C_API.h` exposing core types (mesh, warp nodes)
+- [x] Wrap `pmsdk::Warp` operations into `pmsdk_warp_*` functions
+- [x] Ensure C-linkage (`extern "C"`) is completely PImpl-based to allow Python/C#/Unity consumption
+
+## Milestone 11 — Unit tests (full sweep) (next)
+
+- [ ] Ensure 90%+ code coverage on all critical paths
+- [ ] Implement edge case coverage for `DeformationField`
+- [ ] Ensure API bounds checks are thoroughly tested
 
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Doxygen config (Milestone 12, may land earlier)

@@ -1,19 +1,21 @@
 # AI Handoff — ProjectionMappingSDK
 
-Updated: 2026-07-10 (Milestone 9)
+Updated: 2026-07-10 (Milestone 10)
 
 ## Current state
 
-Milestones 1–9 are complete! Library `pmsdk` (output `ProjectionMappingSDK`) now contains:
+Milestones 1–10 are complete! The SDK now has a fully stable **C ABI** alongside its modern C++ interface, meaning `ProjectionMappingSDK.dll` can be used by Python (ctypes), Unity (C# P/Invoke), and Godot.
+
 - **Core module**: ErrorCode, Status, Logger, Config, Context.
 - **Math module**: Vector, Matrix, Quaternion, Ray, Plane, BoundingBox, Transform.
 - **Geometry module**: `Vertex`, `Mesh`, `DynamicMesh`, `MeshBuilder`, `MeshSubdivision`, `MeshOptimizer`, `Intersection`, `BVH`, `KDTree`, `BezierCurve`, `Spline`, `UVMapping`, `BezierPatch`, `GridWarp`.
 - **Warp module**: `Projector`, `DeformationField`, `WarpNode`, `Sampler`.
 - **Blend module**: `EdgeBlend`, `BlendConfig`, `MaskGenerator`.
 - **Serialization module**: `GeometrySerializer`, `WarpSerializer`, `BlendSerializer`.
-- **Calibration module (M9)**: `Intrinsics`, `Extrinsics`, `Calibrator`, `GrayCode`. OpenCV is successfully integrated privately.
+- **Calibration module**: `Intrinsics`, `Extrinsics`, `Calibrator`, `GrayCode` (Powered privately by OpenCV).
+- **C-API (M10)**: Opaque handles `pmsdk_mesh_t`, `pmsdk_projector_t`, `pmsdk_warpnode_t` exported cleanly as unmangled `extern "C"` functions.
 
-109 unit tests are currently running and passing under strict `/W4 /WX` on MSVC.
+112 unit tests are currently running and passing under strict `/W4 /WX` on MSVC.
 
 ## How to build here
 
@@ -24,27 +26,32 @@ call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\v
 cmake --preset debug && cmake --build --preset debug && ctest --preset debug
 ```
 
-vcpkg bootstrapped in `third_party/vcpkg`. Dependencies so far: gtest (`tests` feature), `nlohmann-json`, `opencv4`.
+To verify C API exports:
+```bat
+dumpbin /exports build\debug\bin\ProjectionMappingSDKd.dll | findstr pmsdk_
+```
 
 ## Key files
 
-- [include/PMSDK/PMSDK.h](../include/PMSDK/PMSDK.h) — umbrella header
-- [include/PMSDK/Calibration/](../include/PMSDK/Calibration/) — new camera and calibration headers.
-- [vcpkg.json](../vcpkg.json) — uses `opencv4`.
+- [include/PMSDK/PMSDK.h](../include/PMSDK/PMSDK.h) — umbrella C++ header
+- [include/PMSDK/PMSDK_C.h](../include/PMSDK/PMSDK_C.h) — umbrella C header
+- [include/PMSDK/C_API/](../include/PMSDK/C_API/) — C-API declarations
+- [src/C_API/](../src/C_API/) — C-API wrappers
 
 ## Conventions locked in (see decisions.md D-001…D-017)
 
 - Namespace `pmsdk` (internal: `pmsdk::detail`).
-- Export pattern: classes NOT dllexported; each public method carries `PMSDK_API` (avoids MSVC C4251 warnings). PImpl members stay private. 
+- Export pattern: classes NOT dllexported; each public method carries `PMSDK_API` (avoids MSVC C4251 warnings).
+- **C-API Architecture (M10)**: Pure C-linkage, opaque structs, no exceptions. Internal `std::shared_ptr` ownership is handled by allocating a thin wrapper struct internally.
 - `pmsdk_apply_compiler_options()` on every target; builds must stay clean under `/W4 /WX`.
-- **Serialization Architecture**: `nlohmann::json` is completely hidden from the public ABI.
-- **Calibration Architecture**: OpenCV is dynamically/privately linked via vcpkg. We completely hide `cv::Mat` from the public APIs, instead defining our own `Intrinsics`/`Extrinsics` structs, which wrap vectors and matrices. This ensures P/Invoke and external users do not need OpenCV.
 
-## Next recommended task — Milestone 10 (Public C API)
+## Next recommended task — Milestone 11 (Unit Tests)
 
-With all core logic (geometry, warping, blending, serialization, calibration) written in Modern C++20, it is now time to write the **C API Wrapper** layer so other languages (Unity C#, Unreal Engine C++, Python, Godot) can consume it safely across ABI boundaries.
+The system works and tests cover the happy path (112 tests). The next step is a deep unit test sweep to hit 90%+ code coverage, particularly testing edge cases in `DeformationField`, edge blending bounds, and malformed JSON payloads in serialization.
 
-## Modified files (Milestone 9)
+## Modified files (Milestone 10)
 
-New: `Calibration/Intrinsics.h/.cpp`, `Calibration/Extrinsics.h/.cpp`, `Calibration/Calibrator.h/.cpp`, `Calibration/GrayCode.h/.cpp` + Tests.
-Changed: `vcpkg.json`, `include/PMSDK/PMSDK.h`, `src/CMakeLists.txt`, `tests/CMakeLists.txt`, docs.
+New: `include/PMSDK/C_API/Types.h`, `GeometryAPI.h`, `WarpAPI.h`, `PMSDK_C.h`
+New: `src/C_API/GeometryAPI.cpp`, `WarpAPI.cpp`
+New: `tests/C_API/GeometryAPITests.cpp`
+Modified: `src/CMakeLists.txt`, `tests/CMakeLists.txt`, `include/PMSDK/PMSDK.h`

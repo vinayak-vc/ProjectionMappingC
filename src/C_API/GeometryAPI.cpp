@@ -69,6 +69,41 @@ PMSDK_API pmsdk_status_t pmsdk_mesh_recalculate_normals(pmsdk_mesh_t* mesh) {
     }
 }
 
+PMSDK_API pmsdk_status_t pmsdk_mesh_get_vertices(const pmsdk_mesh_t* mesh, pmsdk_vertex_t* out_vertices, size_t count) {
+    if (!mesh || !out_vertices) {
+        return PMSDK_ERROR_INVALID_ARGUMENT;
+    }
+
+    auto* m = reinterpret_cast<const pmsdk::Geometry::Mesh*>(mesh);
+    auto vertices = m->GetVertices();
+    
+    if (count > vertices.size()) {
+        count = vertices.size();
+    }
+
+    // pmsdk_vertex_t matches pmsdk::Geometry::Vertex layout exactly
+    std::memcpy(out_vertices, vertices.data(), count * sizeof(pmsdk_vertex_t));
+
+    return PMSDK_SUCCESS;
+}
+
+PMSDK_API pmsdk_status_t pmsdk_mesh_get_indices(const pmsdk_mesh_t* mesh, uint32_t* out_indices, size_t count) {
+    if (!mesh || !out_indices) {
+        return PMSDK_ERROR_INVALID_ARGUMENT;
+    }
+
+    auto* m = reinterpret_cast<const pmsdk::Geometry::Mesh*>(mesh);
+    auto indices = m->GetIndices();
+    
+    if (count > indices.size()) {
+        count = indices.size();
+    }
+
+    std::memcpy(out_indices, indices.data(), count * sizeof(uint32_t));
+
+    return PMSDK_SUCCESS;
+}
+
 PMSDK_API pmsdk_status_t pmsdk_mesh_clear(pmsdk_mesh_t* mesh) {
     if (!mesh) return PMSDK_ERROR_INVALID_ARGUMENT;
     try {

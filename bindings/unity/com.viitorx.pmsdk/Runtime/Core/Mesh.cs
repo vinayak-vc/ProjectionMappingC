@@ -80,6 +80,30 @@ namespace vxpmsdk.Core
             PMSDKException.ThrowIfFailed(status, "Failed to set indices on mesh.");
         }
 
+        public pmsdk_vertex_t[] GetVertices()
+        {
+            CheckDisposed();
+            int count = VertexCount;
+            if (count == 0) return new pmsdk_vertex_t[0];
+
+            pmsdk_vertex_t[] vertices = new pmsdk_vertex_t[count];
+            var status = NativeBindings.pmsdk_mesh_get_vertices(Handle, vertices, (UIntPtr)count);
+            PMSDKException.ThrowIfFailed(status, "Failed to get vertices from mesh.");
+            return vertices;
+        }
+
+        public uint[] GetIndices()
+        {
+            CheckDisposed();
+            int count = IndexCount;
+            if (count == 0) return new uint[0];
+
+            uint[] indices = new uint[count];
+            var status = NativeBindings.pmsdk_mesh_get_indices(Handle, indices, (UIntPtr)count);
+            PMSDKException.ThrowIfFailed(status, "Failed to get indices from mesh.");
+            return indices;
+        }
+
         public int VertexCount
         {
             get

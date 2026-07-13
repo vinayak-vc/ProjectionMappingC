@@ -57,6 +57,24 @@ PMSDK_API size_t pmsdk_mesh_get_index_count(const pmsdk_mesh_t* mesh);
 PMSDK_API pmsdk_status_t pmsdk_mesh_recalculate_normals(pmsdk_mesh_t* mesh);
 
 /**
+ * @brief Retrieves the vertices of the mesh.
+ * @param mesh The handle to the mesh.
+ * @param out_vertices Array to store the vertices. Must be pre-allocated to at least `count`.
+ * @param count Number of vertices to retrieve.
+ * @return PMSDK_SUCCESS on success, or an error code on failure.
+ */
+PMSDK_API pmsdk_status_t pmsdk_mesh_get_vertices(const pmsdk_mesh_t* mesh, pmsdk_vertex_t* out_vertices, size_t count);
+
+/**
+ * @brief Retrieves the indices of the mesh.
+ * @param mesh The handle to the mesh.
+ * @param out_indices Array to store the indices. Must be pre-allocated to at least `count`.
+ * @param count Number of indices to retrieve.
+ * @return PMSDK_SUCCESS on success, or an error code on failure.
+ */
+PMSDK_API pmsdk_status_t pmsdk_mesh_get_indices(const pmsdk_mesh_t* mesh, uint32_t* out_indices, size_t count);
+
+/**
  * @brief Clears all vertices and indices from the mesh.
  * @param mesh The handle to the mesh.
  * @return PMSDK_SUCCESS on success, or an error code on failure.

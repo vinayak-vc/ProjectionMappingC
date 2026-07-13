@@ -128,22 +128,22 @@ namespace vxpmsdk
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern void pmsdk_projector_destroy(IntPtr projector);
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern pmsdk_status_t pmsdk_projector_set_aspect_ratio(IntPtr projector, float ratio);
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern pmsdk_status_t pmsdk_projector_set_throw_ratio(IntPtr projector, float ratio);
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr pmsdk_warpnode_create();
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern void pmsdk_warpnode_destroy(IntPtr node);
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern pmsdk_status_t pmsdk_warpnode_add_child(IntPtr parent, IntPtr child);
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern pmsdk_status_t pmsdk_warpnode_process_mesh(IntPtr node, IntPtr input_mesh, IntPtr output_mesh);
     }
 }

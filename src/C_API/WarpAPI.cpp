@@ -18,7 +18,7 @@ struct C_WarpNode {
 
 extern "C" {
 
-pmsdk_projector_t* pmsdk_projector_create(void) {
+PMSDK_API pmsdk_projector_t* pmsdk_projector_create(void) {
     try {
         auto* wrapper = new C_Projector();
         wrapper->ptr = std::make_shared<Projector>();
@@ -28,26 +28,25 @@ pmsdk_projector_t* pmsdk_projector_create(void) {
     }
 }
 
-void pmsdk_projector_destroy(pmsdk_projector_t* projector) {
+PMSDK_API void pmsdk_projector_destroy(pmsdk_projector_t* projector) {
     if (projector) {
         delete reinterpret_cast<C_Projector*>(projector);
     }
 }
 
-pmsdk_status_t pmsdk_projector_set_aspect_ratio(pmsdk_projector_t* projector, float aspect) {
+PMSDK_API pmsdk_status_t pmsdk_projector_set_aspect_ratio(pmsdk_projector_t* projector, float aspect) {
     if (!projector) return PMSDK_ERROR_INVALID_ARGUMENT;
     reinterpret_cast<C_Projector*>(projector)->ptr->SetAspectRatio(aspect);
     return PMSDK_SUCCESS;
 }
 
-pmsdk_status_t pmsdk_projector_set_throw_ratio(pmsdk_projector_t* projector, float ratio) {
+PMSDK_API pmsdk_status_t pmsdk_projector_set_throw_ratio(pmsdk_projector_t* projector, float ratio) {
     if (!projector) return PMSDK_ERROR_INVALID_ARGUMENT;
     reinterpret_cast<C_Projector*>(projector)->ptr->SetThrowRatio(ratio);
     return PMSDK_SUCCESS;
 }
 
-
-pmsdk_warpnode_t* pmsdk_warpnode_create(void) {
+PMSDK_API pmsdk_warpnode_t* pmsdk_warpnode_create(void) {
     try {
         auto* wrapper = new C_WarpNode();
         wrapper->ptr = std::make_shared<WarpNode>();
@@ -57,13 +56,13 @@ pmsdk_warpnode_t* pmsdk_warpnode_create(void) {
     }
 }
 
-void pmsdk_warpnode_destroy(pmsdk_warpnode_t* node) {
+PMSDK_API void pmsdk_warpnode_destroy(pmsdk_warpnode_t* node) {
     if (node) {
         delete reinterpret_cast<C_WarpNode*>(node);
     }
 }
 
-pmsdk_status_t pmsdk_warpnode_add_child(pmsdk_warpnode_t* parent, pmsdk_warpnode_t* child) {
+PMSDK_API pmsdk_status_t pmsdk_warpnode_add_child(pmsdk_warpnode_t* parent, pmsdk_warpnode_t* child) {
     if (!parent || !child) return PMSDK_ERROR_INVALID_ARGUMENT;
     try {
         auto* parentWrapper = reinterpret_cast<C_WarpNode*>(parent);
@@ -75,7 +74,7 @@ pmsdk_status_t pmsdk_warpnode_add_child(pmsdk_warpnode_t* parent, pmsdk_warpnode
     }
 }
 
-pmsdk_status_t pmsdk_warpnode_process_mesh(pmsdk_warpnode_t* node, const pmsdk_mesh_t* input_mesh, pmsdk_mesh_t* output_mesh) {
+PMSDK_API pmsdk_status_t pmsdk_warpnode_process_mesh(pmsdk_warpnode_t* node, const pmsdk_mesh_t* input_mesh, pmsdk_mesh_t* output_mesh) {
     if (!node || !input_mesh || !output_mesh) return PMSDK_ERROR_INVALID_ARGUMENT;
     try {
         auto* nodeWrapper = reinterpret_cast<C_WarpNode*>(node);
@@ -84,8 +83,13 @@ pmsdk_status_t pmsdk_warpnode_process_mesh(pmsdk_warpnode_t* node, const pmsdk_m
         
         auto processed = nodeWrapper->ptr->ProcessMesh(*cpp_input);
         if (processed) {
-            cpp_output->SetVertices(processed->GetVertices());
-            cpp_output->SetIndices(processed->GetIndices());
+            size_t v_count = 0;
+            auto* verts = processed->GetVertices(&v_count);
+            cpp_output->SetVertices(verts, v_count);
+            
+            size_t i_count = 0;
+            auto* idxs = processed->GetIndices(&i_count);
+            cpp_output->SetIndices(idxs, i_count);
         }
         return PMSDK_SUCCESS;
     } catch (...) {

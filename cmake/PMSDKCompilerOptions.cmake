@@ -3,6 +3,7 @@
 function(pmsdk_apply_compiler_options target)
     target_compile_features(${target} PUBLIC cxx_std_20)
     set_target_properties(${target} PROPERTIES
+        CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF)
 
@@ -13,7 +14,8 @@ function(pmsdk_apply_compiler_options target)
             /utf-8
             /Zc:__cplusplus
             /Zc:preprocessor
-            /EHsc)
+            /EHsc
+            /arch:AVX2)
         if(PMSDK_WARNINGS_AS_ERRORS)
             target_compile_options(${target} PRIVATE /WX)
         endif()
@@ -24,7 +26,8 @@ function(pmsdk_apply_compiler_options target)
             -Wpedantic
             -Wshadow
             -Wconversion
-            -Wsign-conversion)
+            -Wsign-conversion
+            -mavx2)
         if(PMSDK_WARNINGS_AS_ERRORS)
             target_compile_options(${target} PRIVATE -Werror)
         endif()

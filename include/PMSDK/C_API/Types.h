@@ -25,10 +25,23 @@ typedef enum {
 
 /** @brief Opaque handle to a Mesh object. */
 typedef struct pmsdk_mesh_t pmsdk_mesh_t;
-/** @brief Opaque handle to a Projector object. */
-typedef struct pmsdk_projector_t pmsdk_projector_t;
-/** @brief Opaque handle to a WarpNode object. */
 typedef struct pmsdk_warpnode_t pmsdk_warpnode_t;
+typedef struct pmsdk_projector_t pmsdk_projector_t;
+typedef struct pmsdk_blendconfig_t pmsdk_blendconfig_t;
+typedef struct pmsdk_edgeblend_t pmsdk_edgeblend_t;
+typedef struct pmsdk_calibrator_t pmsdk_calibrator_t;
+typedef struct pmsdk_graycode_t pmsdk_graycode_t;
+typedef struct pmsdk_decoder_t pmsdk_decoder_t;
+
+/**
+ * @brief Interpolation curve types for edge blending.
+ */
+typedef enum pmsdk_curve_type_t {
+    PMSDK_CURVE_LINEAR = 0,
+    PMSDK_CURVE_POWER = 1,
+    PMSDK_CURVE_SMOOTHSTEP = 2
+} pmsdk_curve_type_t;
+
 /** @brief Opaque handle to a DeformationField object. */
 typedef struct pmsdk_deformationfield_t pmsdk_deformationfield_t;
 

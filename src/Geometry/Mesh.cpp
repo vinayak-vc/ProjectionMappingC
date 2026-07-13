@@ -1,5 +1,7 @@
 #include "PMSDK/Geometry/Mesh.h"
 #include <vector>
+#include <execution>
+#include <numeric>
 
 namespace pmsdk::Geometry {
 
@@ -13,28 +15,36 @@ Mesh::~Mesh() = default;
 Mesh::Mesh(Mesh&& other) noexcept = default;
 Mesh& Mesh::operator=(Mesh&& other) noexcept = default;
 
-void Mesh::SetVertices(std::span<const Vertex> vertices) {
-    m_impl->vertices.assign(vertices.begin(), vertices.end());
+void Mesh::SetVertices(const Vertex* vertices, size_t count) {
+    if (count > 0 && vertices != nullptr) {
+        m_impl->vertices.assign(vertices, vertices + count);
+    }
 }
 
-void Mesh::SetIndices(std::span<const uint32_t> indices) {
-    m_impl->indices.assign(indices.begin(), indices.end());
+void Mesh::SetIndices(const uint32_t* indices, size_t count) {
+    if (count > 0 && indices != nullptr) {
+        m_impl->indices.assign(indices, indices + count);
+    }
 }
 
-std::span<const Vertex> Mesh::GetVertices() const {
-    return m_impl->vertices;
+const Vertex* Mesh::GetVertices(size_t* out_count) const {
+    if (out_count) *out_count = m_impl->vertices.size();
+    return m_impl->vertices.data();
 }
 
-std::span<const uint32_t> Mesh::GetIndices() const {
-    return m_impl->indices;
+const uint32_t* Mesh::GetIndices(size_t* out_count) const {
+    if (out_count) *out_count = m_impl->indices.size();
+    return m_impl->indices.data();
 }
 
-std::span<Vertex> Mesh::GetVerticesMutable() {
-    return m_impl->vertices;
+Vertex* Mesh::GetVerticesMutable(size_t* out_count) {
+    if (out_count) *out_count = m_impl->vertices.size();
+    return m_impl->vertices.data();
 }
 
-std::span<uint32_t> Mesh::GetIndicesMutable() {
-    return m_impl->indices;
+uint32_t* Mesh::GetIndicesMutable(size_t* out_count) {
+    if (out_count) *out_count = m_impl->indices.size();
+    return m_impl->indices.data();
 }
 
 size_t Mesh::GetVertexCount() const {
@@ -53,9 +63,9 @@ void Mesh::Clear() {
 void Mesh::RecalculateNormals() {
     if (m_impl->indices.empty() || m_impl->vertices.empty()) return;
 
-    for (auto& v : m_impl->vertices) {
+    std::for_each(std::execution::par_unseq, m_impl->vertices.begin(), m_impl->vertices.end(), [](auto& v) {
         v.normal = Math::Vector3(0.0f, 0.0f, 0.0f);
-    }
+    });
 
     for (size_t i = 0; i < m_impl->indices.size(); i += 3) {
         if (i + 2 >= m_impl->indices.size()) break;
@@ -79,17 +89,34 @@ void Mesh::RecalculateNormals() {
         m_impl->vertices[i2].normal += normal;
     }
 
-    for (auto& v : m_impl->vertices) {
+    std::for_each(std::execution::par_unseq, m_impl->vertices.begin(), m_impl->vertices.end(), [](auto& v) {
         v.normal.Normalize();
-    }
+    });
 }
 
 Math::BoundingBox Mesh::CalculateBounds() const {
-    Math::BoundingBox bounds;
-    for (const auto& v : m_impl->vertices) {
-        bounds.Expand(v.position);
-    }
-    return bounds;
+    if (m_impl->vertices.empty()) return Math::BoundingBox{};
+
+    return std::transform_reduce(
+        std::execution::par_unseq,
+        m_impl->vertices.begin(), m_impl->vertices.end(),
+        Math::BoundingBox{},
+        [](const Math::BoundingBox& a, const Math::BoundingBox& b) {
+            Math::BoundingBox res = a;
+            if (b.min.x < res.min.x) res.min.x = b.min.x;
+            if (b.min.y < res.min.y) res.min.y = b.min.y;
+            if (b.min.z < res.min.z) res.min.z = b.min.z;
+            if (b.max.x > res.max.x) res.max.x = b.max.x;
+            if (b.max.y > res.max.y) res.max.y = b.max.y;
+            if (b.max.z > res.max.z) res.max.z = b.max.z;
+            return res;
+        },
+        [](const Vertex& v) {
+            Math::BoundingBox b;
+            b.Expand(v.position);
+            return b;
+        }
+    );
 }
 
 } // namespace pmsdk::Geometry

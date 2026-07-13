@@ -1,25 +1,23 @@
 # AI Agent Handoff Document
 
-## Current State (2026-07-10)
+## Current State (2026-07-13)
 
-**Last Completed Milestone**: Milestone 12 (Documentation/Doxygen)
-**Current Task**: Ready for Milestone 13 (Unity wrapper) or other backlog tasks.
+**Last Completed Milestone**: Milestone 17 (GrayCode Decoder & Triangulation)
+**Current Task**: Ready for Milestone 18 (Performance optimization).
 
 ## What was just done
-- Created a `Doxyfile` and `docs/api.md` overview.
-- Added comprehensive standard Doxygen blocks (`@brief`, `@param`, `@return`) to the core C++ headers (`Mesh`, `WarpNode`, `Projector`, `DeformationField`, `BlendConfig`, `EdgeBlend`, `Serialization`).
-- Added Doxygen blocks to the public C-API headers (`Types.h`, `GeometryAPI.h`, `WarpAPI.h`).
-- Created a GitHub Actions workflow (`.github/workflows/doxygen.yml`) to automatically generate and deploy HTML documentation to GitHub Pages.
+- **Milestone 16 Completed**: Added Advanced OpenCV Calibration Wrappers. Enabled the SDK to perform physical camera intrinsic/extrinsic calibration and calculate reprojection errors directly inside C++.
+- **Milestone 17 Completed**: Built the `GrayCodeDecoder` core which automatically un-gray-codes captured images to find exact projector pixel mappings and then triangulates them using OpenCV. Added ability for the SDK to perform direct camera captures (`cv::VideoCapture`) to bypass Unity's main thread entirely.
+- Both features were exposed via the C-API and Unity bindings (`NativeBindings.cs`, `Calibration.cs`).
 
-## Next Recommended Task (Milestone 13 or Backlog)
-1. Proceed with **Milestone 13**: Creating a Unity package wrapper using `DllImport` to consume the C-API.
-2. Alternatively, address backlog items like version header generation via CMake (`configure_file`).
+## Next Recommended Task (Milestone 18)
+1. Proceed with **Milestone 18**: Performance optimization (SIMD, multithreading, or GPU compute for the Warp mesh deformations).
+2. Or tackle **Milestone 19**: Plugin SDK.
 
 ## Project Structure Notes
-- The C-API uses `_create()` and `_destroy()` semantics. Clients must manage handle lifetimes.
-- Internal details (e.g., OpenCV types in Calibration) are tightly scoped to implementation files and not exported in headers.
-- Doxygen handles all `pmsdk::` namespaces and `pmsdk_*` C-API functions.
+- The DLL is completely self-contained.
+- Unity wrapper expects `ProjectionMappingSDK.dll` in its plugins directory.
+- Unreal wrapper uses the standard ThirdParty plugin structure to load the DLL.
 
 ## Commands
-Build: `cmake --build --preset debug`
-Test: `ctest --preset debug`
+Build C++ core: `cmake --preset vs2022` then `cmake --build build/vs2022 --config Release`

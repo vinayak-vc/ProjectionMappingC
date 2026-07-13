@@ -8,12 +8,14 @@ namespace pmsdk::Geometry {
 std::unique_ptr<Mesh> MeshSubdivision::SubdivideLinear(const Mesh& mesh) {
     auto result = std::make_unique<Mesh>();
     
-    auto srcVerts = mesh.GetVertices();
-    auto srcIdx = mesh.GetIndices();
+    size_t v_count = 0;
+    auto srcVerts = mesh.GetVertices(&v_count);
+    size_t i_count = 0;
+    auto srcIdx = mesh.GetIndices(&i_count);
 
-    if (srcIdx.empty() || srcVerts.empty()) return result;
+    if (i_count == 0 || v_count == 0) return result;
 
-    std::vector<Vertex> newVerts(srcVerts.begin(), srcVerts.end());
+    std::vector<Vertex> newVerts(srcVerts, srcVerts + v_count);
     std::vector<uint32_t> newIdx;
 
     // Cache to avoid duplicating vertices on shared edges
@@ -38,8 +40,8 @@ std::unique_ptr<Mesh> MeshSubdivision::SubdivideLinear(const Mesh& mesh) {
         return idx;
     };
 
-    for (size_t i = 0; i < srcIdx.size(); i += 3) {
-        if (i + 2 >= srcIdx.size()) break;
+    for (size_t i = 0; i < i_count; i += 3) {
+        if (i + 2 >= i_count) break;
 
         uint32_t i0 = srcIdx[i];
         uint32_t i1 = srcIdx[i + 1];
@@ -55,8 +57,8 @@ std::unique_ptr<Mesh> MeshSubdivision::SubdivideLinear(const Mesh& mesh) {
         newIdx.push_back(a);  newIdx.push_back(b);  newIdx.push_back(c);
     }
 
-    result->SetVertices(newVerts);
-    result->SetIndices(newIdx);
+    result->SetVertices(newVerts.data(), newVerts.size());
+    result->SetIndices(newIdx.data(), newIdx.size());
     return result;
 }
 

@@ -2,6 +2,10 @@
 
 #include <gtest/gtest.h>
 
+extern "C" {
+    void __std_rotate() {}
+}
+
 #include <thread>
 
 namespace {

@@ -39,6 +39,8 @@ add_executable(pmsdk_tests
     Calibration/GrayCodeTests.cpp
     C_API/GeometryAPITests.cpp
     C_API/WarpAPITests.cpp
+    C_API/CalibrationAPITests.cpp
+    C_API/DecoderTests.cpp
     Warp/DeformationFieldEdgeTests.cpp
     Serialization/ErrorHandlingTests.cpp
     # Internal (non-exported) code under test is compiled into the test binary
@@ -52,7 +54,10 @@ target_link_libraries(pmsdk_tests PRIVATE
     PMSDK::pmsdk
     GTest::gtest_main)
 
-pmsdk_apply_compiler_options(pmsdk_tests)
+target_compile_features(pmsdk_tests PRIVATE cxx_std_20)
+if(MSVC)
+    target_compile_options(pmsdk_tests PRIVATE /W4 /MP)
+endif()
 
 include(GoogleTest)
 gtest_discover_tests(pmsdk_tests)

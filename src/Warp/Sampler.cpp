@@ -4,11 +4,13 @@
 namespace pmsdk::Warp {
 
 Math::Vector2 Sampler::SampleUVAtPoint(const Geometry::Mesh& mesh, uint32_t faceIndex, const Math::Vector3& pointOnFace) {
-    auto vertices = mesh.GetVertices();
-    auto indices = mesh.GetIndices();
+    size_t v_count = 0;
+    auto vertices = mesh.GetVertices(&v_count);
+    size_t i_count = 0;
+    auto indices = mesh.GetIndices(&i_count);
 
     size_t startIdx = faceIndex * 3;
-    if (startIdx + 2 >= indices.size()) return {0.0f, 0.0f};
+    if (startIdx + 2 >= i_count) return {0.0f, 0.0f};
 
     const auto& v0 = vertices[indices[startIdx]];
     const auto& v1 = vertices[indices[startIdx + 1]];

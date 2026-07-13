@@ -37,10 +37,11 @@ TEST(WarpNodeTests, ProcessMesh) {
     auto warped = node.ProcessMesh(*baseMesh);
 
     // Resulting mesh should be shifted by +10 in Y
-    auto verts = warped->GetVertices();
+    size_t v_count = 0;
+    auto verts = warped->GetVertices(&v_count);
     // Original plane bounds are -0.5 to 0.5. Y should now be 9.5 to 10.5
-    for(const auto& v : verts) {
-        EXPECT_GE(v.position.y, 9.49f);
-        EXPECT_LE(v.position.y, 10.51f);
+    for(size_t i = 0; i < v_count; ++i) {
+        EXPECT_GE(verts[i].position.y, 9.49f);
+        EXPECT_LE(verts[i].position.y, 10.51f);
     }
 }

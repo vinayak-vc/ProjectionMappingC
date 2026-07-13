@@ -95,15 +95,17 @@ BVH::BVH() : m_impl(std::make_unique<Impl>()) {}
 BVH::~BVH() = default;
 
 void BVH::Build(const Mesh& mesh) {
-    auto verts = mesh.GetVertices();
-    auto idx = mesh.GetIndices();
-    if (idx.empty() || verts.empty()) return;
+    size_t v_count = 0;
+    auto verts = mesh.GetVertices(&v_count);
+    size_t i_count = 0;
+    auto idx = mesh.GetIndices(&i_count);
+    if (i_count == 0 || v_count == 0) return;
 
     m_impl->triangles.clear();
     m_impl->nodes.clear();
 
-    for (size_t i = 0; i < idx.size(); i += 3) {
-        if (i + 2 >= idx.size()) break;
+    for (size_t i = 0; i < i_count; i += 3) {
+        if (i + 2 >= i_count) break;
         BVHTriangle tri;
         tri.v0 = verts[idx[i]].position;
         tri.v1 = verts[idx[i+1]].position;

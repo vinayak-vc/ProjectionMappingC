@@ -29,16 +29,16 @@ DynamicMesh::~DynamicMesh() = default;
 
 void DynamicMesh::FromMesh(const Mesh& mesh) {
     Clear();
-    auto verts = mesh.GetVertices();
-    auto idx = mesh.GetIndices();
+    size_t v_count = 0;
+    auto verts = mesh.GetVertices(&v_count);
+    size_t i_count = 0;
+    auto idx = mesh.GetIndices(&i_count);
 
-    for (const auto& v : verts) {
-        AddVertex(v);
-    }
-
-    for (size_t i = 0; i < idx.size(); i += 3) {
-        if (i + 2 >= idx.size()) break;
-        AddFace(idx[i], idx[i+1], idx[i+2]);
+    for (size_t i = 0; i < v_count; ++i) AddVertex(verts[i]);
+    for (size_t i = 0; i < i_count; i += 3) {
+        if (i + 2 < i_count) {
+            AddFace(idx[i], idx[i+1], idx[i+2]);
+        }
     }
 }
 
@@ -70,8 +70,8 @@ std::unique_ptr<Mesh> DynamicMesh::ToMesh() const {
         }
     }
 
-    mesh->SetVertices(verts);
-    mesh->SetIndices(idx);
+    mesh->SetVertices(verts.data(), verts.size());
+    mesh->SetIndices(idx.data(), idx.size());
     return mesh;
 }
 

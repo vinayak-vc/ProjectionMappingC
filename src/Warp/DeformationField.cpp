@@ -1,4 +1,6 @@
 #include "PMSDK/Warp/DeformationField.h"
+#include <execution>
+#include <algorithm>
 
 namespace pmsdk::Warp {
 
@@ -29,27 +31,36 @@ Geometry::GridWarp* DeformationField::GetGridWarp() {
 
 std::unique_ptr<Geometry::Mesh> DeformationField::ApplyDeformation(const Geometry::Mesh& baseMesh) const {
     auto result = std::make_unique<Geometry::Mesh>();
-    auto origVerts = baseMesh.GetVertices();
-    auto origIdx = baseMesh.GetIndices();
+    size_t v_count = 0;
+    auto vertices = baseMesh.GetVertices(&v_count);
+    size_t i_count = 0;
+    auto indices = baseMesh.GetIndices(&i_count);
 
-    std::vector<Geometry::Vertex> newVerts(origVerts.begin(), origVerts.end());
-    std::vector<uint32_t> newIdx(origIdx.begin(), origIdx.end());
+    if (v_count == 0) return nullptr;
+
+    result->SetVertices(vertices, v_count);
+    result->SetIndices(indices, i_count);
+
+    ApplyDeformationInPlace(*result);
+    return result;
+}
+
+void DeformationField::ApplyDeformationInPlace(Geometry::Mesh& mesh) const {
+    size_t v_count = 0;
+    auto verts = mesh.GetVerticesMutable(&v_count);
+    if (v_count == 0) return;
 
     if (m_impl->type == DeformationType::Bezier) {
-        for (auto& v : newVerts) {
-            // Assume the mesh's UV coordinates map 0-1 to the full patch area.
+        std::for_each(std::execution::par_unseq, verts, verts + v_count, [this](auto& v) {
             v.position = m_impl->bezierPatch.Evaluate(v.uv.x, v.uv.y);
-        }
+        });
     } else if (m_impl->type == DeformationType::Grid) {
-        for (auto& v : newVerts) {
+        std::for_each(std::execution::par_unseq, verts, verts + v_count, [this](auto& v) {
             v.position = m_impl->gridWarp.Evaluate(v.uv.x, v.uv.y);
-        }
+        });
     }
-
-    result->SetVertices(newVerts);
-    result->SetIndices(newIdx);
-    result->RecalculateNormals(); // Recompute normals for the deformed mesh
-    return result;
+    
+    mesh.RecalculateNormals();
 }
 
 } // namespace pmsdk::Warp

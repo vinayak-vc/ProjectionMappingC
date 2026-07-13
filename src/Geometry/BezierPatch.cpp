@@ -7,28 +7,45 @@ struct BezierPatch::Impl {
     Math::Vector3 controlPoints[16];
 
     Math::Vector3 Evaluate(float u, float v) const {
-        // Evaluate 4 bezier curves along the V direction (columns)
-        BezierCurve curves[4];
+        // Compute Bernstein basis polynomials for u
+        float u1 = 1.0f - u;
+        float u1_2 = u1 * u1;
+        float u1_3 = u1_2 * u1;
+        float u2 = u * u;
+        float u3 = u2 * u;
+
+        float bu[4] = {
+            u1_3,
+            3.0f * u * u1_2,
+            3.0f * u2 * u1,
+            u3
+        };
+
+        // Compute Bernstein basis polynomials for v
+        float v1 = 1.0f - v;
+        float v1_2 = v1 * v1;
+        float v1_3 = v1_2 * v1;
+        float v2 = v * v;
+        float v3 = v2 * v;
+
+        float bv[4] = {
+            v1_3,
+            3.0f * v * v1_2,
+            3.0f * v2 * v1,
+            v3
+        };
+
+        Math::Vector3 result(0.0f, 0.0f, 0.0f);
+        
+        // Sum the 16 control points weighted by the basis functions
         for (int i = 0; i < 4; ++i) {
-            curves[i].p0 = controlPoints[i * 4 + 0];
-            curves[i].p1 = controlPoints[i * 4 + 1];
-            curves[i].p2 = controlPoints[i * 4 + 2];
-            curves[i].p3 = controlPoints[i * 4 + 3];
+            for (int j = 0; j < 4; ++j) {
+                // i maps to u (columns), j maps to v (rows)
+                result += controlPoints[i * 4 + j] * (bu[i] * bv[j]);
+            }
         }
-
-        Math::Vector3 p0 = curves[0].Evaluate(u);
-        Math::Vector3 p1 = curves[1].Evaluate(u);
-        Math::Vector3 p2 = curves[2].Evaluate(u);
-        Math::Vector3 p3 = curves[3].Evaluate(u);
-
-        // Evaluate the resulting curve along the U direction
-        BezierCurve finalCurve;
-        finalCurve.p0 = p0;
-        finalCurve.p1 = p1;
-        finalCurve.p2 = p2;
-        finalCurve.p3 = p3;
-
-        return finalCurve.Evaluate(v);
+        
+        return result;
     }
 };
 
@@ -86,8 +103,8 @@ std::unique_ptr<Mesh> BezierPatch::GenerateMesh(int resolutionX, int resolutionY
         }
     }
 
-    mesh->SetVertices(vertices);
-    mesh->SetIndices(indices);
+    mesh->SetVertices(vertices.data(), vertices.size());
+    mesh->SetIndices(indices.data(), indices.size());
     mesh->RecalculateNormals();
     return mesh;
 }

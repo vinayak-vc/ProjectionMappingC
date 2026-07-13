@@ -19,7 +19,7 @@ before the next begins.
 | 12 | Documentation (Doxygen) | ✅ done (2026-07-10) |
 | 13 | Unity wrapper | ✅ done (2026-07-11) |
 | 14 | Unreal wrapper | pending |
-| 15 | Sample applications | pending |
+| 15 | Sample applications | ✅ done (2026-07-13) |
 | 16 | Performance optimization | pending |
 | 17 | Plugin SDK | pending |
 | 18 | Release packaging | pending |

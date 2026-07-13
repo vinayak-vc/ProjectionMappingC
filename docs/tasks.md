@@ -84,11 +84,13 @@
 - [x] Ensure C-linkage (`extern "C"`) is completely PImpl-based to allow Python/C#/Unity consumption
 
 ## Done
+- Milestone 15: Sample applications (Unity Interactive Guided Setup Wizard)
 - Milestone 13: Unity Wrapper (`vxpmsdk`)
 - Milestone 12: Documentation (Doxygen)
 - Milestone 11: Unit tests (full sweep to 90% coverage)
 - Milestone 10: Public C API
 
 ## Next Items / Backlog
+- [ ] Milestone 14: Unreal Wrapper
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Code coverage job in CI

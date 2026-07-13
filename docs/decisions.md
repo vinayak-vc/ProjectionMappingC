@@ -91,3 +91,7 @@ To balance rendering performance and editing flexibility, we provide two separat
 ## D-017 2026-07-10 — Warp Node Hierarchy
 
 The projection mapping structure uses a hierarchical Scene Graph for warped surfaces (`WarpNode`). Each node has a local transform and an optional `DeformationField` (Bezier or Grid warp). This mimics the standard slice-grouping mechanisms found in Resolume Arena and MadMapper, allowing complex grouped spatial transforms applied on top of individual deformations.
+
+## D-018 2026-07-13 — C-API exposure of Mesh getters and BlendConfig
+
+To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.

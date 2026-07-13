@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "ProjectionMapping",
+	"Description": "Projection Mapping SDK Wrapper for Unreal Engine",
+	"Category": "Rendering",
+	"CreatedBy": "ViitorCloud",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "ProjectionMapping",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

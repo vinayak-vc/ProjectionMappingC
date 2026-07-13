@@ -3,7 +3,7 @@
 #include "PMSDK/Core/Export.h"
 #include "PMSDK/Geometry/Vertex.h"
 #include "PMSDK/Math/BoundingBox.h"
-#include <span>
+// No span in C++17
 #include <memory>
 #include <cstdint>
 
@@ -35,25 +35,25 @@ public:
      * @brief Sets the vertex data for this mesh.
      * @param vertices Span of vertices to copy into the mesh.
      */
-    PMSDK_API void SetVertices(std::span<const Vertex> vertices);
+    PMSDK_API void SetVertices(const Vertex* vertices, size_t count);
     
     /**
      * @brief Sets the index data for this mesh.
      * @param indices Span of 32-bit unsigned indices to copy into the mesh.
      */
-    PMSDK_API void SetIndices(std::span<const uint32_t> indices);
+    PMSDK_API void SetIndices(const uint32_t* indices, size_t count);
 
     /** @return A read-only span of the mesh vertices. */
-    PMSDK_API std::span<const Vertex> GetVertices() const;
+    PMSDK_API const Vertex* GetVertices(size_t* out_count) const;
     
     /** @return A read-only span of the mesh indices. */
-    PMSDK_API std::span<const uint32_t> GetIndices() const;
+    PMSDK_API const uint32_t* GetIndices(size_t* out_count) const;
 
     /** @return A mutable span of the mesh vertices. */
-    PMSDK_API std::span<Vertex> GetVerticesMutable();
+    PMSDK_API Vertex* GetVerticesMutable(size_t* out_count);
     
     /** @return A mutable span of the mesh indices. */
-    PMSDK_API std::span<uint32_t> GetIndicesMutable();
+    PMSDK_API uint32_t* GetIndicesMutable(size_t* out_count);
 
     /** @return The number of vertices in the mesh. */
     PMSDK_API size_t GetVertexCount() const;

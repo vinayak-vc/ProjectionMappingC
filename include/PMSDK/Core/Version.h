@@ -13,7 +13,12 @@ struct Version {
     std::uint32_t minor = 0;
     std::uint32_t patch = 0;
 
-    [[nodiscard]] friend constexpr bool operator==(const Version&, const Version&) = default;
+    [[nodiscard]] friend constexpr bool operator==(const Version& lhs, const Version& rhs) {
+        return lhs.major == rhs.major && lhs.minor == rhs.minor && lhs.patch == rhs.patch;
+    }
+    [[nodiscard]] friend constexpr bool operator!=(const Version& lhs, const Version& rhs) {
+        return !(lhs == rhs);
+    }
 };
 
 /// Compile-time version of the headers this translation unit was built against.

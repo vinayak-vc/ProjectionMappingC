@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cmath>
-#include <concepts>
+
 
 namespace pmsdk::Math {
 

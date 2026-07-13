@@ -20,12 +20,14 @@ namespace pmsdk::Geometry {
 namespace pmsdk::Serialization {
 
 std::string SerializeMesh(const Geometry::Mesh& mesh) {
-    auto verts = mesh.GetVertices();
-    auto idx = mesh.GetIndices();
+    size_t v_count = 0;
+    auto verts = mesh.GetVertices(&v_count);
+    size_t i_count = 0;
+    auto idx = mesh.GetIndices(&i_count);
     
     nlohmann::json j;
-    j["vertices"] = std::vector<Geometry::Vertex>(verts.begin(), verts.end());
-    j["indices"] = std::vector<uint32_t>(idx.begin(), idx.end());
+    j["vertices"] = std::vector<Geometry::Vertex>(verts, verts + v_count);
+    j["indices"] = std::vector<uint32_t>(idx, idx + i_count);
 
     return j.dump(4);
 }
@@ -35,8 +37,8 @@ void DeserializeMesh(const std::string& jsonString, Geometry::Mesh& outMesh) {
     auto verts = j.at("vertices").get<std::vector<Geometry::Vertex>>();
     auto idx = j.at("indices").get<std::vector<uint32_t>>();
     
-    outMesh.SetVertices(verts);
-    outMesh.SetIndices(idx);
+    outMesh.SetVertices(verts.data(), verts.size());
+    outMesh.SetIndices(idx.data(), idx.size());
     outMesh.RecalculateNormals();
 }
 
@@ -51,10 +53,12 @@ void DeserializeDynamicMesh(const std::string& jsonString, Geometry::DynamicMesh
     // Since DynamicMesh takes a static Mesh via conversion, we don't have a fromMesh constructor
     // yet. But we can build it manually.
     outMesh.Clear();
-    auto verts = m.GetVertices();
-    auto idx = m.GetIndices();
-    for (const auto& v : verts) outMesh.AddVertex(v);
-    for (size_t i = 0; i < idx.size(); i += 3) {
+    size_t v_count = 0;
+    auto verts = m.GetVertices(&v_count);
+    size_t i_count = 0;
+    auto idx = m.GetIndices(&i_count);
+    for (size_t i = 0; i < v_count; ++i) outMesh.AddVertex(verts[i]);
+    for (size_t i = 0; i < i_count; i += 3) {
         outMesh.AddFace(idx[i], idx[i+1], idx[i+2]);
     }
 }

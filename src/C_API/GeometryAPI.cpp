@@ -2,7 +2,7 @@
 #include "PMSDK/Geometry/Mesh.h"
 #include "PMSDK/Geometry/Vertex.h"
 #include <new>
-#include <span>
+
 
 using namespace pmsdk;
 using namespace pmsdk::Geometry;
@@ -28,7 +28,7 @@ PMSDK_API pmsdk_status_t pmsdk_mesh_set_vertices(pmsdk_mesh_t* mesh, const pmsdk
     try {
         auto* cpp_mesh = reinterpret_cast<Mesh*>(mesh);
         const auto* cpp_verts = reinterpret_cast<const Vertex*>(vertices);
-        cpp_mesh->SetVertices(std::span<const Vertex>(cpp_verts, count));
+        cpp_mesh->SetVertices(cpp_verts, count);
         return PMSDK_SUCCESS;
     } catch (const std::bad_alloc&) {
         return PMSDK_ERROR_OUT_OF_MEMORY;
@@ -40,7 +40,7 @@ PMSDK_API pmsdk_status_t pmsdk_mesh_set_vertices(pmsdk_mesh_t* mesh, const pmsdk
 PMSDK_API pmsdk_status_t pmsdk_mesh_set_indices(pmsdk_mesh_t* mesh, const uint32_t* indices, size_t count) {
     if (!mesh || !indices) return PMSDK_ERROR_INVALID_ARGUMENT;
     try {
-        reinterpret_cast<Mesh*>(mesh)->SetIndices(std::span<const uint32_t>(indices, count));
+        reinterpret_cast<Mesh*>(mesh)->SetIndices(indices, count);
         return PMSDK_SUCCESS;
     } catch (const std::bad_alloc&) {
         return PMSDK_ERROR_OUT_OF_MEMORY;
@@ -75,14 +75,15 @@ PMSDK_API pmsdk_status_t pmsdk_mesh_get_vertices(const pmsdk_mesh_t* mesh, pmsdk
     }
 
     auto* m = reinterpret_cast<const pmsdk::Geometry::Mesh*>(mesh);
-    auto vertices = m->GetVertices();
+    size_t actual_size = 0;
+    auto* vertices = m->GetVertices(&actual_size);
     
-    if (count > vertices.size()) {
-        count = vertices.size();
+    if (count > actual_size) {
+        count = actual_size;
     }
 
     // pmsdk_vertex_t matches pmsdk::Geometry::Vertex layout exactly
-    std::memcpy(out_vertices, vertices.data(), count * sizeof(pmsdk_vertex_t));
+    std::memcpy(out_vertices, vertices, count * sizeof(pmsdk_vertex_t));
 
     return PMSDK_SUCCESS;
 }
@@ -93,13 +94,14 @@ PMSDK_API pmsdk_status_t pmsdk_mesh_get_indices(const pmsdk_mesh_t* mesh, uint32
     }
 
     auto* m = reinterpret_cast<const pmsdk::Geometry::Mesh*>(mesh);
-    auto indices = m->GetIndices();
+    size_t actual_size = 0;
+    auto* indices = m->GetIndices(&actual_size);
     
-    if (count > indices.size()) {
-        count = indices.size();
+    if (count > actual_size) {
+        count = actual_size;
     }
 
-    std::memcpy(out_indices, indices.data(), count * sizeof(uint32_t));
+    std::memcpy(out_indices, indices, count * sizeof(uint32_t));
 
     return PMSDK_SUCCESS;
 }

@@ -83,8 +83,13 @@ PMSDK_API pmsdk_status_t pmsdk_warpnode_process_mesh(pmsdk_warpnode_t* node, con
         
         auto processed = nodeWrapper->ptr->ProcessMesh(*cpp_input);
         if (processed) {
-            cpp_output->SetVertices(processed->GetVertices());
-            cpp_output->SetIndices(processed->GetIndices());
+            size_t v_count = 0;
+            auto* verts = processed->GetVertices(&v_count);
+            cpp_output->SetVertices(verts, v_count);
+            
+            size_t i_count = 0;
+            auto* idxs = processed->GetIndices(&i_count);
+            cpp_output->SetIndices(idxs, i_count);
         }
         return PMSDK_SUCCESS;
     } catch (...) {

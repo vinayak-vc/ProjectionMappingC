@@ -13,28 +13,36 @@ Mesh::~Mesh() = default;
 Mesh::Mesh(Mesh&& other) noexcept = default;
 Mesh& Mesh::operator=(Mesh&& other) noexcept = default;
 
-void Mesh::SetVertices(std::span<const Vertex> vertices) {
-    m_impl->vertices.assign(vertices.begin(), vertices.end());
+void Mesh::SetVertices(const Vertex* vertices, size_t count) {
+    if (count > 0 && vertices != nullptr) {
+        m_impl->vertices.assign(vertices, vertices + count);
+    }
 }
 
-void Mesh::SetIndices(std::span<const uint32_t> indices) {
-    m_impl->indices.assign(indices.begin(), indices.end());
+void Mesh::SetIndices(const uint32_t* indices, size_t count) {
+    if (count > 0 && indices != nullptr) {
+        m_impl->indices.assign(indices, indices + count);
+    }
 }
 
-std::span<const Vertex> Mesh::GetVertices() const {
-    return m_impl->vertices;
+const Vertex* Mesh::GetVertices(size_t* out_count) const {
+    if (out_count) *out_count = m_impl->vertices.size();
+    return m_impl->vertices.data();
 }
 
-std::span<const uint32_t> Mesh::GetIndices() const {
-    return m_impl->indices;
+const uint32_t* Mesh::GetIndices(size_t* out_count) const {
+    if (out_count) *out_count = m_impl->indices.size();
+    return m_impl->indices.data();
 }
 
-std::span<Vertex> Mesh::GetVerticesMutable() {
-    return m_impl->vertices;
+Vertex* Mesh::GetVerticesMutable(size_t* out_count) {
+    if (out_count) *out_count = m_impl->vertices.size();
+    return m_impl->vertices.data();
 }
 
-std::span<uint32_t> Mesh::GetIndicesMutable() {
-    return m_impl->indices;
+uint32_t* Mesh::GetIndicesMutable(size_t* out_count) {
+    if (out_count) *out_count = m_impl->indices.size();
+    return m_impl->indices.data();
 }
 
 size_t Mesh::GetVertexCount() const {

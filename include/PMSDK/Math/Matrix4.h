@@ -87,7 +87,7 @@ struct Matrix4 {
 
     // A standard 4x4 matrix inverse
     constexpr Matrix4 Inverse() const {
-        float inv[16];
+        float inv[16]{};
 
         inv[0] = m[5]  * m[10] * m[15] - m[5]  * m[11] * m[14] - m[9]  * m[6]  * m[15] + 
                  m[9]  * m[7]  * m[14] + m[13] * m[6]  * m[11] - m[13] * m[7]  * m[10];

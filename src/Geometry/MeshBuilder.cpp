@@ -21,8 +21,8 @@ std::unique_ptr<Mesh> MeshBuilder::CreatePlane(float width, float height) {
         0, 2, 3
     };
 
-    mesh->SetVertices(vertices);
-    mesh->SetIndices(indices);
+    mesh->SetVertices(vertices.data(), vertices.size());
+    mesh->SetIndices(indices.data(), indices.size());
     return mesh;
 }
 
@@ -67,8 +67,8 @@ std::unique_ptr<Mesh> MeshBuilder::CreateGrid(float width, float height, int col
         }
     }
 
-    mesh->SetVertices(vertices);
-    mesh->SetIndices(indices);
+    mesh->SetVertices(vertices.data(), vertices.size());
+    mesh->SetIndices(indices.data(), indices.size());
     return mesh;
 }
 
@@ -122,8 +122,8 @@ std::unique_ptr<Mesh> MeshBuilder::CreateCylinder(float radius, float height, in
 
     // Skipping caps for brevity in projection mapping, typically surfaces are open.
 
-    mesh->SetVertices(vertices);
-    mesh->SetIndices(indices);
+    mesh->SetVertices(vertices.data(), vertices.size());
+    mesh->SetIndices(indices.data(), indices.size());
     return mesh;
 }
 

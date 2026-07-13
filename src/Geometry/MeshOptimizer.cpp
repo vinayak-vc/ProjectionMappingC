@@ -5,10 +5,12 @@
 namespace pmsdk::Geometry {
 
 void MeshOptimizer::WeldVertices(Mesh& mesh, float threshold) {
-    auto vertices = mesh.GetVertices();
-    auto indices = mesh.GetIndices();
+    size_t v_count = 0;
+    auto vertices = mesh.GetVertices(&v_count);
+    size_t i_count = 0;
+    auto indices = mesh.GetIndices(&i_count);
 
-    if (vertices.empty()) return;
+    if (v_count == 0) return;
 
     std::vector<Vertex> newVertices;
     std::vector<uint32_t> newIndices;
@@ -16,12 +18,8 @@ void MeshOptimizer::WeldVertices(Mesh& mesh, float threshold) {
     
     float thresholdSq = threshold * threshold;
 
-    for (uint32_t i = 0; i < vertices.size(); ++i) {
+    for (uint32_t i = 0; i < v_count; ++i) {
         int foundIdx = -1;
-        // Simple O(N^2) search. For production, use KDTree or Octree.
-        // Since meshes in mapping are usually < 10k vertices, this might be fine,
-        // but KDTree exists in our library. Let's just do simple search for now 
-        // to avoid dependency circularity in this single function.
         for (uint32_t j = 0; j < newVertices.size(); ++j) {
             float dx = vertices[i].position.x - newVertices[j].position.x;
             float dy = vertices[i].position.y - newVertices[j].position.y;
@@ -41,25 +39,27 @@ void MeshOptimizer::WeldVertices(Mesh& mesh, float threshold) {
         }
     }
 
-    newIndices.reserve(indices.size());
-    for (uint32_t idx : indices) {
-        newIndices.push_back(remap[idx]);
+    newIndices.reserve(i_count);
+    for (size_t i = 0; i < i_count; ++i) {
+        newIndices.push_back(remap[indices[i]]);
     }
 
-    mesh.SetVertices(newVertices);
-    mesh.SetIndices(newIndices);
+    mesh.SetVertices(newVertices.data(), newVertices.size());
+    mesh.SetIndices(newIndices.data(), newIndices.size());
 }
 
 void MeshOptimizer::RecalculateSmoothNormals(Mesh& mesh) {
-    auto vertices = mesh.GetVerticesMutable();
-    auto indices = mesh.GetIndices();
+    size_t v_count = 0;
+    auto vertices = mesh.GetVerticesMutable(&v_count);
+    size_t i_count = 0;
+    auto indices = mesh.GetIndices(&i_count);
 
-    for (auto& v : vertices) {
-        v.normal = {0.0f, 0.0f, 0.0f};
+    for (size_t i = 0; i < v_count; ++i) {
+        vertices[i].normal = {0.0f, 0.0f, 0.0f};
     }
 
-    for (size_t i = 0; i < indices.size(); i += 3) {
-        if (i + 2 >= indices.size()) break;
+    for (size_t i = 0; i < i_count; i += 3) {
+        if (i + 2 >= i_count) break;
         uint32_t i0 = indices[i];
         uint32_t i1 = indices[i+1];
         uint32_t i2 = indices[i+2];
@@ -72,14 +72,13 @@ void MeshOptimizer::RecalculateSmoothNormals(Mesh& mesh) {
         Math::Vector3 e2 = v2 - v0;
         Math::Vector3 cross = e1.Cross(e2);
         
-        // Accumulate area-weighted normal (cross product magnitude is 2x area)
         vertices[i0].normal = vertices[i0].normal + cross;
         vertices[i1].normal = vertices[i1].normal + cross;
         vertices[i2].normal = vertices[i2].normal + cross;
     }
 
-    for (auto& v : vertices) {
-        v.normal.Normalize();
+    for (size_t i = 0; i < v_count; ++i) {
+        vertices[i].normal.Normalize();
     }
 }
 

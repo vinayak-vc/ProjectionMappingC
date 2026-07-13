@@ -100,9 +100,10 @@ std::unique_ptr<Geometry::Mesh> WarpNode::ProcessMesh(const Geometry::Mesh& base
     Math::Transform globalTx = ComputeGlobalTransform();
     Math::Matrix4 m = globalTx.ToMatrix();
 
-    auto vertices = deformedMesh->GetVerticesMutable();
-    for (auto& v : vertices) {
-        v.position = m.MultiplyPoint(v.position);
+    size_t v_count = 0;
+    auto* vertices = deformedMesh->GetVerticesMutable(&v_count);
+    for (size_t i = 0; i < v_count; ++i) {
+        vertices[i].position = m.MultiplyPoint(vertices[i].position);
     }
     
     // Recalculate normals after spatial transformation

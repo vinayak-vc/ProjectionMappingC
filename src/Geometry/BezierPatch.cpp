@@ -86,8 +86,8 @@ std::unique_ptr<Mesh> BezierPatch::GenerateMesh(int resolutionX, int resolutionY
         }
     }
 
-    mesh->SetVertices(vertices);
-    mesh->SetIndices(indices);
+    mesh->SetVertices(vertices.data(), vertices.size());
+    mesh->SetIndices(indices.data(), indices.size());
     mesh->RecalculateNormals();
     return mesh;
 }

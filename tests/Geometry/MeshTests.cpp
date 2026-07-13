@@ -15,9 +15,12 @@ TEST(MeshTests, SetAndGetVertices) {
     std::vector<Vertex> verts = {
         {{0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}
     };
-    mesh.SetVertices(verts);
-    EXPECT_EQ(mesh.GetVertexCount(), 1);
-    EXPECT_EQ(mesh.GetVertices()[0].position.x, 0.0f);
+    mesh.SetVertices(verts.data(), verts.size());
+    
+    size_t v_count = 0;
+    auto retrievedVerts = mesh.GetVertices(&v_count);
+    EXPECT_EQ(v_count, 1);
+    EXPECT_EQ(retrievedVerts[0].position.x, 0.0f);
 }
 
 TEST(MeshTests, RecalculateNormals) {
@@ -27,12 +30,13 @@ TEST(MeshTests, RecalculateNormals) {
     verts[1].position = {1.0f, 0.0f, 0.0f};
     verts[2].position = {0.0f, 0.0f, 1.0f};
     std::vector<uint32_t> idx = {0, 1, 2};
-    mesh.SetVertices(verts);
-    mesh.SetIndices(idx);
+    mesh.SetVertices(verts.data(), verts.size());
+    mesh.SetIndices(idx.data(), idx.size());
 
     mesh.RecalculateNormals();
 
-    auto outVerts = mesh.GetVertices();
+    size_t v_count = 0;
+    auto outVerts = mesh.GetVertices(&v_count);
     // Normal should point to -Y given right hand rule: (1,0,0) x (0,0,1) = (0,-1,0)
     EXPECT_NEAR(outVerts[0].normal.y, -1.0f, 1e-5f);
 }
@@ -50,7 +54,7 @@ TEST(MeshTests, CalculateBounds) {
         {{0.0f, 2.0f, -1.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}}
     };
 
-    mesh.SetVertices(verts);
+    mesh.SetVertices(verts.data(), verts.size());
     BoundingBox bounds = mesh.CalculateBounds();
 
     EXPECT_FLOAT_EQ(bounds.min.x, 0.0f);

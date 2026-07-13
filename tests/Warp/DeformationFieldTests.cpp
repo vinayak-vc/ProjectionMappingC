@@ -24,10 +24,12 @@ TEST(DeformationFieldTests, ApplyDeformationGrid) {
     EXPECT_NE(warped, nullptr);
     EXPECT_EQ(warped->GetVertexCount(), baseMesh->GetVertexCount());
 
-    auto verts = warped->GetVertices();
+    size_t v_count = 0;
+    auto verts = warped->GetVertices(&v_count);
     // UV (1,1) should map to position {2,2,0} since GridWarp evaluates the grid.
     bool foundMax = false;
-    for(const auto& v : verts) {
+    for(size_t i = 0; i < v_count; ++i) {
+        const auto& v = verts[i];
         if (v.uv.x > 0.99f && v.uv.y > 0.99f) {
             EXPECT_NEAR(v.position.x, 2.0f, 0.001f);
             EXPECT_NEAR(v.position.y, 2.0f, 0.001f);

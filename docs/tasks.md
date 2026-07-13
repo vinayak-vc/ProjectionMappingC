@@ -84,13 +84,18 @@
 - [x] Ensure C-linkage (`extern "C"`) is completely PImpl-based to allow Python/C#/Unity consumption
 
 ## Done
+- Milestone 17: GrayCode Decoder & Triangulation (2026-07-13) ✅
+- Milestone 16: Advanced OpenCV calibration wrappers (2026-07-13) ✅
 - Milestone 15: Sample applications (Unity Interactive Guided Setup Wizard)
+- Milestone 14: Unreal Wrapper
 - Milestone 13: Unity Wrapper (`vxpmsdk`)
 - Milestone 12: Documentation (Doxygen)
 - Milestone 11: Unit tests (full sweep to 90% coverage)
 - Milestone 10: Public C API
 
 ## Next Items / Backlog
-- [ ] Milestone 14: Unreal Wrapper
+- [ ] Milestone 18: Performance optimization (SIMD, Multithreading)
+- [ ] Milestone 19: Plugin SDK
+- [ ] Milestone 20: Release packaging
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Code coverage job in CI

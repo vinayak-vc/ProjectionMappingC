@@ -34,9 +34,11 @@ target_sources(pmsdk PRIVATE
     Calibration/Extrinsics.cpp
     Calibration/Calibrator.cpp
     Calibration/GrayCode.cpp
+    Calibration/GrayCodeDecoder.cpp
     C_API/GeometryAPI.cpp
     C_API/WarpAPI.cpp
-    C_API/BlendAPI.cpp)
+    C_API/BlendAPI.cpp
+    C_API/CalibrationAPI.cpp)
 
 # Internal headers (src/…) are visible to the SDK only, never installed.
 target_include_directories(pmsdk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -45,7 +47,11 @@ target_include_directories(pmsdk PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
 
-target_link_libraries(pmsdk PRIVATE nlohmann_json::nlohmann_json ${OpenCV_LIBS})
+if (MSVC)
+    target_link_libraries(pmsdk PRIVATE nlohmann_json::nlohmann_json ${OpenCV_LIBS} libcpmt.lib libcmt.lib)
+else()
+    target_link_libraries(pmsdk PRIVATE nlohmann_json::nlohmann_json ${OpenCV_LIBS})
+endif()
 
 pmsdk_apply_compiler_options(pmsdk)
 

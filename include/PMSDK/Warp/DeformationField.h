@@ -64,6 +64,16 @@ public:
      */
     PMSDK_API std::unique_ptr<Geometry::Mesh> ApplyDeformation(const Geometry::Mesh& baseMesh) const;
 
+    /**
+     * @brief Applies the active deformation to a mesh in-place.
+     * 
+     * Avoids memory allocations by directly modifying the vertices of the provided mesh.
+     * The mesh's existing UV coordinates are used to evaluate the deformation surface.
+     * 
+     * @param mesh The mesh to deform.
+     */
+    PMSDK_API void ApplyDeformationInPlace(Geometry::Mesh& mesh) const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> m_impl;

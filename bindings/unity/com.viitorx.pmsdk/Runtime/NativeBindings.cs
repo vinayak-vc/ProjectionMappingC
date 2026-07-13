@@ -145,5 +145,56 @@ namespace vxpmsdk
 
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern pmsdk_status_t pmsdk_warpnode_process_mesh(IntPtr node, IntPtr input_mesh, IntPtr output_mesh);
+
+        // --- CalibrationAPI.h ---
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr pmsdk_graycode_create(int width, int height);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void pmsdk_graycode_destroy(IntPtr handle);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern UIntPtr pmsdk_graycode_get_pattern_count(IntPtr handle);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_graycode_generate_pattern(IntPtr handle, UIntPtr index, byte[] outPixels);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr pmsdk_calibrator_create();
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void pmsdk_calibrator_destroy(IntPtr handle);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_calibrator_add_observation(IntPtr handle, pmsdk_vec3_t[] objectPoints, pmsdk_vec2_t[] imagePoints, UIntPtr pointCount);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_calibrator_calibrate(IntPtr handle, int imageWidth, int imageHeight, float[] outIntrinsics, float[] outDistortion, out double outRmsError);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr pmsdk_decoder_create(int projectorWidth, int projectorHeight);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void pmsdk_decoder_destroy(IntPtr handle);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_decoder_open_camera(IntPtr handle, int cameraIndex);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_decoder_capture_frame(IntPtr handle);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void pmsdk_decoder_close_camera(IntPtr handle);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_decoder_add_image(IntPtr handle, [MarshalAs(UnmanagedType.LPStr)] string filepath);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_decoder_decode_and_triangulate(
+            IntPtr handle,
+            int threshold,
+            float[] camIntrinsics, float[] camExtrinsics,
+            float[] projIntrinsics, float[] projExtrinsics,
+            [Out] pmsdk_vec3_t[] outPoints, out UIntPtr outCount, UIntPtr maxPoints);
     }
 }

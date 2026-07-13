@@ -29,6 +29,9 @@ typedef struct pmsdk_warpnode_t pmsdk_warpnode_t;
 typedef struct pmsdk_projector_t pmsdk_projector_t;
 typedef struct pmsdk_blendconfig_t pmsdk_blendconfig_t;
 typedef struct pmsdk_edgeblend_t pmsdk_edgeblend_t;
+typedef struct pmsdk_calibrator_t pmsdk_calibrator_t;
+typedef struct pmsdk_graycode_t pmsdk_graycode_t;
+typedef struct pmsdk_decoder_t pmsdk_decoder_t;
 
 /**
  * @brief Interpolation curve types for edge blending.

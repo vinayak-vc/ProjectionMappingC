@@ -2,26 +2,22 @@
 
 ## Current State (2026-07-13)
 
-**Last Completed Milestone**: Milestone 15 (Sample applications)
-**Current Task**: Ready for Milestone 14 (Unreal wrapper) or other backlog tasks.
+**Last Completed Milestone**: Milestone 17 (GrayCode Decoder & Triangulation)
+**Current Task**: Ready for Milestone 18 (Performance optimization).
 
 ## What was just done
-- **Milestone 15 Completed**: Created a fully functional interactive Projection Mapping scene in Unity (`WarpAndBlendExample.unity`).
-- Extended the C-API to expose `BlendConfig` and `EdgeBlend` configurations.
-- Extended the C-API to allow reading warped geometry back via `pmsdk_mesh_get_vertices` and `pmsdk_mesh_get_indices`.
-- Updated the Unity Wrapper (`com.viitorx.pmsdk`) to support the new `BlendConfig` and Mesh getter functionality.
-- Implemented `GuidedProjectionDemo.cs` featuring an interactive Wizard UI that statically lives in the Unity Scene, allowing users to step through and visualize Warping and Edge Blending dynamically.
+- **Milestone 16 Completed**: Added Advanced OpenCV Calibration Wrappers. Enabled the SDK to perform physical camera intrinsic/extrinsic calibration and calculate reprojection errors directly inside C++.
+- **Milestone 17 Completed**: Built the `GrayCodeDecoder` core which automatically un-gray-codes captured images to find exact projector pixel mappings and then triangulates them using OpenCV. Added ability for the SDK to perform direct camera captures (`cv::VideoCapture`) to bypass Unity's main thread entirely.
+- Both features were exposed via the C-API and Unity bindings (`NativeBindings.cs`, `Calibration.cs`).
 
-## Next Recommended Task (Milestone 14 or Backlog)
-1. Proceed with **Milestone 14**: Unreal Engine wrapper (creating an Unreal Plugin).
-2. Or tackle **Milestone 16**: Performance optimization.
-3. Or implement the remaining C APIs (`DeformationField`) and update the wrappers accordingly.
+## Next Recommended Task (Milestone 18)
+1. Proceed with **Milestone 18**: Performance optimization (SIMD, multithreading, or GPU compute for the Warp mesh deformations).
+2. Or tackle **Milestone 19**: Plugin SDK.
 
 ## Project Structure Notes
-- The Unity wrapper expects `ProjectionMappingSDK.dll` to be present in the Unity project's plugins directory.
-- `IDisposable` pattern is strictly followed to prevent memory leaks from unmanaged SDK handles.
-- The Sample Scene UI is statically built inside the Scene file (`.unity`), avoiding runtime Canvas creation for easier user editing.
+- The DLL is completely self-contained.
+- Unity wrapper expects `ProjectionMappingSDK.dll` in its plugins directory.
+- Unreal wrapper uses the standard ThirdParty plugin structure to load the DLL.
 
 ## Commands
-Build C++ core: `cmake --build --preset debug`
-Test C++ core: `ctest --preset debug`
+Build C++ core: `cmake --preset vs2022` then `cmake --build build/vs2022 --config Release`

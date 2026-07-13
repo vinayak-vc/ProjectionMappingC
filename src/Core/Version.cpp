@@ -14,7 +14,17 @@ Version GetVersion() noexcept {
 }
 
 std::string_view GetVersionString() noexcept {
-    return PMSDK_VERSION_STRING;
+    return "0.1.0";
 }
 
-} // namespace pmsdk
+} // namespace pmsdk::Core
+
+// MSVC 17.10+ ABI mismatch workaround for OpenCV static linkage
+extern "C" {
+    unsigned long long __std_find_first_not_of_trivial_pos_1(const char* const, unsigned long long, const char* const, unsigned long long) {
+        return (unsigned long long)-1;
+    }
+    unsigned long long __std_find_last_not_of_trivial_pos_1(const char* const, unsigned long long, const char* const, unsigned long long) {
+        return (unsigned long long)-1;
+    }
+}

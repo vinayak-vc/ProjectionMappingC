@@ -18,11 +18,13 @@ before the next begins.
 | 11 | Unit tests (full sweep to 90% coverage) | ✅ done (2026-07-10) |
 | 12 | Documentation (Doxygen) | ✅ done (2026-07-10) |
 | 13 | Unity wrapper | ✅ done (2026-07-11) |
-| 14 | Unreal wrapper | pending |
+| 14 | Unreal wrapper | ✅ done (2026-07-13) |
 | 15 | Sample applications | ✅ done (2026-07-13) |
-| 16 | Performance optimization | pending |
-| 17 | Plugin SDK | pending |
-| 18 | Release packaging | pending |
+| 16 | Advanced OpenCV calibration wrappers | ✅ done (2026-07-13) |
+| 17 | GrayCode Decoder & Triangulation | ✅ done (2026-07-13) |
+| 18 | Performance optimization | pending |
+| 19 | Plugin SDK | pending |
+| 20 | Release packaging | pending |
 
 ## Dependency plan (vcpkg manifest features)
 

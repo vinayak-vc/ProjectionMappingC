@@ -18,18 +18,19 @@ TEST(BezierPatchTests, GenerateMesh) {
     auto mesh = patch.GenerateMesh(10, 10);
     EXPECT_NE(mesh, nullptr);
 
-    // 10x10 resolution = 11x11 vertices = 121 vertices
-    auto vertices = mesh->GetVertices();
-    EXPECT_EQ(vertices.size(), 121);
+    size_t v_count = 0;
+    auto vertices = mesh->GetVertices(&v_count);
+    EXPECT_EQ(v_count, 121);
 
     // 10x10 = 100 quads = 200 triangles = 600 indices
-    auto indices = mesh->GetIndices();
-    EXPECT_EQ(indices.size(), 600);
+    size_t i_count = 0;
+    auto indices = mesh->GetIndices(&i_count);
+    EXPECT_EQ(i_count, 600);
 
     // Test corners
     EXPECT_FLOAT_EQ(vertices[0].position.x, 0.0f);
     EXPECT_FLOAT_EQ(vertices[0].position.y, 0.0f);
 
-    EXPECT_FLOAT_EQ(vertices.back().position.x, 3.0f);
-    EXPECT_FLOAT_EQ(vertices.back().position.y, 3.0f);
+    EXPECT_FLOAT_EQ(vertices[v_count - 1].position.x, 3.0f);
+    EXPECT_FLOAT_EQ(vertices[v_count - 1].position.y, 3.0f);
 }

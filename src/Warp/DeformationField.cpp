@@ -1,4 +1,6 @@
 #include "PMSDK/Warp/DeformationField.h"
+#include <execution>
+#include <algorithm>
 
 namespace pmsdk::Warp {
 
@@ -36,24 +38,29 @@ std::unique_ptr<Geometry::Mesh> DeformationField::ApplyDeformation(const Geometr
 
     if (v_count == 0) return nullptr;
 
-    std::vector<Geometry::Vertex> deformedVerts(vertices, vertices + v_count);
-    std::vector<uint32_t> deformedIndices(indices, indices + i_count);
+    result->SetVertices(vertices, v_count);
+    result->SetIndices(indices, i_count);
+
+    ApplyDeformationInPlace(*result);
+    return result;
+}
+
+void DeformationField::ApplyDeformationInPlace(Geometry::Mesh& mesh) const {
+    size_t v_count = 0;
+    auto verts = mesh.GetVerticesMutable(&v_count);
+    if (v_count == 0) return;
 
     if (m_impl->type == DeformationType::Bezier) {
-        for (auto& v : deformedVerts) {
-            // Assume the mesh's UV coordinates map 0-1 to the full patch area.
+        std::for_each(std::execution::par_unseq, verts, verts + v_count, [this](auto& v) {
             v.position = m_impl->bezierPatch.Evaluate(v.uv.x, v.uv.y);
-        }
+        });
     } else if (m_impl->type == DeformationType::Grid) {
-        for (auto& v : deformedVerts) {
+        std::for_each(std::execution::par_unseq, verts, verts + v_count, [this](auto& v) {
             v.position = m_impl->gridWarp.Evaluate(v.uv.x, v.uv.y);
-        }
+        });
     }
-
-    result->SetVertices(deformedVerts.data(), deformedVerts.size());
-    result->SetIndices(deformedIndices.data(), deformedIndices.size());
-    result->RecalculateNormals(); // Recompute normals for the deformed mesh
-    return result;
+    
+    mesh.RecalculateNormals();
 }
 
 } // namespace pmsdk::Warp

@@ -52,6 +52,6 @@ TEST(DynamicMeshTests, ToMeshConversion) {
     mesh.AddFace(id0, id1, id2);
 
     auto staticMesh = mesh.ToMesh();
-    EXPECT_EQ(staticMesh->GetVertices().size(), 3);
-    EXPECT_EQ(staticMesh->GetIndices().size(), 3);
+    EXPECT_EQ(staticMesh->GetVertexCount(), 3);
+    EXPECT_EQ(staticMesh->GetIndexCount(), 3);
 }

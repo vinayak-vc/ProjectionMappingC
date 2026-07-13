@@ -1,5 +1,7 @@
 #include "PMSDK/Geometry/Mesh.h"
 #include <vector>
+#include <execution>
+#include <numeric>
 
 namespace pmsdk::Geometry {
 
@@ -61,9 +63,9 @@ void Mesh::Clear() {
 void Mesh::RecalculateNormals() {
     if (m_impl->indices.empty() || m_impl->vertices.empty()) return;
 
-    for (auto& v : m_impl->vertices) {
+    std::for_each(std::execution::par_unseq, m_impl->vertices.begin(), m_impl->vertices.end(), [](auto& v) {
         v.normal = Math::Vector3(0.0f, 0.0f, 0.0f);
-    }
+    });
 
     for (size_t i = 0; i < m_impl->indices.size(); i += 3) {
         if (i + 2 >= m_impl->indices.size()) break;
@@ -87,17 +89,34 @@ void Mesh::RecalculateNormals() {
         m_impl->vertices[i2].normal += normal;
     }
 
-    for (auto& v : m_impl->vertices) {
+    std::for_each(std::execution::par_unseq, m_impl->vertices.begin(), m_impl->vertices.end(), [](auto& v) {
         v.normal.Normalize();
-    }
+    });
 }
 
 Math::BoundingBox Mesh::CalculateBounds() const {
-    Math::BoundingBox bounds;
-    for (const auto& v : m_impl->vertices) {
-        bounds.Expand(v.position);
-    }
-    return bounds;
+    if (m_impl->vertices.empty()) return Math::BoundingBox{};
+
+    return std::transform_reduce(
+        std::execution::par_unseq,
+        m_impl->vertices.begin(), m_impl->vertices.end(),
+        Math::BoundingBox{},
+        [](const Math::BoundingBox& a, const Math::BoundingBox& b) {
+            Math::BoundingBox res = a;
+            if (b.min.x < res.min.x) res.min.x = b.min.x;
+            if (b.min.y < res.min.y) res.min.y = b.min.y;
+            if (b.min.z < res.min.z) res.min.z = b.min.z;
+            if (b.max.x > res.max.x) res.max.x = b.max.x;
+            if (b.max.y > res.max.y) res.max.y = b.max.y;
+            if (b.max.z > res.max.z) res.max.z = b.max.z;
+            return res;
+        },
+        [](const Vertex& v) {
+            Math::BoundingBox b;
+            b.Expand(v.position);
+            return b;
+        }
+    );
 }
 
 } // namespace pmsdk::Geometry

@@ -48,11 +48,17 @@ add_executable(pmsdk_tests
     ${PROJECT_SOURCE_DIR}/src/Core/LastError.cpp)
 
 # Tests may reach internal headers; consumers must not.
-target_include_directories(pmsdk_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_include_directories(pmsdk_tests PRIVATE 
+    ${PROJECT_SOURCE_DIR}/src
+    ${OpenCV_INCLUDE_DIRS}
+)
 
-target_link_libraries(pmsdk_tests PRIVATE
-    PMSDK::pmsdk
-    GTest::gtest_main)
+target_link_libraries(pmsdk_tests
+    PRIVATE
+        PMSDK::pmsdk
+        GTest::gtest_main
+        ${OpenCV_LIBS}
+)
 
 target_compile_features(pmsdk_tests PRIVATE cxx_std_20)
 if(MSVC)

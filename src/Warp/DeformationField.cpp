@@ -51,13 +51,9 @@ void DeformationField::ApplyDeformationInPlace(Geometry::Mesh& mesh) const {
     if (v_count == 0) return;
 
     if (m_impl->type == DeformationType::Bezier) {
-        std::for_each(std::execution::par_unseq, verts, verts + v_count, [this](auto& v) {
-            v.position = m_impl->bezierPatch.Evaluate(v.uv.x, v.uv.y);
-        });
+        m_impl->bezierPatch.ApplyDeformation(verts, v_count);
     } else if (m_impl->type == DeformationType::Grid) {
-        std::for_each(std::execution::par_unseq, verts, verts + v_count, [this](auto& v) {
-            v.position = m_impl->gridWarp.Evaluate(v.uv.x, v.uv.y);
-        });
+        m_impl->gridWarp.ApplyDeformation(verts, v_count);
     }
     
     mesh.RecalculateNormals();

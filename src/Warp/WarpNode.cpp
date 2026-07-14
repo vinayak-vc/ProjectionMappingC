@@ -1,6 +1,6 @@
 #include "PMSDK/Warp/WarpNode.h"
 #include <algorithm>
-
+#include <execution>
 namespace pmsdk::Warp {
 
 struct WarpNode::Impl {
@@ -102,9 +102,10 @@ std::unique_ptr<Geometry::Mesh> WarpNode::ProcessMesh(const Geometry::Mesh& base
 
     size_t v_count = 0;
     auto* vertices = deformedMesh->GetVerticesMutable(&v_count);
-    for (size_t i = 0; i < v_count; ++i) {
-        vertices[i].position = m.MultiplyPoint(vertices[i].position);
-    }
+    
+    std::for_each(std::execution::par_unseq, vertices, vertices + v_count, [&m](auto& v) {
+        v.position = m.MultiplyPoint(v.position);
+    });
     
     // Recalculate normals after spatial transformation
     deformedMesh->RecalculateNormals();

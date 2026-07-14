@@ -2,6 +2,7 @@
 #include <cmath>
 #include <algorithm>
 #include <stdexcept>
+#include <execution>
 
 namespace pmsdk::Geometry {
 
@@ -98,6 +99,34 @@ std::unique_ptr<Mesh> GridWarp::GenerateMesh(int resolutionX, int resolutionY) c
     mesh->SetIndices(indices.data(), indices.size());
     mesh->RecalculateNormals();
     return mesh;
+}
+
+void GridWarp::ApplyDeformation(Vertex* vertices, size_t count) const {
+    if (m_impl->cols < 2 || m_impl->rows < 2 || count == 0 || !vertices) return;
+
+    std::for_each(std::execution::par_unseq, vertices, vertices + count, [this](auto& v) {
+        float clampedU = std::clamp(v.uv.x, 0.0f, 1.0f);
+        float clampedV = std::clamp(v.uv.y, 0.0f, 1.0f);
+        
+        float scaledU = clampedU * (m_impl->cols - 1);
+        float scaledV = clampedV * (m_impl->rows - 1);
+
+        int idxX = std::clamp((int)std::floor(scaledU), 0, m_impl->cols - 2);
+        int idxY = std::clamp((int)std::floor(scaledV), 0, m_impl->rows - 2);
+
+        float tx = scaledU - idxX;
+        float ty = scaledV - idxY;
+
+        Math::Vector3 p00 = m_impl->controlPoints[idxY * m_impl->cols + idxX];
+        Math::Vector3 p10 = m_impl->controlPoints[idxY * m_impl->cols + (idxX + 1)];
+        Math::Vector3 p01 = m_impl->controlPoints[(idxY + 1) * m_impl->cols + idxX];
+        Math::Vector3 p11 = m_impl->controlPoints[(idxY + 1) * m_impl->cols + (idxX + 1)];
+
+        Math::Vector3 pY0 = p00 * (1.0f - tx) + p10 * tx;
+        Math::Vector3 pY1 = p01 * (1.0f - tx) + p11 * tx;
+
+        v.position = pY0 * (1.0f - ty) + pY1 * ty;
+    });
 }
 
 } // namespace pmsdk::Geometry

@@ -1,6 +1,9 @@
 #include "PMSDK/C_API/CalibrationAPI.h"
 #include "PMSDK/Calibration/Calibrator.h"
 #include "PMSDK/Calibration/GrayCode.h"
+#include "PMSDK/Calibration/GrayCodeDecoder.h"
+#include <algorithm>
+#include <string>
 
 using namespace pmsdk;
 using namespace pmsdk::Calibration;
@@ -243,7 +246,7 @@ PMSDK_API pmsdk_status_t pmsdk_decoder_decode_and_triangulate(
         auto matches = handle->obj.Decode(threshold);
         auto points3d = GrayCodeDecoder::Triangulate(matches, cI, cE, pI, pE);
 
-        size_t count = std::min(points3d.size(), maxPoints);
+        size_t count = std::min<size_t>(points3d.size(), maxPoints);
         *outCount = points3d.size(); // Tell the caller how many points there actually are
 
         for (size_t i = 0; i < count; ++i) {

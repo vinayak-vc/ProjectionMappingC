@@ -84,6 +84,7 @@
 - [x] Ensure C-linkage (`extern "C"`) is completely PImpl-based to allow Python/C#/Unity consumption
 
 ## Done
+- Milestone 18: Performance optimization (SIMD, Multithreading) (2026-07-14) ✅
 - Milestone 17: GrayCode Decoder & Triangulation (2026-07-13) ✅
 - Milestone 16: Advanced OpenCV calibration wrappers (2026-07-13) ✅
 - Milestone 15: Sample applications (Unity Interactive Guided Setup Wizard)
@@ -94,7 +95,6 @@
 - Milestone 10: Public C API
 
 ## Next Items / Backlog
-- [ ] Milestone 18: Performance optimization (SIMD, Multithreading)
 - [ ] Milestone 19: Plugin SDK
 - [ ] Milestone 20: Release packaging
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)

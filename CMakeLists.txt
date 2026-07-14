@@ -11,7 +11,7 @@ if(PMSDK_BUILD_TESTS)
 endif()
 
 project(ProjectionMappingSDK
-    VERSION 0.1.0
+    VERSION 1.0.3
     DESCRIPTION "Engine-agnostic projection mapping SDK"
     LANGUAGES CXX)
 
@@ -38,3 +38,11 @@ endif()
 if(PMSDK_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
+
+find_package(Python COMPONENTS Interpreter REQUIRED)
+add_custom_target(package_sdk
+    COMMAND ${Python_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/package_release.py
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    DEPENDS pmsdk
+    COMMENT "Packaging the SDK..."
+)

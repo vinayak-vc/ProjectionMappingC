@@ -14,7 +14,7 @@ Version GetVersion() noexcept {
 }
 
 std::string_view GetVersionString() noexcept {
-    return "0.1.0";
+    return PMSDK_VERSION_STRING;
 }
 
 } // namespace pmsdk::Core

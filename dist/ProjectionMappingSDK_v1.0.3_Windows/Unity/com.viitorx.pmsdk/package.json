@@ -1,0 +1,17 @@
+{
+  "name": "com.viitorx.pmsdk",
+  "version": "0.1.0",
+  "displayName": "ViitorX Projection Mapping SDK",
+  "description": "Engine-agnostic projection mapping core library for Unity.",
+  "unity": "2021.3",
+  "keywords": [
+    "projection mapping",
+    "warp",
+    "blend",
+    "pmsdk",
+    "viitorx"
+  ],
+  "author": {
+    "name": "ViitorX"
+  }
+}

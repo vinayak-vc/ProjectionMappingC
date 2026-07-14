@@ -9,7 +9,6 @@
       "toolchainFile": "${sourceDir}/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "VCPKG_TARGET_TRIPLET": "x64-windows-static",
         "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
         "VCPKG_INSTALL_OPTIONS": "--no-binarycaching"
       }

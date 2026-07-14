@@ -60,6 +60,8 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure
+        env:
+          VCPKG_DEFAULT_TRIPLET: ${{ matrix.os == 'windows-latest' && 'x64-windows-static' || (matrix.os == 'macos-latest' && 'arm64-osx' || 'x64-linux') }}
         run: cmake --preset ${{ matrix.preset }} -DPMSDK_WARNINGS_AS_ERRORS=ON
 
       - name: Build

@@ -1,4 +1,5 @@
 find_package(GTest CONFIG REQUIRED)
+find_package(OpenCV REQUIRED)
 
 add_executable(pmsdk_tests
     Core/ConfigTests.cpp
@@ -45,7 +46,8 @@ add_executable(pmsdk_tests
     Serialization/ErrorHandlingTests.cpp
     # Internal (non-exported) code under test is compiled into the test binary
     # directly — its symbols are hidden inside the SDK DLL.
-    ${PROJECT_SOURCE_DIR}/src/Core/LastError.cpp)
+    ${PROJECT_SOURCE_DIR}/src/Core/LastError.cpp
+    ${PROJECT_SOURCE_DIR}/src/Core/MSVCWorkaround.cpp)
 
 # Tests may reach internal headers; consumers must not.
 target_include_directories(pmsdk_tests PRIVATE 

@@ -94,8 +94,9 @@
 - Milestone 11: Unit tests (full sweep to 90% coverage)
 - Milestone 10: Public C API
 
+- Milestone 20: Release packaging (2026-07-14) ✅
+
 ## Next Items / Backlog
 - [ ] Milestone 19: Plugin SDK
-- [ ] Milestone 20: Release packaging
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Code coverage job in CI

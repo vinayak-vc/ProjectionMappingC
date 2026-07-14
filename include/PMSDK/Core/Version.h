@@ -23,7 +23,7 @@ struct Version {
 
 /// Compile-time version of the headers this translation unit was built against.
 /// Kept in sync with the CMake project version (enforced by a static_assert in Version.cpp).
-inline constexpr Version kHeaderVersion{0, 1, 0};
+inline constexpr Version kHeaderVersion{1, 0, 3};
 
 /// Runtime version of the linked PMSDK binary. Compare against kHeaderVersion
 /// to detect header/binary mismatches across the DLL boundary.

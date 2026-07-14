@@ -10,6 +10,7 @@ target_sources(pmsdk PRIVATE
     Core/LastError.cpp
     Core/Logger.cpp
     Core/Version.cpp
+    Core/MSVCWorkaround.cpp
     Geometry/Mesh.cpp
     Geometry/MeshBuilder.cpp
     Geometry/MeshSubdivision.cpp

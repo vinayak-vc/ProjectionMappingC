@@ -63,32 +63,52 @@ void Mesh::Clear() {
 void Mesh::RecalculateNormals() {
     if (m_impl->indices.empty() || m_impl->vertices.empty()) return;
 
+    // Zero out normals (Parallel)
     std::for_each(std::execution::par_unseq, m_impl->vertices.begin(), m_impl->vertices.end(), [](auto& v) {
         v.normal = Math::Vector3(0.0f, 0.0f, 0.0f);
     });
 
-    for (size_t i = 0; i < m_impl->indices.size(); i += 3) {
-        if (i + 2 >= m_impl->indices.size()) break;
+    size_t faceCount = m_impl->indices.size() / 3;
+    std::vector<Math::Vector3> faceNormals(faceCount, {0.0f, 0.0f, 0.0f});
 
+    // 1. Map: Calculate face normals (Parallel)
+    // We use a counting_iterator-like approach by generating indices 0 to faceCount-1
+    std::vector<size_t> faceIndices(faceCount);
+    std::iota(faceIndices.begin(), faceIndices.end(), 0);
+
+    std::for_each(std::execution::par_unseq, faceIndices.begin(), faceIndices.end(), [&](size_t faceIdx) {
+        size_t i = faceIdx * 3;
         uint32_t i0 = m_impl->indices[i];
         uint32_t i1 = m_impl->indices[i + 1];
         uint32_t i2 = m_impl->indices[i + 2];
 
-        if (i0 >= m_impl->vertices.size() || i1 >= m_impl->vertices.size() || i2 >= m_impl->vertices.size()) continue;
+        if (i0 < m_impl->vertices.size() && i1 < m_impl->vertices.size() && i2 < m_impl->vertices.size()) {
+            Math::Vector3 v0 = m_impl->vertices[i0].position;
+            Math::Vector3 v1 = m_impl->vertices[i1].position;
+            Math::Vector3 v2 = m_impl->vertices[i2].position;
 
-        Math::Vector3 v0 = m_impl->vertices[i0].position;
-        Math::Vector3 v1 = m_impl->vertices[i1].position;
-        Math::Vector3 v2 = m_impl->vertices[i2].position;
+            Math::Vector3 edge1 = v1 - v0;
+            Math::Vector3 edge2 = v2 - v0;
+            faceNormals[faceIdx] = edge1.Cross(edge2).Normalized();
+        }
+    });
 
-        Math::Vector3 edge1 = v1 - v0;
-        Math::Vector3 edge2 = v2 - v0;
-        Math::Vector3 normal = edge1.Cross(edge2).Normalized();
+    // 2. Reduce: Accumulate face normals into vertices (Serial)
+    for (size_t faceIdx = 0; faceIdx < faceCount; ++faceIdx) {
+        size_t i = faceIdx * 3;
+        uint32_t i0 = m_impl->indices[i];
+        uint32_t i1 = m_impl->indices[i + 1];
+        uint32_t i2 = m_impl->indices[i + 2];
 
-        m_impl->vertices[i0].normal += normal;
-        m_impl->vertices[i1].normal += normal;
-        m_impl->vertices[i2].normal += normal;
+        if (i0 < m_impl->vertices.size() && i1 < m_impl->vertices.size() && i2 < m_impl->vertices.size()) {
+            const Math::Vector3& normal = faceNormals[faceIdx];
+            m_impl->vertices[i0].normal += normal;
+            m_impl->vertices[i1].normal += normal;
+            m_impl->vertices[i2].normal += normal;
+        }
     }
 
+    // 3. Normalize: Normalize all accumulated vertex normals (Parallel)
     std::for_each(std::execution::par_unseq, m_impl->vertices.begin(), m_impl->vertices.end(), [](auto& v) {
         v.normal.Normalize();
     });

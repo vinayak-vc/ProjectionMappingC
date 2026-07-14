@@ -2,17 +2,17 @@
 
 ## Current State (2026-07-13)
 
-**Last Completed Milestone**: Milestone 17 (GrayCode Decoder & Triangulation)
-**Current Task**: Ready for Milestone 18 (Performance optimization).
+**Last Completed Milestone**: Milestone 18 (Performance optimization)
+**Current Task**: Ready for Milestone 19 (Plugin SDK).
 
-## What was just done
-- **Milestone 16 Completed**: Added Advanced OpenCV Calibration Wrappers. Enabled the SDK to perform physical camera intrinsic/extrinsic calibration and calculate reprojection errors directly inside C++.
-- **Milestone 17 Completed**: Built the `GrayCodeDecoder` core which automatically un-gray-codes captured images to find exact projector pixel mappings and then triangulates them using OpenCV. Added ability for the SDK to perform direct camera captures (`cv::VideoCapture`) to bypass Unity's main thread entirely.
-- Both features were exposed via the C-API and Unity bindings (`NativeBindings.cs`, `Calibration.cs`).
+## Current State
+- The Core, Math, Geometry, Warp, Blend, Serialization, and Calibration modules are implemented.
+- We have fully decoupled OpenCV behind a strict PImpl interface to prevent ABI spillage.
+- Milestone 18 (Performance Optimization) is complete. The Warp, Mesh, and Math components now heavily utilize `std::execution::par_unseq` for multithreaded SIMD vectorization.
+- The `MSVCWorkaround.cpp` was introduced as a C++ file wrapped in `extern "C"` to provide missing static linker symbols on older MSVC environments without conflicting with GHA MSVC CI headers.
 
-## Next Recommended Task (Milestone 18)
-1. Proceed with **Milestone 18**: Performance optimization (SIMD, multithreading, or GPU compute for the Warp mesh deformations).
-2. Or tackle **Milestone 19**: Plugin SDK.
+## Next Recommended Task
+- **Milestone 19: Plugin SDK**: Create plugin bindings for UE5 or wrap the C API in C# for advanced Unity rendering hooks.
 
 ## Project Structure Notes
 - The DLL is completely self-contained.

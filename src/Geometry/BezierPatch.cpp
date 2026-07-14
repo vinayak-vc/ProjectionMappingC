@@ -1,6 +1,7 @@
 #include "PMSDK/Geometry/BezierPatch.h"
 #include "PMSDK/Geometry/BezierCurve.h"
-
+#include <algorithm>
+#include <execution>
 namespace pmsdk::Geometry {
 
 struct BezierPatch::Impl {
@@ -107,6 +108,51 @@ std::unique_ptr<Mesh> BezierPatch::GenerateMesh(int resolutionX, int resolutionY
     mesh->SetIndices(indices.data(), indices.size());
     mesh->RecalculateNormals();
     return mesh;
+}
+
+void BezierPatch::ApplyDeformation(Vertex* vertices, size_t count) const {
+    if (count == 0 || !vertices) return;
+
+    std::for_each(std::execution::par_unseq, vertices, vertices + count, [this](auto& v) {
+        float u = v.uv.x;
+        float v_c = v.uv.y;
+
+        float u1 = 1.0f - u;
+        float u1_2 = u1 * u1;
+        float u1_3 = u1_2 * u1;
+        float u2 = u * u;
+        float u3 = u2 * u;
+
+        float bu[4] = {
+            u1_3,
+            3.0f * u * u1_2,
+            3.0f * u2 * u1,
+            u3
+        };
+
+        float v1 = 1.0f - v_c;
+        float v1_2 = v1 * v1;
+        float v1_3 = v1_2 * v1;
+        float v2 = v_c * v_c;
+        float v3 = v2 * v_c;
+
+        float bv[4] = {
+            v1_3,
+            3.0f * v_c * v1_2,
+            3.0f * v2 * v1,
+            v3
+        };
+
+        Math::Vector3 result(0.0f, 0.0f, 0.0f);
+        
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                result += m_impl->controlPoints[i * 4 + j] * (bu[i] * bv[j]);
+            }
+        }
+        
+        v.position = result;
+    });
 }
 
 } // namespace pmsdk::Geometry

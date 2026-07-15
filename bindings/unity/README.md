@@ -4,6 +4,14 @@ Welcome to the Projection Mapping SDK for Unity! This package provides high-perf
 
 **This SDK handles all warping and edge-blending natively, meaning you do NOT need third-party software (like Resolume or MadMapper), nor do you need to use Nvidia Surround/AMD Eyefinity to stitch displays.**
 
+## Why Native Unity SDK vs. Third Party Applications (TPAs)?
+Traditionally, projection mapping requires running a game in Unity, using Nvidia Surround to stitch projectors into one massive virtual monitor, and running a Third Party Application (like Resolume or MadMapper) to warp the screen via Spout/Syphon. 
+Our native SDK is superior for interactive installations because:
+1. **Zero Latency**: By living inside Unity's rendering pipeline, warping happens directly on the GPU in real-time, which is critical for interactive tracking (Kinect, Lidar).
+2. **True 3D Mapping**: TPAs just warp a flat 2D video feed. The SDK maps natively onto 3D objects in the Unity scene.
+3. **No Screen Tunneling Hacks**: By utilizing Unity's native `Target Display` routing, you bypass the instability of Nvidia Surround. Windows sees normal, stable displays.
+4. **No Expensive Licenses**: Professional TPAs cost thousands of dollars; you are running an enterprise-grade solution natively in the engine.
+
 ## Installation
 1. Open the Unity Package Manager (`Window > Package Manager`).
 2. Click the `+` button in the top left and select `Add package from disk...`

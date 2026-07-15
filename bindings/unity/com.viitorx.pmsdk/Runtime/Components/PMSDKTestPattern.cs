@@ -22,22 +22,34 @@ namespace vxpmsdk.Components
         public Color CircleColor = Color.yellow;
 
         private MeshRenderer meshRenderer;
-        private Material originalMaterial;
+        // Serialized so the original screen material survives domain reloads and
+        // scene reloads while the pattern is enabled. Without this, the runtime
+        // test-pattern material gets saved into the scene as the "real" material
+        // and the original (e.g. the RenderTexture screen material) is lost.
+        [SerializeField, HideInInspector] private Material originalMaterial;
         private Material testPatternMaterial;
         private Texture2D testTexture;
 
         private void OnEnable()
         {
             meshRenderer = GetComponent<MeshRenderer>();
-            originalMaterial = meshRenderer.sharedMaterial;
+            // Capture only once: if originalMaterial is already set we are recovering
+            // from a reload and sharedMaterial may be a stale test-pattern material.
+            if (originalMaterial == null)
+            {
+                originalMaterial = meshRenderer.sharedMaterial;
+            }
 
             GenerateTestPattern();
-            
+
             // Create a simple unlit material to display the texture
             Shader unlitShader = Shader.Find("Unlit/Texture");
             if (unlitShader != null)
             {
                 testPatternMaterial = new Material(unlitShader);
+                testPatternMaterial.name = "PMSDK_TestPattern (runtime)";
+                // Never serialize the runtime pattern material/texture into the scene.
+                testPatternMaterial.hideFlags = HideFlags.DontSave;
                 testPatternMaterial.mainTexture = testTexture;
                 meshRenderer.sharedMaterial = testPatternMaterial;
             }
@@ -52,6 +64,9 @@ namespace vxpmsdk.Components
             if (meshRenderer != null && originalMaterial != null)
             {
                 meshRenderer.sharedMaterial = originalMaterial;
+                // Clear so the next OnEnable re-captures whatever material the user
+                // has assigned in the meantime.
+                originalMaterial = null;
             }
 
             if (testPatternMaterial != null)
@@ -75,6 +90,7 @@ namespace vxpmsdk.Components
         {
             int texSize = 1024;
             testTexture = new Texture2D(texSize, texSize, TextureFormat.RGBA32, false);
+            testTexture.hideFlags = HideFlags.DontSave;
             testTexture.filterMode = FilterMode.Point;
             testTexture.wrapMode = TextureWrapMode.Clamp;
 

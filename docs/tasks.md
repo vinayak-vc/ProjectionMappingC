@@ -96,7 +96,52 @@
 
 - Milestone 20: Release packaging (2026-07-14) ✅
 
+## Unity demo overhaul (2026-07-15) ✅
+
+- [x] Diagnosed black projector outputs: warped meshes live in normalized raster space; old 3D-plane + perspective-camera rig rendered them edge-on (D-020)
+- [x] Raster-space rig: identity-rotation warp surfaces (16:9 scale), orthographic projector cameras, split-slice RT materials with 10% overlap
+- [x] New `PMSDK/UnlitWarp` shader (edge blend writes vertex alpha; Unlit/Texture ignored it)
+- [x] New `PMSDKDisplayActivator` (Display.Activate — displays 2/3 were black in builds)
+- [x] New `PMSDKVelocityCap` (maxLinearVelocity is not serialized; PhysX restitution overshoot made the demo cube bounce ever higher)
+- [x] `PMSDKTestPattern` no longer clobbers screen materials across scene saves (serialized originalMaterial, DontSave runtime objects)
+- [x] Demo generator persists RT/materials/physics material as assets (in-memory references died on scene reload)
+- [x] Auto-configurator creates the ortho raster rig; culling mask uses the surface's own layer (was hardcoded `Default`)
+- [x] Scenes: `WarpAndBlendExample` retrofitted; `ProBuilderMappingDemo` added (ProBuilder stage: wall/pillars/arch/stairs)
+- [x] Play-mode verified: both projector outputs show split content with black-falloff blend bands
+
+## On-site calibration P1 (2026-07-16) ✅
+
+- [x] `PMSDKCalibrationManager` — F2 calibration mode, keyboard-only editing (PgUp/PgDn surface, Tab corner/edge, arrows nudge with Shift/Ctrl step scaling, B blend submode, T test pattern, R reset, Ctrl+S save, Esc exit+autosave)
+- [x] JSON persistence in persistentDataPath (atomic write, `-calibfile`/`-calibrate` CLI overrides); silent load+apply on boot; auto-enter calibration on first run
+- [x] `PMSDKCalibrationOverlay` — corner handles (selected = yellow/pulsing) + projector identify badge on each output
+- [x] `PMSDKCalibrationHUD` — operator console on Display 1 (status line, dirty flag, F1 help)
+- [x] `PMSDKCornerPinUI` superseded (manager disables it); generator/configurator create "PMSDK Runtime Services" (manager + display activator); both demo scenes migrated
+- [x] Play-mode verified end-to-end: nudge → CornerPin → native GridWarp → visible keystone on projector output; save/reload roundtrip works
+
+## On-site calibration P2 (2026-07-16) ✅
+
+- [x] Mouse drag: `Display.RelativeMouseAt` per-display routing (Editor fallback: raw mouse vs focused Game view, distance-gated grab), Alt = fine drag
+- [x] Undo: coalesced snapshot stack (0.7 s groups, Ctrl+Z, depth 100), restores corners + blend per surface
+- [x] Loupe: hidden service camera renders magnified view around selected corner into RT, shown with crosshair on operator HUD
+- [x] Per-projector live thumbnails on operator HUD (0.33 s refresh), click to select, yellow frame on selection
+- [x] Blend-zone tint on projector outputs in blend submode (orange = selected edge, cyan = others)
+- [x] Fixed: overlay canvas parented under 16:9-scaled surface inherited the scale and pushed zones out of frustum — overlays now live under the manager
+- [x] Play-mode verified: pixel-probed orange/cyan bands, handle positions, undo roundtrip, thumbnails + loupe RTs live
+
+## On-site calibration P3 — camera auto-align (2026-07-16) ✅ (simulation-verified)
+
+- [x] `PMSDKGrayCodeDecode` — managed decode bit-compatible with native GrayCode.cpp (colBits+rowBits, MSB-first, Gray→binary, per-pixel white/black threshold, contrast reject)
+- [x] `PMSDKHomography` — least-squares planar homography (normal equations, 8x8 Gaussian solve), apply
+- [x] `PMSDKCalibrationCamera` — `IPMSDKCalibrationCamera` + `PMSDKSimulatedCamera` (Unity camera → luminance readback, top-left origin)
+- [x] `PMSDKAutoAlign` — coroutine: take over surface → show white/black + Gray patterns → capture → decode correspondence → fit camera→projector homography → map target corners to corner-pin
+- [x] Manager `A` / `Shift+A` (selected / all), input gated during sweep, HUD status; `AlignSelectedWithTarget` for explicit target quads
+- [x] Numeric verify: decode roundtrip 16384/16384 (0 errors), homography reproj 1.9e-6
+- [x] Simulated integration verify: recovered identity from skewed corner-pin (err 0.008), explicit sub-rectangle target mapped exactly
+- [ ] Real-hardware loop: add C-API `pmsdk_decoder_get_frame` grayscale readback, wire native webcam into IPMSDKCalibrationCamera, physical smoke test (no hardware here)
+
 ## Next Items / Backlog
+- [ ] Auto-align real-hardware path (C-API frame readback + webcam source + physical test)
+- [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
 - [ ] Milestone 19: Plugin SDK
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Code coverage job in CI

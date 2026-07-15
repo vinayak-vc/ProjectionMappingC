@@ -1,0 +1,319 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace vxpmsdk.Components
+{
+    /// <summary>
+    /// Operator console shown on the control display (Display 1) while calibration
+    /// mode is active: selection readout, current values, step hints, save state,
+    /// an F1 help overlay, a loupe (magnified view around the selected corner) and
+    /// live per-projector thumbnails (click one to select that surface).
+    /// Built entirely at runtime.
+    /// </summary>
+    public class PMSDKCalibrationHUD : MonoBehaviour
+    {
+        private const string HelpText =
+            "PMSDK CALIBRATION — KEYS\n" +
+            "F2            toggle calibration mode\n" +
+            "F1            toggle this help\n" +
+            "PgUp / PgDn   select projector surface (or click a thumbnail)\n" +
+            "Tab           cycle corner (blend mode: cycle edge)\n" +
+            "Arrows        nudge corner   [Shift] coarse x5   [Ctrl] fine x0.1\n" +
+            "Mouse drag    move handle directly   [Alt] fine drag\n" +
+            "B             blend mode: arrows = width / gamma, zones tinted\n" +
+            "N / Shift+N   black level up / down\n" +
+            "T / Shift+T   test pattern: selected / all\n" +
+            "R / Ctrl+R    reset corner / reset surface\n" +
+            "A / Shift+A   auto-align (camera): selected / all\n" +
+            "Ctrl+Z        undo\n" +
+            "Ctrl+S        save          Esc  exit (auto-saves)";
+
+        private const float ThumbWidth = 192f;
+        private const float ThumbHeight = 108f;
+
+        private PMSDKCalibrationManager manager;
+        private Canvas canvas;
+        private Text statusText;
+        private Text helpTextUi;
+        private RawImage loupeImage;
+        private GameObject loupePanel;
+        private RectTransform thumbRow;
+        private readonly List<RawImage> thumbImages = new List<RawImage>();
+        private readonly List<Image> thumbFrames = new List<Image>();
+
+        public static PMSDKCalibrationHUD Create(PMSDKCalibrationManager manager)
+        {
+            var go = new GameObject("PMSDK Calibration HUD");
+            go.transform.SetParent(manager.transform, false);
+            var hud = go.AddComponent<PMSDKCalibrationHUD>();
+            hud.manager = manager;
+            hud.Build();
+            return hud;
+        }
+
+        public void SetVisible(bool visible)
+        {
+            if (canvas != null)
+            {
+                canvas.gameObject.SetActive(visible);
+            }
+        }
+
+        private void Build()
+        {
+            var canvasObj = new GameObject("Canvas");
+            canvasObj.transform.SetParent(transform, false);
+            canvasObj.layer = LayerMask.NameToLayer("UI");
+            canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.targetDisplay = 0; // operator/control display
+            canvas.sortingOrder = 200;
+            canvasObj.AddComponent<CanvasScaler>();
+            canvasObj.AddComponent<GraphicRaycaster>(); // thumbnail click-select
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            // Dark strip behind the status line so it reads over any content.
+            var panel = new GameObject("Panel");
+            panel.transform.SetParent(canvasObj.transform, false);
+            panel.layer = canvasObj.layer;
+            var panelImg = panel.AddComponent<Image>();
+            panelImg.color = new Color(0f, 0f, 0f, 0.75f);
+            var panelRect = panel.GetComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(0f, 1f);
+            panelRect.anchorMax = new Vector2(1f, 1f);
+            panelRect.pivot = new Vector2(0.5f, 1f);
+            panelRect.anchoredPosition = Vector2.zero;
+            panelRect.sizeDelta = new Vector2(0f, 96f);
+
+            statusText = CreateText(panel.transform, font, 20, TextAnchor.UpperLeft);
+            var statusRect = statusText.GetComponent<RectTransform>();
+            statusRect.anchorMin = Vector2.zero;
+            statusRect.anchorMax = Vector2.one;
+            statusRect.offsetMin = new Vector2(16f, 8f);
+            statusRect.offsetMax = new Vector2(-16f, -8f);
+
+            // Loupe: magnified view around the selected corner, docked top-right
+            // under the status strip.
+            loupePanel = new GameObject("LoupePanel");
+            loupePanel.transform.SetParent(canvasObj.transform, false);
+            loupePanel.layer = canvasObj.layer;
+            var loupeBg = loupePanel.AddComponent<Image>();
+            loupeBg.color = new Color(0f, 0f, 0f, 0.75f);
+            var loupeRect = loupePanel.GetComponent<RectTransform>();
+            loupeRect.anchorMin = new Vector2(1f, 1f);
+            loupeRect.anchorMax = new Vector2(1f, 1f);
+            loupeRect.pivot = new Vector2(1f, 1f);
+            loupeRect.anchoredPosition = new Vector2(-8f, -104f);
+            loupeRect.sizeDelta = new Vector2(216f, 216f);
+
+            var loupeImgObj = new GameObject("Loupe");
+            loupeImgObj.transform.SetParent(loupePanel.transform, false);
+            loupeImgObj.layer = canvasObj.layer;
+            loupeImage = loupeImgObj.AddComponent<RawImage>();
+            var loupeImgRect = loupeImage.GetComponent<RectTransform>();
+            loupeImgRect.anchorMin = Vector2.zero;
+            loupeImgRect.anchorMax = Vector2.one;
+            loupeImgRect.offsetMin = new Vector2(8f, 8f);
+            loupeImgRect.offsetMax = new Vector2(-8f, -8f);
+            CreateCrosshair(loupeImage.transform);
+
+            // Thumbnail row, docked bottom-left.
+            var rowObj = new GameObject("Thumbnails");
+            rowObj.transform.SetParent(canvasObj.transform, false);
+            rowObj.layer = canvasObj.layer;
+            thumbRow = rowObj.AddComponent<RectTransform>();
+            thumbRow.anchorMin = new Vector2(0f, 0f);
+            thumbRow.anchorMax = new Vector2(0f, 0f);
+            thumbRow.pivot = new Vector2(0f, 0f);
+            thumbRow.anchoredPosition = new Vector2(8f, 8f);
+
+            var helpPanel = new GameObject("HelpPanel");
+            helpPanel.transform.SetParent(canvasObj.transform, false);
+            helpPanel.layer = canvasObj.layer;
+            var helpImg = helpPanel.AddComponent<Image>();
+            helpImg.color = new Color(0f, 0f, 0f, 0.85f);
+            var helpRect = helpPanel.GetComponent<RectTransform>();
+            helpRect.anchorMin = new Vector2(0.5f, 0.5f);
+            helpRect.anchorMax = new Vector2(0.5f, 0.5f);
+            helpRect.sizeDelta = new Vector2(760f, 460f);
+
+            helpTextUi = CreateText(helpPanel.transform, font, 22, TextAnchor.MiddleLeft);
+            var helpTextRect = helpTextUi.GetComponent<RectTransform>();
+            helpTextRect.anchorMin = Vector2.zero;
+            helpTextRect.anchorMax = Vector2.one;
+            helpTextRect.offsetMin = new Vector2(24f, 16f);
+            helpTextRect.offsetMax = new Vector2(-24f, -16f);
+            helpTextUi.text = HelpText;
+        }
+
+        private void CreateCrosshair(Transform parent)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                var line = new GameObject(i == 0 ? "CrossH" : "CrossV");
+                line.transform.SetParent(parent, false);
+                line.layer = parent.gameObject.layer;
+                var img = line.AddComponent<Image>();
+                img.color = new Color(1f, 0.9f, 0.1f, 0.6f);
+                img.raycastTarget = false;
+                var r = line.GetComponent<RectTransform>();
+                r.anchorMin = new Vector2(0.5f, 0.5f);
+                r.anchorMax = new Vector2(0.5f, 0.5f);
+                r.sizeDelta = i == 0 ? new Vector2(60f, 2f) : new Vector2(2f, 60f);
+            }
+        }
+
+        private void RebuildThumbnails()
+        {
+            foreach (Transform child in thumbRow)
+            {
+                Destroy(child.gameObject);
+            }
+            thumbImages.Clear();
+            thumbFrames.Clear();
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            for (int i = 0; i < manager.Surfaces.Count; i++)
+            {
+                int index = i; // capture for the click handler
+                var frameObj = new GameObject("Thumb_" + manager.Surfaces[i].Id);
+                frameObj.transform.SetParent(thumbRow, false);
+                frameObj.layer = thumbRow.gameObject.layer;
+                var frame = frameObj.AddComponent<Image>();
+                frame.color = new Color(0.2f, 0.2f, 0.2f, 0.9f);
+                var frameRect = frameObj.GetComponent<RectTransform>();
+                frameRect.anchorMin = Vector2.zero;
+                frameRect.anchorMax = Vector2.zero;
+                frameRect.pivot = Vector2.zero;
+                frameRect.anchoredPosition = new Vector2(i * (ThumbWidth + 12f), 0f);
+                frameRect.sizeDelta = new Vector2(ThumbWidth + 6f, ThumbHeight + 26f);
+
+                var button = frameObj.AddComponent<Button>();
+                button.onClick.AddListener(() => manager.SetSelectedSurface(index));
+
+                var imgObj = new GameObject("Image");
+                imgObj.transform.SetParent(frameObj.transform, false);
+                imgObj.layer = frameObj.layer;
+                var raw = imgObj.AddComponent<RawImage>();
+                raw.raycastTarget = false;
+                var rawRect = raw.GetComponent<RectTransform>();
+                rawRect.anchorMin = new Vector2(0f, 0f);
+                rawRect.anchorMax = new Vector2(0f, 0f);
+                rawRect.pivot = Vector2.zero;
+                rawRect.anchoredPosition = new Vector2(3f, 3f);
+                rawRect.sizeDelta = new Vector2(ThumbWidth, ThumbHeight);
+
+                var label = CreateText(frameObj.transform, font, 14, TextAnchor.UpperCenter);
+                label.raycastTarget = false;
+                int displayNumber = manager.Surfaces[i].ProjectorCamera != null ? manager.Surfaces[i].ProjectorCamera.targetDisplay + 1 : 1;
+                label.text = $"[{i + 1}] Display {displayNumber} — {manager.Surfaces[i].Id}";
+                var labelRect = label.GetComponent<RectTransform>();
+                labelRect.anchorMin = new Vector2(0f, 1f);
+                labelRect.anchorMax = new Vector2(1f, 1f);
+                labelRect.pivot = new Vector2(0.5f, 1f);
+                labelRect.anchoredPosition = new Vector2(0f, -4f);
+                labelRect.sizeDelta = new Vector2(0f, 18f);
+
+                thumbImages.Add(raw);
+                thumbFrames.Add(frame);
+            }
+        }
+
+        private static Text CreateText(Transform parent, Font font, int size, TextAnchor anchor)
+        {
+            var go = new GameObject("Text");
+            go.transform.SetParent(parent, false);
+            go.layer = parent.gameObject.layer;
+            var text = go.AddComponent<Text>();
+            text.font = font;
+            text.fontSize = size;
+            text.alignment = anchor;
+            text.color = Color.white;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            return text;
+        }
+
+        private void LateUpdate()
+        {
+            if (canvas == null || !canvas.gameObject.activeSelf || manager == null)
+            {
+                return;
+            }
+
+            helpTextUi.transform.parent.gameObject.SetActive(manager.HelpVisible);
+
+            var s = manager.Selected;
+            if (s == null)
+            {
+                statusText.text = "PMSDK CALIBRATION — no surfaces found";
+                return;
+            }
+
+            if (manager.IsAutoAligning)
+            {
+                statusText.text = "PMSDK CALIBRATION — AUTO-ALIGN RUNNING\n" + (manager.AutoAlignStatus ?? "") + "\ndisplaying structured-light patterns, please wait…";
+                return;
+            }
+
+            if (thumbImages.Count != manager.Surfaces.Count)
+            {
+                RebuildThumbnails();
+            }
+            for (int i = 0; i < thumbImages.Count; i++)
+            {
+                thumbImages[i].texture = manager.Surfaces[i].Thumbnail;
+                thumbFrames[i].color = i == manager.SelectedSurfaceIndex
+                    ? new Color(1f, 0.9f, 0.1f, 0.95f)
+                    : new Color(0.2f, 0.2f, 0.2f, 0.9f);
+            }
+
+            // Loupe only makes sense while corner editing.
+            loupePanel.SetActive(!manager.BlendSubmode);
+            if (loupeImage != null)
+            {
+                loupeImage.texture = manager.LoupeRT;
+            }
+
+            int displayNumber = s.ProjectorCamera != null ? s.ProjectorCamera.targetDisplay + 1 : 1;
+            string line1 = $"PMSDK CALIBRATION   Projector [{manager.SelectedSurfaceIndex + 1}/{manager.Surfaces.Count}]  {s.Id}  (Display {displayNumber})";
+
+            string line2;
+            if (manager.BlendSubmode)
+            {
+                string edge = PMSDKCalibrationManager.EdgeNames[manager.SelectedEdge];
+                float gamma = s.Blend != null ? s.Blend.Gamma : 0f;
+                float black = s.Blend != null ? s.Blend.BlackLevel : 0f;
+                line2 = $"BLEND  edge {edge}   L {F(s, 0)}  R {F(s, 1)}  T {F(s, 2)}  B {F(s, 3)}   gamma {gamma:F2}   black {black:F2}";
+            }
+            else
+            {
+                Vector2 pos = PMSDKCalibrationManager.GetCorner(s.CornerPin, manager.SelectedCorner);
+                string corner = PMSDKCalibrationManager.CornerNames[manager.SelectedCorner];
+                string drag = manager.IsDragging ? "   [dragging]" : "";
+                line2 = $"CORNER {corner}   pos ({pos.x:F4}, {pos.y:F4})   arrows/drag  [Shift] coarse  [Ctrl/Alt] fine{drag}";
+            }
+
+            string saveState = manager.Dirty ? "* UNSAVED CHANGES — Ctrl+S to save" : "saved";
+            string undo = manager.UndoDepth > 0 ? $"   undo x{manager.UndoDepth}" : "";
+            string aa = string.IsNullOrEmpty(manager.AutoAlignStatus) ? "" : $"   |   {manager.AutoAlignStatus}";
+            string line3 = $"{saveState}{undo}   |   F1 help   A auto-align   Esc exit{aa}";
+
+            statusText.text = line1 + "\n" + line2 + "\n" + line3;
+        }
+
+        private static string F(PMSDKCalibrationManager.Surface s, int edge)
+        {
+            if (s.Blend == null) return "-";
+            switch (edge)
+            {
+                case 0: return s.Blend.LeftEdge.ToString("F2");
+                case 1: return s.Blend.RightEdge.ToString("F2");
+                case 2: return s.Blend.TopEdge.ToString("F2");
+                default: return s.Blend.BottomEdge.ToString("F2");
+            }
+        }
+    }
+}

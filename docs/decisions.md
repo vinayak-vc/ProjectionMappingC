@@ -96,6 +96,34 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
+## D-021 2026-07-16 — Camera auto-align uses a homography, not the native stereo triangulation
+
+On-site auto-align (calibration P3) recovers a camera→projector planar homography from
+Gray-code correspondence and maps target corners into the corner-pin. It deliberately
+does NOT use `pmsdk_decoder_decode_and_triangulate`: that produces a metric 3D point
+cloud but requires a fully calibrated camera AND projector (intrinsics + extrinsics),
+which an on-site technician cannot supply quickly. A homography needs zero calibration,
+matches the model the corner-pin already implements, and is sufficient for flat/quasi-flat
+mapping surfaces. Gray decode is reimplemented in managed C# (bit-compatible with
+src/Calibration/GrayCode.cpp) so the correspondence pipeline is deterministic and testable
+without hardware. The native triangulation path remains for future true-3D calibration
+onto complex geometry. Capture is abstracted (`IPMSDKCalibrationCamera`): a simulated
+Unity-camera source ships now (works for virtual/LED-volume rigs and testing); the
+physical webcam source needs a per-frame grayscale readback added to the C API
+(`pmsdk_decoder_get_frame`). See docs/calibration-ux-design.md §9.
+
+## D-020 2026-07-15 — Unity renders warped meshes in normalized raster space with orthographic projector cameras
+
+The native warp engine's output contract is `position = gridwarp(uv)`: processed meshes
+always land on a normalized [0,1]² XY quad, regardless of the input mesh's 3D pose. The
+original Unity demo rig (3D planes + perspective projector cameras) therefore rendered the
+warped quad edge-on — projector outputs were pure black in play mode. The Unity integration
+now standardizes on: identity-rotation warp surfaces scaled to raster aspect (16:9, 1, 1),
+orthographic projector cameras framing the unit quad, split-slice RT materials with an
+overlap band, and the `PMSDK/UnlitWarp` shader (native edge blend writes vertex ALPHA only;
+stock Unlit/Texture ignores it). Multi-display output requires `PMSDKDisplayActivator`
+(Display.Activate is mandatory in standalone builds). See docs/unity-architecture.md §2–4.
+
 ## D-019 2026-07-13 — Direct SDK Camera Capture for Structured Light
 
 Instead of requiring the host engine (Unity/Unreal) to capture WebCam frames, allocate large `Texture2D` memory on the main thread, and serialize/pass them to the SDK, we enabled the `GrayCodeDecoder` to directly bind to the physical camera hardware using OpenCV's `cv::VideoCapture`. This keeps memory and frame extraction strictly off the host's main thread, drastically improving performance.

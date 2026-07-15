@@ -37,14 +37,14 @@ namespace vxpmsdk.Editor
             leftPlane.name = "Left_Screen";
             leftPlane.layer = LayerMask.NameToLayer("TransparentFX"); // Isolate Screens
             leftPlane.transform.position = new Vector3(-5, 0, 0);
-            leftPlane.transform.rotation = Quaternion.Euler(-90, 0, 0);
+            leftPlane.transform.rotation = Quaternion.Euler(90, 0, 0);
             leftPlane.GetComponent<MeshRenderer>().sharedMaterial = rtMat;
 
             GameObject rightPlane = GameObject.CreatePrimitive(PrimitiveType.Plane);
             rightPlane.name = "Right_Screen";
             rightPlane.layer = LayerMask.NameToLayer("TransparentFX"); // Isolate Screens
             rightPlane.transform.position = new Vector3(5, 0, 0);
-            rightPlane.transform.rotation = Quaternion.Euler(-90, 0, 0);
+            rightPlane.transform.rotation = Quaternion.Euler(90, 0, 0);
             rightPlane.GetComponent<MeshRenderer>().sharedMaterial = rtMat;
 
             // 5. Add Core SDK Components to Planes

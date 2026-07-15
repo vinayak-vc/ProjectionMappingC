@@ -46,7 +46,25 @@ namespace vxpmsdk.Editor
                 Debug.Log($"Created new Projector Camera: {projObj.name}");
             }
 
-            // 2. Add dependencies
+            // 2. Ensure the object has a Mesh assigned!
+            MeshFilter meshFilter = warp.GetComponent<MeshFilter>();
+            if (meshFilter != null && meshFilter.sharedMesh == null)
+            {
+                // Create a temporary primitive to steal its mesh
+                GameObject tempPlane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                Mesh defaultPlaneMesh = tempPlane.GetComponent<MeshFilter>().sharedMesh;
+                DestroyImmediate(tempPlane);
+                
+                Undo.RecordObject(meshFilter, "Assign Default Plane Mesh");
+                meshFilter.sharedMesh = defaultPlaneMesh;
+                Debug.Log($"Assigned default Unity Plane mesh to {warp.gameObject.name}");
+                
+                // We should re-enable the warp component so it picks up the new mesh
+                warp.enabled = false;
+                warp.enabled = true;
+            }
+
+            // 3. Add dependencies
             AddIfMissing<PMSDKTestPattern>(warp.gameObject);
             AddIfMissing<PMSDKCornerPin>(warp.gameObject);
             AddIfMissing<PMSDKEdgeBlend>(warp.gameObject);

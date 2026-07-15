@@ -5,6 +5,7 @@ using vxpmsdk;
 namespace vxpmsdk.Components
 {
     [ExecuteAlways]
+    [RequireComponent(typeof(PMSDKMeshWarp))]
     public class PMSDKEdgeBlend : MonoBehaviour
     {
         [Header("Blend Sizes (0 to 1)")]

@@ -19,18 +19,30 @@ namespace vxpmsdk.Components
         private void OnEnable()
         {
             cornerPin = GetComponent<PMSDKCornerPin>();
+            TryCreateCanvas();
+        }
+
+        private void Update()
+        {
+            if (canvasObj == null)
+            {
+                TryCreateCanvas();
+            }
+        }
+
+        private void TryCreateCanvas()
+        {
             PMSDKMeshWarp warp = GetComponent<PMSDKMeshWarp>();
 
             if (warp == null || warp.Projector == null)
             {
-                Debug.LogWarning("PMSDKCornerPinUI requires a PMSDKMeshWarp with a linked Projector to spawn the UI Canvas.");
+                // Wait for the projector to be assigned
                 return;
             }
 
             projectorCamera = warp.Projector.GetComponent<Camera>();
             if (projectorCamera == null)
             {
-                Debug.LogWarning("Projector does not have a Camera component attached.");
                 return;
             }
 

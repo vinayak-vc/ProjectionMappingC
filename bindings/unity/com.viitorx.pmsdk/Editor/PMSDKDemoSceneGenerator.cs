@@ -45,17 +45,15 @@ namespace vxpmsdk.Editor
             rightPlane.transform.rotation = Quaternion.Euler(-90, 0, 0);
             rightPlane.GetComponent<MeshRenderer>().sharedMaterial = rtMat;
 
-            // 5. Add SDK Components to Planes
+            // 5. Add Core SDK Components to Planes
             var leftWarp = leftPlane.AddComponent<PMSDKMeshWarp>();
             leftPlane.AddComponent<PMSDKTestPattern>();
             leftPlane.AddComponent<PMSDKCornerPin>();
-            leftPlane.AddComponent<PMSDKCornerPinUI>(); // NEW! Interactive UI
             leftPlane.AddComponent<PMSDKEdgeBlend>();
 
             var rightWarp = rightPlane.AddComponent<PMSDKMeshWarp>();
             rightPlane.AddComponent<PMSDKTestPattern>();
             rightPlane.AddComponent<PMSDKCornerPin>();
-            rightPlane.AddComponent<PMSDKCornerPinUI>(); // NEW! Interactive UI
             rightPlane.AddComponent<PMSDKEdgeBlend>();
 
             // 6. Create Projector Cameras
@@ -63,19 +61,29 @@ namespace vxpmsdk.Editor
             leftProjObj.transform.position = leftPlane.transform.position + new Vector3(0, 0, -10);
             Camera leftCam = leftProjObj.AddComponent<Camera>();
             leftCam.targetDisplay = 1; // Display 2
-            leftCam.cullingMask = 1 << LayerMask.NameToLayer("UI") | 1 << LayerMask.NameToLayer("Default"); // Ensure UI is seen
+            leftCam.cullingMask = (1 << LayerMask.NameToLayer("UI")) | (1 << LayerMask.NameToLayer("Default"));
             var leftProjector = leftProjObj.AddComponent<PMSDKProjector>();
 
             GameObject rightProjObj = new GameObject("PMSDK_Projector_Right");
             rightProjObj.transform.position = rightPlane.transform.position + new Vector3(0, 0, -10);
             Camera rightCam = rightProjObj.AddComponent<Camera>();
             rightCam.targetDisplay = 2; // Display 3
-            rightCam.cullingMask = 1 << LayerMask.NameToLayer("UI") | 1 << LayerMask.NameToLayer("Default");
+            rightCam.cullingMask = (1 << LayerMask.NameToLayer("UI")) | (1 << LayerMask.NameToLayer("Default"));
             var rightProjector = rightProjObj.AddComponent<PMSDKProjector>();
 
             // 7. Link Projectors
             leftWarp.Projector = leftProjector;
             rightWarp.Projector = rightProjector;
+
+            // 8. Add UI Components AFTER linking projectors so they can find the cameras!
+            leftPlane.AddComponent<PMSDKCornerPinUI>();
+            rightPlane.AddComponent<PMSDKCornerPinUI>();
+
+            // 9. Fix Skybox leaking by clearing to solid black for Projectors
+            leftCam.clearFlags = CameraClearFlags.SolidColor;
+            leftCam.backgroundColor = Color.black;
+            rightCam.clearFlags = CameraClearFlags.SolidColor;
+            rightCam.backgroundColor = Color.black;
 
             Selection.objects = new UnityEngine.Object[] { leftPlane, rightPlane };
             Debug.Log("Demo scene successfully generated! Press Play and you will see the interactive UI handles on the projector outputs.");

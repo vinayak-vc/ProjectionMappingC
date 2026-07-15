@@ -9,6 +9,7 @@ namespace vxpmsdk.Components
     /// Manages the native WarpNode and Projector configurations.
     /// </summary>
     [ExecuteAlways]
+    [RequireComponent(typeof(Camera))]
     public class PMSDKProjector : MonoBehaviour
     {
         public float AspectRatio = 1.777f; // 16:9

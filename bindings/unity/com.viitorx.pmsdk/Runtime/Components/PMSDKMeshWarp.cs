@@ -5,6 +5,7 @@ using vxpmsdk;
 namespace vxpmsdk.Components
 {
     [RequireComponent(typeof(MeshFilter))]
+    [RequireComponent(typeof(MeshRenderer))]
     [ExecuteAlways]
     public class PMSDKMeshWarp : MonoBehaviour
     {
@@ -32,6 +33,10 @@ namespace vxpmsdk.Components
 
                 InitializeNativeMeshes();
             }
+            else
+            {
+                Debug.LogWarning("PMSDKMeshWarp requires a Mesh to deform! Please assign a Mesh to the MeshFilter.", this);
+            }
         }
 
         private void OnDisable()
@@ -46,6 +51,7 @@ namespace vxpmsdk.Components
                 NativeBindings.pmsdk_mesh_destroy(nativeOutputMesh);
                 nativeOutputMesh = IntPtr.Zero;
             }
+            
             if (meshFilter != null && originalMesh != null)
             {
                 meshFilter.sharedMesh = originalMesh;
@@ -64,27 +70,24 @@ namespace vxpmsdk.Components
             nativeInputMesh = NativeBindings.pmsdk_mesh_create();
             nativeOutputMesh = NativeBindings.pmsdk_mesh_create();
 
-            Vector3[] unityVerts = originalMesh.vertices;
-            Vector3[] unityNormals = originalMesh.normals;
-            Vector2[] unityUvs = originalMesh.uv;
-            int[] unityIndices = originalMesh.triangles;
+            Vector3[] verts = warpedMesh.vertices;
+            Vector3[] normals = warpedMesh.normals;
+            Vector2[] uvs = warpedMesh.uv;
+            Color[] colors = warpedMesh.colors;
 
-            vertexBuffer = new pmsdk_vertex_t[unityVerts.Length];
-            for (int i = 0; i < unityVerts.Length; i++)
+            vertexBuffer = new pmsdk_vertex_t[verts.Length];
+            for (int i = 0; i < verts.Length; i++)
             {
-                vertexBuffer[i].position = new pmsdk_vec3_t { x = unityVerts[i].x, y = unityVerts[i].y, z = unityVerts[i].z };
-                if (unityNormals.Length > i)
-                    vertexBuffer[i].normal = new pmsdk_vec3_t { x = unityNormals[i].x, y = unityNormals[i].y, z = unityNormals[i].z };
-                if (unityUvs.Length > i)
-                    vertexBuffer[i].uv = new pmsdk_vec2_t { x = unityUvs[i].x, y = unityUvs[i].y };
-                vertexBuffer[i].color = new pmsdk_vec4_t { x = 1, y = 1, z = 1, w = 1 };
+                vertexBuffer[i] = new pmsdk_vertex_t
+                {
+                    position = new pmsdk_vec3_t { x = verts[i].x, y = verts[i].y, z = verts[i].z },
+                    normal = new pmsdk_vec3_t { x = normals[i].x, y = normals[i].y, z = normals[i].z },
+                    uv = new pmsdk_vec2_t { x = uvs.Length > i ? uvs[i].x : 0, y = uvs.Length > i ? uvs[i].y : 0 },
+                    color = new pmsdk_vec4_t { x = colors.Length > i ? colors[i].r : 1, y = colors.Length > i ? colors[i].g : 1, z = colors.Length > i ? colors[i].b : 1, w = colors.Length > i ? colors[i].a : 1 }
+                };
             }
 
-            indexBuffer = new uint[unityIndices.Length];
-            for (int i = 0; i < unityIndices.Length; i++)
-            {
-                indexBuffer[i] = (uint)unityIndices[i];
-            }
+            indexBuffer = (uint[])(object)warpedMesh.triangles;
 
             NativeBindings.pmsdk_mesh_set_vertices(nativeInputMesh, vertexBuffer, (UIntPtr)vertexBuffer.Length);
             NativeBindings.pmsdk_mesh_set_indices(nativeInputMesh, indexBuffer, (UIntPtr)indexBuffer.Length);
@@ -92,7 +95,13 @@ namespace vxpmsdk.Components
 
         private void Update()
         {
-            if (Projector == null || Projector.NativeWarpNode == IntPtr.Zero || nativeInputMesh == IntPtr.Zero)
+            if (Projector == null)
+            {
+                Debug.LogWarning("PMSDKMeshWarp is missing a linked Projector! Please assign a PMSDKProjector to this component.", this);
+                return;
+            }
+            
+            if (Projector.NativeWarpNode == IntPtr.Zero || nativeInputMesh == IntPtr.Zero)
                 return;
 
             // Process warp using native C++ multithreaded backend

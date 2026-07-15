@@ -5,7 +5,7 @@ using vxpmsdk;
 namespace vxpmsdk.Components
 {
     [ExecuteAlways]
-    [RequireComponent(typeof(PMSDKProjector))]
+    [RequireComponent(typeof(PMSDKMeshWarp))]
     public class PMSDKCornerPin : MonoBehaviour
     {
         public Vector2 TopLeft = new Vector2(0, 1);
@@ -13,18 +13,20 @@ namespace vxpmsdk.Components
         public Vector2 BottomLeft = new Vector2(0, 0);
         public Vector2 BottomRight = new Vector2(1, 0);
 
-        private PMSDKProjector projector;
+        private PMSDKMeshWarp warp;
         private pmsdk_vec3_t[] pointsBuffer = new pmsdk_vec3_t[4];
 
         private void OnEnable()
         {
-            projector = GetComponent<PMSDKProjector>();
+            warp = GetComponent<PMSDKMeshWarp>();
         }
 
         private void Update()
         {
-            if (projector == null || projector.NativeWarpNode == IntPtr.Zero)
+            if (warp == null || warp.Projector == null || warp.Projector.NativeWarpNode == IntPtr.Zero)
                 return;
+
+            PMSDKProjector projector = warp.Projector;
 
             // Set warp node deformation type to Grid (2)
             NativeBindings.pmsdk_warpnode_set_deformation_type(projector.NativeWarpNode, 2);

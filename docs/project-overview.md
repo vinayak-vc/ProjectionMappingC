@@ -12,6 +12,15 @@ of tools): geometry, warping, edge blending, calibration, and project serializat
 - No rendering: no DirectX/OpenGL/Vulkan, no GUI, no engine includes. Computation only.
   Everything graphical belongs to the host application.
 
+## Documents
+
+- [Architecture (`architecture.md`)](architecture.md) - C++ Core constraints, module layering, build targets.
+- [Unity Architecture (`unity-architecture.md`)](unity-architecture.md) - Unity Editor integration rules, layer isolation, SDK constraints, and Editor Utilities.
+- [Tasks (`tasks.md`)](tasks.md) - Living checklist (Current: Milestone 19 - Plugin SDK).
+- [Roadmap (`roadmap.md`)](roadmap.md) - Milestone definitions from 01 (Math) to 20 (Unreal/Unity Polish).
+- [Decisions (`decisions.md`)](decisions.md) - Architecture decision records (e.g., C-API over P/Invoke).
+- [AI Handoff (`ai_handoff.md`)](ai_handoff.md) - State capture for the next agent session.
+
 ## Deliverables
 
 - Windows DLL / Linux `.so` / macOS `.dylib` / static library.

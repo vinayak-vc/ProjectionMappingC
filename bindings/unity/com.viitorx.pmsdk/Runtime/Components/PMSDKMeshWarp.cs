@@ -101,15 +101,26 @@ namespace vxpmsdk.Components
 
             if (status == pmsdk_status_t.PMSDK_SUCCESS)
             {
+                // If EdgeBlend is attached to this object, apply it to the mesh
+                PMSDKEdgeBlend edgeBlend = GetComponent<PMSDKEdgeBlend>();
+                if (edgeBlend != null && edgeBlend.NativeBlendConfig != IntPtr.Zero)
+                {
+                    NativeBindings.pmsdk_blendconfig_apply_to_mesh(edgeBlend.NativeBlendConfig, nativeOutputMesh);
+                }
+
                 // Pull data back and apply to Unity mesh
                 NativeBindings.pmsdk_mesh_get_vertices(nativeOutputMesh, vertexBuffer, (UIntPtr)vertexBuffer.Length);
 
                 Vector3[] unityVerts = new Vector3[vertexBuffer.Length];
+                Color[] unityColors = new Color[vertexBuffer.Length];
+                
                 for (int i = 0; i < vertexBuffer.Length; i++)
                 {
                     unityVerts[i] = new Vector3(vertexBuffer[i].position.x, vertexBuffer[i].position.y, vertexBuffer[i].position.z);
+                    unityColors[i] = new Color(vertexBuffer[i].color.x, vertexBuffer[i].color.y, vertexBuffer[i].color.z, vertexBuffer[i].color.w);
                 }
                 warpedMesh.vertices = unityVerts;
+                warpedMesh.colors = unityColors;
                 warpedMesh.RecalculateBounds();
             }
         }

@@ -144,7 +144,19 @@ namespace vxpmsdk
         public static extern pmsdk_status_t pmsdk_warpnode_add_child(IntPtr parent, IntPtr child);
 
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_warpnode_set_deformation_type(IntPtr node, int type);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr pmsdk_warpnode_get_gridwarp(IntPtr node);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_gridwarp_set_control_points(IntPtr gridwarp, int columns, int rows, pmsdk_vec3_t[] points);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern pmsdk_status_t pmsdk_warpnode_process_mesh(IntPtr node, IntPtr input_mesh, IntPtr output_mesh);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_blendconfig_apply_to_mesh(IntPtr config, IntPtr mesh);
 
         // --- CalibrationAPI.h ---
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]

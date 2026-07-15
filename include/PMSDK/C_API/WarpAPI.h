@@ -54,6 +54,31 @@ PMSDK_API void pmsdk_warpnode_destroy(pmsdk_warpnode_t* node);
 PMSDK_API pmsdk_status_t pmsdk_warpnode_add_child(pmsdk_warpnode_t* parent, pmsdk_warpnode_t* child);
 
 /**
+ * @brief Sets the deformation type for the warp node.
+ * @param node The warp node.
+ * @param type 0 = None, 1 = Bezier, 2 = Grid.
+ * @return PMSDK_SUCCESS on success.
+ */
+PMSDK_API pmsdk_status_t pmsdk_warpnode_set_deformation_type(pmsdk_warpnode_t* node, int type);
+
+/**
+ * @brief Retrieves the GridWarp handle from a WarpNode.
+ * @param node The warp node (must have type Grid).
+ * @return Handle to the GridWarp, or nullptr if unavailable.
+ */
+PMSDK_API pmsdk_gridwarp_t* pmsdk_warpnode_get_gridwarp(pmsdk_warpnode_t* node);
+
+/**
+ * @brief Sets the control points for a GridWarp.
+ * @param gridwarp The GridWarp handle.
+ * @param columns Number of columns in the grid.
+ * @param rows Number of rows in the grid.
+ * @param points Array of 3D control points (length = columns * rows).
+ * @return PMSDK_SUCCESS on success.
+ */
+PMSDK_API pmsdk_status_t pmsdk_gridwarp_set_control_points(pmsdk_gridwarp_t* gridwarp, int columns, int rows, const pmsdk_vec3_t* points);
+
+/**
  * @brief Processes an input mesh through a warp node hierarchy.
  * The input mesh is read, and the deformed result is written to the output mesh.
  * @param node The warp node to process through.

@@ -74,6 +74,43 @@ PMSDK_API pmsdk_status_t pmsdk_warpnode_add_child(pmsdk_warpnode_t* parent, pmsd
     }
 }
 
+PMSDK_API pmsdk_status_t pmsdk_warpnode_set_deformation_type(pmsdk_warpnode_t* node, int type) {
+    if (!node) return PMSDK_ERROR_INVALID_ARGUMENT;
+    try {
+        auto* wrapper = reinterpret_cast<C_WarpNode*>(node);
+        wrapper->ptr->GetDeformationField().SetType(static_cast<DeformationType>(type));
+        return PMSDK_SUCCESS;
+    } catch (...) {
+        return PMSDK_ERROR_UNKNOWN;
+    }
+}
+
+PMSDK_API pmsdk_gridwarp_t* pmsdk_warpnode_get_gridwarp(pmsdk_warpnode_t* node) {
+    if (!node) return nullptr;
+    try {
+        auto* wrapper = reinterpret_cast<C_WarpNode*>(node);
+        auto* grid = wrapper->ptr->GetDeformationField().GetGridWarp();
+        return reinterpret_cast<pmsdk_gridwarp_t*>(grid);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+PMSDK_API pmsdk_status_t pmsdk_gridwarp_set_control_points(pmsdk_gridwarp_t* gridwarp, int columns, int rows, const pmsdk_vec3_t* points) {
+    if (!gridwarp || !points) return PMSDK_ERROR_INVALID_ARGUMENT;
+    try {
+        auto* cppGrid = reinterpret_cast<GridWarp*>(gridwarp);
+        std::vector<pmsdk::Math::Vector3> pts(columns * rows);
+        for (int i = 0; i < columns * rows; ++i) {
+            pts[i] = { points[i].x, points[i].y, points[i].z };
+        }
+        cppGrid->SetControlPoints(columns, rows, pts);
+        return PMSDK_SUCCESS;
+    } catch (...) {
+        return PMSDK_ERROR_UNKNOWN;
+    }
+}
+
 PMSDK_API pmsdk_status_t pmsdk_warpnode_process_mesh(pmsdk_warpnode_t* node, const pmsdk_mesh_t* input_mesh, pmsdk_mesh_t* output_mesh) {
     if (!node || !input_mesh || !output_mesh) return PMSDK_ERROR_INVALID_ARGUMENT;
     try {

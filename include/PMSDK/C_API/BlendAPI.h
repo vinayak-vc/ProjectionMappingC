@@ -18,6 +18,14 @@ PMSDK_API pmsdk_edgeblend_t* pmsdk_blendconfig_get_bottom_edge(pmsdk_blendconfig
 
 PMSDK_API float pmsdk_blendconfig_evaluate(const pmsdk_blendconfig_t* config, float u, float v);
 
+/**
+ * @brief Applies the edge blend config to a mesh, modulating vertex colors (alpha channel) based on UVs.
+ * @param config The BlendConfig to apply.
+ * @param mesh The mesh to modify in-place.
+ * @return PMSDK_SUCCESS on success.
+ */
+PMSDK_API pmsdk_status_t pmsdk_blendconfig_apply_to_mesh(const pmsdk_blendconfig_t* config, pmsdk_mesh_t* mesh);
+
 PMSDK_API void pmsdk_edgeblend_set_size(pmsdk_edgeblend_t* edge, float size);
 PMSDK_API float pmsdk_edgeblend_get_size(const pmsdk_edgeblend_t* edge);
 

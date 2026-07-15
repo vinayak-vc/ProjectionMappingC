@@ -23,10 +23,10 @@ namespace vxpmsdk.Editor
             GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
             cube.name = "Bouncing Cube";
             cube.transform.position = new Vector3(0, 0, 0);
+            cube.layer = LayerMask.NameToLayer("Water"); // Isolate Content
             cube.AddComponent<Rigidbody>().useGravity = false;
             
-            // Add a simple rotate script
-            // For now, it will just sit there, but the user can add animation.
+            contentCam.cullingMask = 1 << LayerMask.NameToLayer("Water");
 
             // 3. Create a Material that uses the RenderTexture
             Material rtMat = new Material(Shader.Find("Unlit/Texture"));
@@ -35,12 +35,14 @@ namespace vxpmsdk.Editor
             // 4. Create the Projection Planes
             GameObject leftPlane = GameObject.CreatePrimitive(PrimitiveType.Plane);
             leftPlane.name = "Left_Screen";
+            leftPlane.layer = LayerMask.NameToLayer("TransparentFX"); // Isolate Screens
             leftPlane.transform.position = new Vector3(-5, 0, 0);
             leftPlane.transform.rotation = Quaternion.Euler(-90, 0, 0);
             leftPlane.GetComponent<MeshRenderer>().sharedMaterial = rtMat;
 
             GameObject rightPlane = GameObject.CreatePrimitive(PrimitiveType.Plane);
             rightPlane.name = "Right_Screen";
+            rightPlane.layer = LayerMask.NameToLayer("TransparentFX"); // Isolate Screens
             rightPlane.transform.position = new Vector3(5, 0, 0);
             rightPlane.transform.rotation = Quaternion.Euler(-90, 0, 0);
             rightPlane.GetComponent<MeshRenderer>().sharedMaterial = rtMat;
@@ -61,14 +63,14 @@ namespace vxpmsdk.Editor
             leftProjObj.transform.position = leftPlane.transform.position + new Vector3(0, 0, -10);
             Camera leftCam = leftProjObj.AddComponent<Camera>();
             leftCam.targetDisplay = 1; // Display 2
-            leftCam.cullingMask = (1 << LayerMask.NameToLayer("UI")) | (1 << LayerMask.NameToLayer("Default"));
+            leftCam.cullingMask = (1 << LayerMask.NameToLayer("UI")) | (1 << LayerMask.NameToLayer("TransparentFX"));
             var leftProjector = leftProjObj.AddComponent<PMSDKProjector>();
 
             GameObject rightProjObj = new GameObject("PMSDK_Projector_Right");
             rightProjObj.transform.position = rightPlane.transform.position + new Vector3(0, 0, -10);
             Camera rightCam = rightProjObj.AddComponent<Camera>();
             rightCam.targetDisplay = 2; // Display 3
-            rightCam.cullingMask = (1 << LayerMask.NameToLayer("UI")) | (1 << LayerMask.NameToLayer("Default"));
+            rightCam.cullingMask = (1 << LayerMask.NameToLayer("UI")) | (1 << LayerMask.NameToLayer("TransparentFX"));
             var rightProjector = rightProjObj.AddComponent<PMSDKProjector>();
 
             // 7. Link Projectors

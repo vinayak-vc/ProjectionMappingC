@@ -207,6 +207,11 @@ pin needs the new DLL, so both wait on one redeploy + Unity restart.
   until a real install needs it.
 - [x] z-fix DLL redeployed to the nested repo + pushed (nested `02176ef`).
 
+## Projector-pose calibration for object mapping (2026-07-16) ✅
+- [x] `PMSDKPoseSolver` — managed LM reprojection solve of projector pose+FOV against Unity's camera (no native/OpenCV conversion, D-024). Closed-loop verified: noise-free = exact recovery (0 px); 0.5% marking noise = ~3 px / 0.03 m / 0.3° FOV.
+- [x] `PMSDKProjectorPoseCalibrator` — workflow component (F3): place anchors on the twin, mark each in the output, Space to solve + apply to the projector camera. Wired into `ObjectMappingDemo` (9 anchors on the monument).
+- This is the enabler for real-world object mapping: align the virtual twin's projector to the physical projector, then fine-tune with corner-pin/grid warp.
+
 ## Demo scenes (2026-07-16)
 - [x] `ObjectMappingDemo` — object mapping / spatial AR: projector cam renders a virtual
   twin of a ProBuilder monument directly to its display (content wraps the object faces).

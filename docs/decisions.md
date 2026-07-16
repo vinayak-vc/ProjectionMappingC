@@ -96,6 +96,23 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
+## D-024 2026-07-16 — Projector-pose calibration solves against Unity's camera, not OpenCV
+
+Object mapping needs the virtual projector camera's pose+FOV to match the real projector
+so the virtual twin overlays the physical object. Rather than expose OpenCV
+`solvePnP`/`calibrateCamera` extrinsics through the C API (which the C API does not
+currently return) and then convert OpenCV↔Unity coordinate conventions, the solve is done
+directly in managed code as reprojection minimization over Unity's own
+`Camera.WorldToViewportPoint` (`PMSDKPoseSolver`, Levenberg–Marquardt over
+[posXYZ, eulerXYZ, fov] with a numeric Jacobian). This removes the coordinate-conversion
+class of bugs, needs no native rebuild, and is fully sim-verifiable. Verified closed-loop:
+noise-free recovery is exact (0 px, exact pose/FOV); with 0.5% marking noise, ~3 px
+reprojection / 0.03 m / 0.3° FOV. Trade-off: needs a rough initial pose (operator aims the
+projector cam near the object first) and is iterative, not closed-form — fine for a
+one-time on-site calibration. `PMSDKProjectorPoseCalibrator` drives the workflow (place
+anchors on the twin → mark each in the output → solve → apply); fine registration then uses
+corner-pin/grid warp as usual.
+
 ## D-023 2026-07-16 — Edge-blend ramp exponent is 1/projectorGamma (fixes the dark seam)
 
 The projector shader blends in linear framebuffer space (output = content × alpha) and

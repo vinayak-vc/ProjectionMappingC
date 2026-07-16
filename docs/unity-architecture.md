@@ -127,6 +127,11 @@ To prevent runtime crashes and silent failures, the SDK enforces strict componen
   Scenes carry one "PMSDK Runtime Services" object (manager + display activator).
 - **`PMSDKGridWarp`**: N×M bilinear grid warp component (curved surfaces); disabled by
   default, takes over the warp node when enabled (see §4b).
+- **`PMSDKProjectorPoseCalibrator`** (+ `PMSDKPoseSolver`): object-mapping projector-pose
+  calibration. Place anchor transforms on the virtual twin's features, mark each in the
+  projector output (F3 mode), then solve the projector camera's pose+FOV so the twin
+  overlays the physical object. Managed reprojection solve against Unity's camera — no
+  native/OpenCV conversion (D-024). Fine registration afterward uses corner-pin/grid warp.
 - **`PMSDKColorCorrection`**: per-projector RGB gain/offset + per-channel output gamma
   (luminance/white-balance matching between projectors); drives `PMSDK/UnlitWarp`.
 - **`PMSDKOutputTransform`**: content rotation (0/90/180/270) + mirror X/Y for portrait,

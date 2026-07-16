@@ -96,6 +96,20 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
+## D-023 2026-07-16 — Edge-blend ramp exponent is 1/projectorGamma (fixes the dark seam)
+
+The projector shader blends in linear framebuffer space (output = content × alpha) and
+two projectors' emitted light adds after each applies its ~2.2 display gamma. For the
+overlap to sum to full brightness the ramps must satisfy alpha_A^γ + alpha_B^γ = 1, i.e.
+alpha(x) = x^(1/γ). The native `EdgeBlend` Power curve computes `pow(x, gammaArg)`, so the
+Unity `PMSDKEdgeBlend` now exposes **projector gamma** (default 2.2) and passes
+`1/gamma` as the ramp exponent. Previously the default fed 2.2 straight in, giving
+`pow(x,2.2)` — a visibly DARK seam (0.5^2.2×2 ≈ 0.43 at the centre). This was the cause of
+the reported black strip. Black level is a uniform shader floor (`_BlackLevel`); true
+per-region black-level compensation is future work. Per-channel gamma + gain/offset live
+in `PMSDKColorCorrection`; output rotation/mirror in `PMSDKOutputTransform`; all fold into
+the one `PMSDK/UnlitWarp` fragment pipeline.
+
 ## D-022 2026-07-16 — Corner pin is projective; grid warp is bilinear; they are distinct deformation modes
 
 The 4-corner pin now uses a true homography (`DeformationType::Perspective`,

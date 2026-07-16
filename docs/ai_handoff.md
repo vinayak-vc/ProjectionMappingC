@@ -72,7 +72,19 @@ features, and any physical camera loop.
   projectors (coverage-histogram scan), applied after `Shift+A` align-all; core verified
   by edit-mode tests. All **compile + unit-tested but not yet runtime-verified**: the new
   DLL couldn't be deployed because the open Unity editor holds the native-plugin lock.
-  Pro-feature gap list now 4/12 (all High + auto-blend). Deploy step: close Unity → copy
+  Pro-feature gap list now 4/12 (all High + auto-blend).
+- **Medium batch (2026-07-16)**: (#6) blend-gamma fix — `PMSDKEdgeBlend` sends ramp
+  exponent 1/projectorGamma, fixing the reported dark overlap seam (D-023), + uniform
+  black-level floor + per-channel output gamma in `PMSDK/UnlitWarp`; (#7)
+  `PMSDKColorCorrection` gain/offset/gamma; (#8) `PMSDKOutputTransform` rotate/mirror;
+  (#5) `PMSDKDenseWarp.FitGrid` dense N×M grid from correspondence (off by default via
+  `DenseAutoWarpN`). Compiled clean (Editor.log 0 CS errors, shader imported); blend-gamma
+  math-proven; dense-warp numeric test NOT run (MCP client link dropped after a domain
+  reload — Unity healthy, reconnect to run it). Gap list now **8/12**.
+- **Env note**: the Unity MCP client transport can drop after a forced recompile/domain
+  reload and not re-handshake for the session; Unity stays healthy. Editor.log
+  (`%LOCALAPPDATA%/Unity/Editor/Editor.log`, grep `error CS`) is the fallback to confirm
+  compilation when MCP is down. Deploy step: close Unity → copy
   build/vs2022/bin/Release/ProjectionMappingSDK.dll into the nested repo's
   Plugins/Mapping/ → reopen → hit play. Until then, entering play mode with the OLD DLL
   throws EntryPointNotFound in PMSDKCornerPin (perspective entry points missing).

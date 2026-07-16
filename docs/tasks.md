@@ -179,9 +179,20 @@ pin needs the new DLL, so both wait on one redeploy + Unity restart.
 - [x] Verified via edit-mode tests: 2-projector symmetric (~0.33 facing edges, 0 elsewhere), 3-in-a-row (middle gets both edges), no-overlap → 0
 - [ ] End-to-end runtime: needs the DLL redeploy AND one camera seeing all projectors (the demo's raster-space surfaces are far apart, so sim can't observe two at once — real webcam is the true test)
 
+## Pro-feature gaps — Medium batch (2026-07-16) ✅ (compiled clean; runtime pending DLL swap + MCP)
+
+- [x] #6 Blend gamma fix — `PMSDKEdgeBlend` sends ramp exponent 1/projectorGamma (default 2.2), fixing the dark overlap seam (D-023); math-proven. Added uniform `_BlackLevel` floor + per-channel output gamma in the `PMSDK/UnlitWarp` fragment pipeline.
+- [x] #7 Per-projector color correction — `PMSDKColorCorrection` (per-channel gain/offset + output gamma) driving the shader; no-op by default.
+- [x] #8 Output rotation/mirroring — `PMSDKOutputTransform` (0/90/180/270 + mirror X/Y) via shader UV transform, for portrait/ceiling/rear projection; warp/corner-pin unaffected.
+- [x] #5 Dense auto-warp — `PMSDKDenseWarp.FitGrid` fits an N×M grid from the camera correspondence (curved surfaces); wired into auto-align via `DenseAutoWarpN` (0 = off). Core logic reasoned against the identity→lattice invariant; numeric test not run this round (MCP link dropped) — re-run when reconnected.
+- Verification note: Editor.log shows 0 CS errors and the shader imported clean; blend-gamma is math-proven; auto-blend unit-tested earlier. Visual/runtime confirm still pending the DLL redeploy (Unity plugin lock) and hardware.
+
+**Pro-feature gap list: 8 of 12 done** (all High + auto-blend, blend-gamma, color, rotation, dense-warp).
+
 ## Next Items / Backlog
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
-- [ ] Remaining pro-feature gaps (medium/low): dense auto-warp, black-level region + per-channel gamma, color/LUT, output rotation/mirror, OSC/HTTP, presets, NDI/Spout, test patterns
+- [ ] Remaining gaps (low): OSC/HTTP remote, named presets/cues, NDI/Spout, extra test patterns
+- [ ] True per-region black-level compensation (current `_BlackLevel` is a uniform floor)
 - [ ] Milestone 19: Plugin SDK
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Code coverage job in CI

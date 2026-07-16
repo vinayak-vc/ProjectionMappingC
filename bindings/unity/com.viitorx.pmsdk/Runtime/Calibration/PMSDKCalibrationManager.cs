@@ -69,6 +69,8 @@ namespace vxpmsdk.Components
         public int WebcamFlushFrames = 2;
         [Tooltip("After aligning ALL projectors (Shift+A), auto-compute edge-blend widths from the camera-detected overlap between them.")]
         public bool AutoBlendAfterAlignAll = true;
+        [Tooltip("If >= 2, auto-align fits an NxN grid warp from the camera (dense auto-warp) instead of only the 4 corners — for curved/irregular surfaces. 0 = corner pin only.")]
+        public int DenseAutoWarpN = 0;
         [Tooltip("Observer camera for simulated auto-align. If null, a scene object named 'PMSDK Calibration Observer' with a Camera is used.")]
         public Camera ObserverCamera;
         [Tooltip("Capture resolution for the simulated observer camera.")]
@@ -1019,6 +1021,14 @@ namespace vxpmsdk.Components
                 while (!done) yield return null;
                 if (captured.Success) ok++;
                 results.Add(captured);
+
+                // Dense auto-warp: fit an NxN grid from the correspondence for curved
+                // surfaces (captures warp the 4-corner homography cannot).
+                if (captured.Success && DenseAutoWarpN >= 2 && captured.Correspondence != null)
+                {
+                    ApplyDenseWarp(s, captured, target);
+                }
+
                 AutoAlignStatus = captured.Message;
                 Debug.Log("[PMSDK] " + captured.Message);
             }
@@ -1071,6 +1081,47 @@ namespace vxpmsdk.Components
                 applied++;
             }
             return $" Auto-blend set on {applied} projectors.";
+        }
+
+        /// <summary>
+        /// Fit a dense grid warp for one surface from its align correspondence and
+        /// enable it (takes over from the corner pin). Target is the marked rectangle
+        /// if supplied, else the full observed projection bbox.
+        /// </summary>
+        private void ApplyDenseWarp(Surface s, PMSDKAutoAlign.Result r, Vector2[] target)
+        {
+            Vector2[] tgt = target;
+            if (tgt == null || tgt.Length != 4)
+            {
+                tgt = BBoxTarget(r.Correspondence, r.CamW, r.CamH);
+            }
+            var pts = PMSDKDenseWarp.FitGrid(r.Correspondence, r.CamW, r.CamH, r.ProjW, r.ProjH,
+                tgt, DenseAutoWarpN, DenseAutoWarpN);
+            if (pts == null) return;
+
+            if (s.Grid == null)
+            {
+                s.Grid = s.Warp.GetComponent<PMSDKGridWarp>();
+                if (s.Grid == null) s.Grid = s.Warp.gameObject.AddComponent<PMSDKGridWarp>();
+            }
+            s.Grid.Resize(DenseAutoWarpN, DenseAutoWarpN);
+            for (int i = 0; i < pts.Length && i < s.Grid.PointCount; i++) s.Grid.SetPointByIndex(i, pts[i]);
+            s.Grid.enabled = true; // grid takes over from the corner pin
+        }
+
+        // Full lit-region bbox in camera space (top-left origin), order TL,TR,BR,BL.
+        private static Vector2[] BBoxTarget(PMSDKGrayCodeDecode.Correspondence[] corr, int camW, int camH)
+        {
+            float minX = 1, minY = 1, maxX = 0, maxY = 0;
+            for (int y = 0; y < camH; y++)
+                for (int x = 0; x < camW; x++)
+                {
+                    if (!corr[y * camW + x].Valid) continue;
+                    float nx = (x + 0.5f) / camW, ny = (y + 0.5f) / camH;
+                    if (nx < minX) minX = nx; if (nx > maxX) maxX = nx;
+                    if (ny < minY) minY = ny; if (ny > maxY) maxY = ny;
+                }
+            return new[] { new Vector2(minX, minY), new Vector2(maxX, minY), new Vector2(maxX, maxY), new Vector2(minX, maxY) };
         }
 
         private void EnsureAutoAlign()

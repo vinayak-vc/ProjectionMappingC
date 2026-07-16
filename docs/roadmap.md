@@ -41,12 +41,16 @@ Driven by the Unity host work and a gap audit against Resolume / MadMapper / VIO
 | N×M grid warp UI (curved surfaces) | ✅ done (runtime pending DLL redeploy) |
 | Mark-target-rectangle UI (map onto a specific physical screen) | ✅ done (runtime pending DLL redeploy) |
 | Auto-blend from camera overlap (edge widths from Gray-code overlap) | ✅ done (core unit-tested; runtime pending DLL + shared camera) |
+| Blend gamma fix + black-level + per-channel gamma (dark-seam fix, D-023) | ✅ done (math-proven; runtime pending DLL) |
+| Per-projector color correction (gain/offset/gamma) | ✅ done (compiled; runtime pending DLL) |
+| Output rotation / mirroring (portrait/ceiling/rear) | ✅ done (compiled; runtime pending DLL) |
+| Dense auto-warp (fit N×M grid from camera, curved surfaces) | ✅ done (compiled; numeric test pending MCP reconnect) |
 
-Remaining pro-feature gaps (medium/low): dense auto-warp, per-channel gamma / luminance
-maps / black-level region, color/LUT matching, output rotation/mirroring, OSC/HTTP remote,
-named presets, NDI/Spout, extra test patterns. See docs/tasks.md.
+Remaining pro-feature gaps (low): OSC/HTTP remote, named presets/cues, NDI/Spout, extra
+test patterns; plus true per-region black-level compensation. See docs/tasks.md.
 
-Pro-feature gap list: **4 of 12 done** (all 3 High + auto-blend).
+Pro-feature gap list: **8 of 12 done** (all 3 High + auto-blend, blend-gamma, color,
+rotation, dense-warp).
 
 ## Dependency plan (vcpkg manifest features)
 

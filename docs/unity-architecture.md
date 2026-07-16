@@ -127,6 +127,18 @@ To prevent runtime crashes and silent failures, the SDK enforces strict componen
   Scenes carry one "PMSDK Runtime Services" object (manager + display activator).
 - **`PMSDKGridWarp`**: N×M bilinear grid warp component (curved surfaces); disabled by
   default, takes over the warp node when enabled (see §4b).
+- **`PMSDKColorCorrection`**: per-projector RGB gain/offset + per-channel output gamma
+  (luminance/white-balance matching between projectors); drives `PMSDK/UnlitWarp`.
+- **`PMSDKOutputTransform`**: content rotation (0/90/180/270) + mirror X/Y for portrait,
+  ceiling-mounted, or rear projection; UV transform in the shader (warp/corner-pin
+  unaffected).
+
+### Blend, black level, color — the `PMSDK/UnlitWarp` fragment pipeline
+UV transform → sample → edge-blend (vertex-color ramp) → black-level floor → color
+correct (gain/offset + per-channel gamma). The **edge-blend ramp exponent is
+1/projectorGamma** so two projectors' light sums to full across the overlap; setting
+`PMSDKEdgeBlend.Gamma` to the projector's gamma (~2.2) removes the dark seam (D-023).
+`_BlackLevel` is a uniform floor (true per-region black-level compensation is future).
 - **`PMSDKCornerPinUI`**: superseded by the calibration system; the manager disables any
   instance it finds at startup. Kept only for source compatibility.
 

@@ -71,10 +71,14 @@ TEST(PerspectiveWarpTests, ApplyDeformationUsesVertexUV) {
     verts[1].uv = {1.0f, 1.0f};
     verts[1].position = {0, 0, 0};
 
+    verts[0].position = {9, 9, 9};
+    verts[1].position = {9, 9, 9};
     pw.ApplyDeformation(verts, 2);
 
     EXPECT_NEAR(verts[0].position.x, 1.0f, 1e-4f); // 0.5 * 2
     EXPECT_NEAR(verts[0].position.y, 0.5f, 1e-4f);
+    EXPECT_NEAR(verts[0].position.z, 0.0f, 1e-4f); // flattened to raster plane
     EXPECT_NEAR(verts[1].position.x, 2.0f, 1e-4f);
     EXPECT_NEAR(verts[1].position.y, 1.0f, 1e-4f);
+    EXPECT_NEAR(verts[1].position.z, 0.0f, 1e-4f);
 }

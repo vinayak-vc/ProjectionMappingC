@@ -185,7 +185,8 @@ pin needs the new DLL, so both wait on one redeploy + Unity restart.
 - [x] #7 Per-projector color correction — `PMSDKColorCorrection` (per-channel gain/offset + output gamma) driving the shader; no-op by default.
 - [x] #8 Output rotation/mirroring — `PMSDKOutputTransform` (0/90/180/270 + mirror X/Y) via shader UV transform, for portrait/ceiling/rear projection; warp/corner-pin unaffected.
 - [x] #5 Dense auto-warp — `PMSDKDenseWarp.FitGrid` fits an N×M grid from the camera correspondence (curved surfaces); wired into auto-align via `DenseAutoWarpN` (0 = off). Core logic reasoned against the identity→lattice invariant; numeric test not run this round (MCP link dropped) — re-run when reconnected.
-- Verification note: Editor.log shows 0 CS errors and the shader imported clean; blend-gamma is math-proven; auto-blend unit-tested earlier. Visual/runtime confirm still pending the DLL redeploy (Unity plugin lock) and hardware.
+- Verification note: Editor.log shows 0 CS errors and the shader imported clean; blend-gamma is math-proven; auto-blend unit-tested earlier.
+- Runtime-verified (2026-07-16, Unity restart): perspective corner pin (visual + math), color correction (tint), output rotation (180° flip) all confirmed in play mode. Fixed a PerspectiveWarp z-flatten issue (retested green; z-fix DLL redeploy deferred — plugin lock). Grid/auto-blend/dense-warp remain unit-verified; mark-target/webcam/hardware still unverified.
 
 **Pro-feature gap list: 8 of 12 done** (all High + auto-blend, blend-gamma, color, rotation, dense-warp).
 

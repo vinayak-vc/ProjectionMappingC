@@ -76,7 +76,11 @@ void PerspectiveWarp::ApplyDeformation(Vertex* vertices, size_t count) const {
         Math::Vector2 p = impl.Map(u, v);
         vert.position.x = p.x;
         vert.position.y = p.y;
-        // Z left unchanged (raster-space warp keeps z = 0).
+        // Flatten to the raster plane. The source mesh (e.g. a Unity Plane) carries
+        // its own z across its extent; a corner pin maps into z=0 raster space, so
+        // zero it for consistency with GridWarp and correct depth under a
+        // perspective projector camera.
+        vert.position.z = 0.0f;
     });
 }
 

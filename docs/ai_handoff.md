@@ -81,6 +81,16 @@ features, and any physical camera loop.
   `DenseAutoWarpN`). Compiled clean (Editor.log 0 CS errors, shader imported); blend-gamma
   math-proven; dense-warp numeric test NOT run (MCP client link dropped after a domain
   reload — Unity healthy, reconnect to run it). Gap list now **8/12**.
+- **Runtime verification (2026-07-16, after Unity restart, MCP reconnected)**: deployed
+  DLL == fresh build (has perspective exports). Play-mode confirmed on ProBuilderMappingDemo:
+  perspective corner pin (corners exact + mid-edge perspective, not bilinear; visually
+  foreshortens correctly), per-projector color correction (red-gain tint), output rotation
+  (180° flip). Restored `Assets/PMSDKDemo` resolved the missing-material refs. Grid /
+  auto-blend / dense-warp remain unit-test-verified; blend-gamma math-proven; mark-target +
+  webcam + real-hardware still unverified. Found + fixed: `PerspectiveWarp` left the source
+  mesh's z instead of flattening to 0 (harmless under the ortho projector cam, wrong under a
+  perspective one) — fixed + retested; **DLL redeploy of the z-fix deferred** (Unity holds
+  the plugin lock; current deployed DLL renders the ortho rig correctly).
 - **Env note**: the Unity MCP client transport can drop after a forced recompile/domain
   reload and not re-handshake for the session; Unity stays healthy. Editor.log
   (`%LOCALAPPDATA%/Unity/Editor/Editor.log`, grep `error CS`) is the fallback to confirm

@@ -196,6 +196,15 @@ unmoved camera needs no re-marking). The preview source is the same
 `IPMSDKCalibrationCamera` as auto-align (simulated observer or native webcam), so it is
 freed before the sweep opens the camera.
 
+### Auto-blend from overlap (`Shift+A`)
+Aligning all projectors (`Shift+A`) additionally runs `PMSDKAutoBlend`: a camera pixel lit
+by two projectors is in their overlap, so mapping those pixels back into each projector's
+raster gives the overlap band per edge. A coverage-histogram scan (a band must span most of
+an edge's length, so corner blobs are rejected) yields the four edge-blend widths, applied
+to each `PMSDKEdgeBlend` automatically. Requires one camera that sees every projector
+(`AutoBlendAfterAlignAll`, default on). Core verified by edit-mode tests (2-projector
+symmetric, 3-in-a-row middle gets both edges, no-overlap → zero).
+
 ### Why homography, not the native stereo triangulation
 `pmsdk_decoder_decode_and_triangulate` produces a metric 3D point cloud but needs a
 fully calibrated camera **and** projector (intrinsics + extrinsics). That is not

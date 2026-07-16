@@ -67,9 +67,12 @@ features, and any physical camera loop.
   persisted in the calibration JSON. (3) mark-target-rectangle UI — calibration `M`
   submode: live camera preview on the operator console with 4 draggable corners →
   `AlignSelectedWithTarget`, so the projection can be mapped onto a specific physical
-  screen instead of the full throw; persisted in the JSON. All **compile + unit-tested
-  but not yet runtime-verified**: the new DLL couldn't be deployed because the open Unity
-  editor holds the native-plugin lock. Deploy step: close Unity → copy
+  screen instead of the full throw; persisted in the JSON. (4) auto-blend from camera
+  overlap — `PMSDKAutoBlend` derives edge-blend widths from the Gray-code overlap between
+  projectors (coverage-histogram scan), applied after `Shift+A` align-all; core verified
+  by edit-mode tests. All **compile + unit-tested but not yet runtime-verified**: the new
+  DLL couldn't be deployed because the open Unity editor holds the native-plugin lock.
+  Pro-feature gap list now 4/12 (all High + auto-blend). Deploy step: close Unity → copy
   build/vs2022/bin/Release/ProjectionMappingSDK.dll into the nested repo's
   Plugins/Mapping/ → reopen → hit play. Until then, entering play mode with the OLD DLL
   throws EntryPointNotFound in PMSDKCornerPin (perspective entry points missing).

@@ -67,6 +67,8 @@ namespace vxpmsdk.Components
         public int WebcamIndex;
         [Tooltip("Frames grabbed and discarded before each webcam capture (VideoCapture buffers frames; without flushing, captures show the previous pattern).")]
         public int WebcamFlushFrames = 2;
+        [Tooltip("After aligning ALL projectors (Shift+A), auto-compute edge-blend widths from the camera-detected overlap between them.")]
+        public bool AutoBlendAfterAlignAll = true;
         [Tooltip("Observer camera for simulated auto-align. If null, a scene object named 'PMSDK Calibration Observer' with a Camera is used.")]
         public Camera ObserverCamera;
         [Tooltip("Capture resolution for the simulated observer camera.")]
@@ -1004,6 +1006,7 @@ namespace vxpmsdk.Components
             else if (Selected != null) toAlign.Add(Selected);
 
             int ok = 0;
+            var results = new List<PMSDKAutoAlign.Result>();
             foreach (var s in toAlign)
             {
                 AutoAlignStatus = $"Auto-aligning {s.Id}…";
@@ -1015,13 +1018,59 @@ namespace vxpmsdk.Components
                 yield return autoAlign.AlignSurface(s, cam, target, r => { captured = r; done = true; });
                 while (!done) yield return null;
                 if (captured.Success) ok++;
+                results.Add(captured);
                 AutoAlignStatus = captured.Message;
                 Debug.Log("[PMSDK] " + captured.Message);
             }
 
+            string blendMsg = "";
+            if (all && AutoBlendAfterAlignAll && ok >= 2)
+            {
+                blendMsg = ApplyAutoBlend(toAlign, results);
+            }
+
             Dirty = true;
-            AutoAlignStatus = $"Auto-align done: {ok}/{toAlign.Count} surfaces. Fine-tune by hand, Ctrl+S to save.";
+            AutoAlignStatus = $"Auto-align done: {ok}/{toAlign.Count} surfaces.{blendMsg} Fine-tune by hand, Ctrl+S to save.";
             IsAutoAligning = false;
+        }
+
+        /// <summary>
+        /// Compute edge-blend widths from the overlap between the just-aligned
+        /// projectors (all seen by the same camera) and apply them. Returns a status
+        /// fragment. Requires every correspondence to share the camera resolution.
+        /// </summary>
+        private string ApplyAutoBlend(List<Surface> aligned, List<PMSDKAutoAlign.Result> results)
+        {
+            var corr = new List<PMSDKGrayCodeDecode.Correspondence[]>();
+            var blendSurfaces = new List<Surface>();
+            int camW = -1, camH = -1, projW = 0, projH = 0;
+            for (int i = 0; i < results.Count; i++)
+            {
+                var r = results[i];
+                if (!r.Success || r.Correspondence == null) continue;
+                if (camW < 0) { camW = r.CamW; camH = r.CamH; projW = r.ProjW; projH = r.ProjH; }
+                // Auto-blend overlap detection only makes sense when all projectors
+                // are observed by the one camera (same frame).
+                if (r.CamW != camW || r.CamH != camH) continue;
+                corr.Add(r.Correspondence);
+                blendSurfaces.Add(aligned[i]);
+            }
+            if (corr.Count < 2) return " (auto-blend skipped: need 2+ projectors in one camera view).";
+
+            var widths = PMSDKAutoBlend.Compute(corr, camW, camH, projW, projH);
+            int applied = 0;
+            for (int i = 0; i < blendSurfaces.Count; i++)
+            {
+                var blend = blendSurfaces[i].Blend;
+                if (blend == null) continue;
+                blend.LeftEdge = widths[i].Left;
+                blend.RightEdge = widths[i].Right;
+                blend.TopEdge = widths[i].Top;
+                blend.BottomEdge = widths[i].Bottom;
+                if (blend.Gamma <= 0f) blend.Gamma = 2.2f;
+                applied++;
+            }
+            return $" Auto-blend set on {applied} projectors.";
         }
 
         private void EnsureAutoAlign()

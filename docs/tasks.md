@@ -173,9 +173,15 @@ pin needs the new DLL, so both wait on one redeploy + Unity restart.
 - [x] Per-surface target corners with UI→camera-space flip into `AlignSelectedWithTarget`; preview via the shared `IPMSDKCalibrationCamera` (freed before the sweep); persisted in the calibration JSON
 - [x] Pure C# (no new native) — but play-mode still gated on the perspective-DLL redeploy since the corner pin runs on entry
 
+### Auto-blend from camera overlap ✅ (core unit-tested; runtime pending DLL redeploy + shared camera)
+- [x] `PMSDKAutoBlend.Compute` — detects overlap from per-projector Gray-code correspondence (pixels lit by ≥2 projectors), maps it into each projector's raster, and derives per-edge blend widths via a coverage-histogram scan (rejects corner blobs; robust to sparse sampling)
+- [x] `PMSDKAutoAlign.Result` carries the correspondence; align-all (`Shift+A`) runs auto-blend across projectors sharing one camera and applies the widths to each `PMSDKEdgeBlend` (`AutoBlendAfterAlignAll`, default on)
+- [x] Verified via edit-mode tests: 2-projector symmetric (~0.33 facing edges, 0 elsewhere), 3-in-a-row (middle gets both edges), no-overlap → 0
+- [ ] End-to-end runtime: needs the DLL redeploy AND one camera seeing all projectors (the demo's raster-space surfaces are far apart, so sim can't observe two at once — real webcam is the true test)
+
 ## Next Items / Backlog
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
-- [ ] Remaining pro-feature gaps (medium): auto-blend from overlap, dense auto-warp, black-level region + per-channel gamma, color/LUT, output rotation/mirror, OSC/HTTP
+- [ ] Remaining pro-feature gaps (medium/low): dense auto-warp, black-level region + per-channel gamma, color/LUT, output rotation/mirror, OSC/HTTP, presets, NDI/Spout, test patterns
 - [ ] Milestone 19: Plugin SDK
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Code coverage job in CI

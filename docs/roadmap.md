@@ -40,11 +40,13 @@ Driven by the Unity host work and a gap audit against Resolume / MadMapper / VIO
 | Perspective corner pin (homography, replaces bilinear) | ✅ done (unit-tested; runtime pending DLL redeploy) |
 | N×M grid warp UI (curved surfaces) | ✅ done (runtime pending DLL redeploy) |
 | Mark-target-rectangle UI (map onto a specific physical screen) | ✅ done (runtime pending DLL redeploy) |
+| Auto-blend from camera overlap (edge widths from Gray-code overlap) | ✅ done (core unit-tested; runtime pending DLL + shared camera) |
 
-Remaining pro-feature gaps (medium/low): auto-blend from camera overlap, dense auto-warp,
-per-channel gamma / luminance maps / black-level region, color/LUT matching, output
-rotation/mirroring, OSC/HTTP remote, named presets, NDI/Spout, extra test patterns.
-See docs/tasks.md.
+Remaining pro-feature gaps (medium/low): dense auto-warp, per-channel gamma / luminance
+maps / black-level region, color/LUT matching, output rotation/mirroring, OSC/HTTP remote,
+named presets, NDI/Spout, extra test patterns. See docs/tasks.md.
+
+Pro-feature gap list: **4 of 12 done** (all 3 High + auto-blend).
 
 ## Dependency plan (vcpkg manifest features)
 

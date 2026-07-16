@@ -34,6 +34,10 @@ namespace vxpmsdk.Components
             public int ValidPixels;
             public float ReprojectionError; // mean, in camera pixels
             public string Message;
+            // Decoded camera->projector correspondence, retained for auto-blend
+            // (overlap detection across projectors). Null if the sweep failed.
+            public PMSDKGrayCodeDecode.Correspondence[] Correspondence;
+            public int CamW, CamH, ProjW, ProjH;
         }
 
         [Tooltip("Gray-code resolution used for correspondence. Only needs to be fine enough for a stable homography; 128 (7+7=14 patterns) is plenty.")]
@@ -151,6 +155,8 @@ namespace vxpmsdk.Components
 
             // --- decode + fit camera->projector homography ---
             var corr = PMSDKGrayCodeDecode.Decode(captures, inverseCaptures, white, black, camW, camH, projW, projH, MinContrast);
+            result.Correspondence = corr;
+            result.CamW = camW; result.CamH = camH; result.ProjW = projW; result.ProjH = projH;
 
             var camPts = new List<Vector2>();
             var projPts = new List<Vector2>();

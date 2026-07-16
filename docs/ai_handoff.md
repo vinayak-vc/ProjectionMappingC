@@ -14,10 +14,12 @@ correction, output rotation/mirror, dense auto-warp) + mark-target UI.
 **Unit/ math-verified**: grid, auto-blend, dense-warp, blend-gamma, Gray-code decode.
 **NOT verified**: real projector+camera loop (no hardware), mark-target/webcam runtime,
 per-frame warp-readback perf at scale.
-**Current Task**: Milestone 19 (Plugin SDK) open. Immediate pending: (a) redeploy the z-fix
-DLL to the nested repo (needs Unity closed — plugin lock) and commit it there; (b) sim
-closed-loop calibration test + warp-readback profiling (both no-hardware); (c) real-hardware
-calibration smoke test when hardware is available.
+**Current Task**: Milestone 19 (Plugin SDK) open. Done since last note: z-fix DLL deployed +
+committed to the nested repo (`02176ef`); sim closed-loop auto-align verified with an
+off-axis perspective observer (312 pts, 0.39 px reproj); warp-readback profiled and the
+per-frame GC allocation removed (`PMSDKMeshWarp` caches its vertex/color arrays). Remaining:
+(a) real-hardware calibration smoke test (only unverified link); (b) optional GPU warp path
+for extreme scale; (c) low-priority gaps (OSC/presets/NDI/test patterns, per-region black).
 **Verified**: native robust-decode + perspective are unit-tested (green); Unity C#
 compiles clean; sim auto-align verified. Not yet: play-mode runtime for the DLL-dependent
 features, and any physical camera loop.

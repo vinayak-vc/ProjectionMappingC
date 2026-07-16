@@ -21,6 +21,12 @@ namespace vxpmsdk.Components
         private pmsdk_vertex_t[] vertexBuffer;
         private uint[] indexBuffer;
 
+        // Reused across frames to avoid per-frame GC allocation (a fine warp mesh is
+        // ~10k verts → ~280 KB/frame/surface if reallocated; multiply by projectors
+        // and 60 fps and it becomes a GC-hitch source).
+        private Vector3[] unityVertsCache;
+        private Color[] unityColorsCache;
+
         private void OnEnable()
         {
             meshFilter = GetComponent<MeshFilter>();
@@ -120,16 +126,21 @@ namespace vxpmsdk.Components
                 // Pull data back and apply to Unity mesh
                 NativeBindings.pmsdk_mesh_get_vertices(nativeOutputMesh, vertexBuffer, (UIntPtr)vertexBuffer.Length);
 
-                Vector3[] unityVerts = new Vector3[vertexBuffer.Length];
-                Color[] unityColors = new Color[vertexBuffer.Length];
-                
+                // Reuse cached arrays — allocating fresh each frame is a GC-hitch
+                // source at high grid density / many projectors.
+                if (unityVertsCache == null || unityVertsCache.Length != vertexBuffer.Length)
+                {
+                    unityVertsCache = new Vector3[vertexBuffer.Length];
+                    unityColorsCache = new Color[vertexBuffer.Length];
+                }
+
                 for (int i = 0; i < vertexBuffer.Length; i++)
                 {
-                    unityVerts[i] = new Vector3(vertexBuffer[i].position.x, vertexBuffer[i].position.y, vertexBuffer[i].position.z);
-                    unityColors[i] = new Color(vertexBuffer[i].color.x, vertexBuffer[i].color.y, vertexBuffer[i].color.z, vertexBuffer[i].color.w);
+                    unityVertsCache[i] = new Vector3(vertexBuffer[i].position.x, vertexBuffer[i].position.y, vertexBuffer[i].position.z);
+                    unityColorsCache[i] = new Color(vertexBuffer[i].color.x, vertexBuffer[i].color.y, vertexBuffer[i].color.z, vertexBuffer[i].color.w);
                 }
-                warpedMesh.vertices = unityVerts;
-                warpedMesh.colors = unityColors;
+                warpedMesh.SetVertices(unityVertsCache);
+                warpedMesh.SetColors(unityColorsCache);
                 warpedMesh.RecalculateBounds();
             }
         }

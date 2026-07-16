@@ -190,10 +190,29 @@ pin needs the new DLL, so both wait on one redeploy + Unity restart.
 
 **Pro-feature gap list: 8 of 12 done** (all High + auto-blend, blend-gamma, color, rotation, dense-warp).
 
+## Verification & perf (2026-07-16, Unity restart #2)
+
+- [x] Sim closed-loop auto-align with an **off-axis PERSPECTIVE observer** (real-camera
+  scenario, not the earlier aligned-ortho identity case): 312 correspondence points,
+  **0.39 px** mean reprojection error. Confirms the homography path handles genuine
+  perspective sub-pixel. Only physical capture noise remains unverified (needs hardware).
+- [x] Warp-readback perf profiled: `PMSDKMeshWarp` per-frame cost per surface ≈ 0.017 ms
+  (121 v) / 0.34 ms (2.6k) / 1.34 ms (10k) / 3.2 ms (23k). Compute is fine; the real risk
+  was **per-frame `new Vector3[]`+`new Color[]` allocation** (~280 KB/frame at 10k verts ×
+  projectors × 60fps → GC hitches).
+- [x] Fixed: `PMSDKMeshWarp` now reuses cached vertex/color arrays + `SetVertices/SetColors`
+  → steady-state zero per-frame allocation. Render verified in play mode.
+- [ ] For very large installs (many 4K projectors × dense grids): consider a GPU warp path
+  (vertex displacement from a warp texture) to remove the CPU readback entirely — deferred
+  until a real install needs it.
+- [x] z-fix DLL redeployed to the nested repo + pushed (nested `02176ef`).
+
 ## Next Items / Backlog
+- [ ] Real-hardware calibration smoke test (projector + webcam) — the last unverified link
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
 - [ ] Remaining gaps (low): OSC/HTTP remote, named presets/cues, NDI/Spout, extra test patterns
 - [ ] True per-region black-level compensation (current `_BlackLevel` is a uniform floor)
+- [ ] GPU warp path for extreme projector counts / grid density
 - [ ] Milestone 19: Plugin SDK
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Code coverage job in CI

@@ -34,6 +34,8 @@ namespace vxpmsdk.Components
 
         private readonly List<PMSDKPoseSolver.Correspondence> captured = new List<PMSDKPoseSolver.Correspondence>();
         private Vector2 marker = new Vector2(0.5f, 0.5f);
+        private PMSDKPoseCalibratorOverlay overlay;
+        private bool dragging;
 
         private void Awake()
         {
@@ -54,6 +56,13 @@ namespace vxpmsdk.Components
             marker.x = Mathf.Clamp01(marker.x + dx * step);
             marker.y = Mathf.Clamp01(marker.y + dy * step);
 
+            // Mouse drag of the marker over the projector output.
+            if (ProjectorCamera != null && Input.GetMouseButton(0))
+            {
+                if (TryPointerViewport(out Vector2 vp)) { marker = vp; dragging = true; }
+            }
+            else dragging = false;
+
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) CaptureCurrent();
             if (Input.GetKeyDown(KeyCode.Backspace)) UndoCapture();
             if (Input.GetKeyDown(KeyCode.Space)) SolveAndApply();
@@ -68,10 +77,29 @@ namespace vxpmsdk.Components
             CurrentAnchor = 0;
             marker = new Vector2(0.5f, 0.5f);
             Active = true;
+            if (overlay == null) overlay = PMSDKPoseCalibratorOverlay.Create(this);
             RefreshStatus();
         }
 
         public void Exit() { Active = false; }
+
+        // Pointer position in the projector camera's viewport (multi-display aware).
+        private bool TryPointerViewport(out Vector2 viewport)
+        {
+            viewport = default;
+            if (ProjectorCamera == null) return false;
+            Vector3 mouse = Input.mousePosition;
+            Vector3 rel = Display.RelativeMouseAt(mouse);
+            if (rel != Vector3.zero)
+            {
+                if ((int)rel.z != ProjectorCamera.targetDisplay) return false;
+                mouse = new Vector3(rel.x, rel.y, 0f);
+            }
+            Vector3 vp = ProjectorCamera.ScreenToViewportPoint(mouse);
+            if (vp.x < -0.05f || vp.x > 1.05f || vp.y < -0.05f || vp.y > 1.05f) return false;
+            viewport = new Vector2(Mathf.Clamp01(vp.x), Mathf.Clamp01(vp.y));
+            return true;
+        }
 
         /// <summary>Record the current anchor's 3D point against the current marker position.</summary>
         public void CaptureCurrent()

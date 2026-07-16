@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -29,6 +30,15 @@ namespace vxpmsdk.Components
         private readonly RectTransform[] blendZones = new RectTransform[4]; // L R T B
         private readonly Image[] blendZoneImages = new Image[4];
         private Text badge;
+
+        // Grid-warp handles + lattice lines (pixel-positioned within gridRoot).
+        private const float GridHandleSize = 20f;
+        private const float GridSelectedHandleSize = 34f;
+        private static readonly Color GridLineColor = new Color(0f, 0.9f, 1f, 0.5f);
+        private RectTransform gridRoot;
+        private RectTransform canvasRect;
+        private readonly List<Image> gridHandleImages = new List<Image>();
+        private readonly List<Image> gridLineImages = new List<Image>();
 
         public static PMSDKCalibrationOverlay GetOrCreate(PMSDKCalibrationManager manager, PMSDKCalibrationManager.Surface surface)
         {
@@ -83,6 +93,18 @@ namespace vxpmsdk.Components
             canvas.planeDistance = surface.ProjectorCamera.nearClipPlane + 0.1f;
             canvas.sortingOrder = 100;
             canvasObj.AddComponent<CanvasScaler>();
+            canvasRect = canvasObj.GetComponent<RectTransform>();
+
+            // Grid-warp visuals root (full-rect, bottom-left origin so pixel
+            // positioning of handles and lines shares one basis).
+            var gridObj = new GameObject("GridRoot");
+            gridObj.transform.SetParent(canvasObj.transform, false);
+            gridObj.layer = canvasObj.layer;
+            gridRoot = gridObj.AddComponent<RectTransform>();
+            gridRoot.anchorMin = Vector2.zero;
+            gridRoot.anchorMax = Vector2.one;
+            gridRoot.offsetMin = Vector2.zero;
+            gridRoot.offsetMax = Vector2.zero;
 
             // Blend-zone tint rects (under handles): visualize each edge's falloff
             // band while in blend submode.
@@ -134,9 +156,19 @@ namespace vxpmsdk.Components
             bool isSelectedSurface = manager.Selected == surface;
             float pulse = 0.7f + 0.3f * Mathf.PingPong(Time.unscaledTime * 2f, 1f);
 
+            // In grid mode the N x M lattice owns the surface; hide the 4 corner
+            // handles so the two editors don't visually collide.
+            bool gridActive = surface.Grid != null && surface.Grid.enabled;
+
             for (int i = 0; i < 4; i++)
             {
                 if (handles[i] == null) continue;
+                if (gridActive)
+                {
+                    handleImages[i].enabled = false;
+                    continue;
+                }
+                handleImages[i].enabled = true;
                 Vector2 pos = PMSDKCalibrationManager.GetCorner(surface.CornerPin, i);
                 handles[i].anchorMin = pos;
                 handles[i].anchorMax = pos;
@@ -155,6 +187,101 @@ namespace vxpmsdk.Components
             }
 
             UpdateBlendZones(isSelectedSurface);
+            UpdateGrid(gridActive, isSelectedSurface, pulse);
+        }
+
+        private void UpdateGrid(bool gridActive, bool isSelectedSurface, float pulse)
+        {
+            if (!gridActive)
+            {
+                foreach (var img in gridHandleImages) if (img != null) img.enabled = false;
+                foreach (var img in gridLineImages) if (img != null) img.enabled = false;
+                return;
+            }
+
+            var grid = surface.Grid;
+            int cols = grid.Columns, rows = grid.Rows;
+            int pointCount = cols * rows;
+            Vector2 size = canvasRect.rect.size;
+
+            EnsureGridHandles(pointCount);
+
+            // Handles at each control point (pixel-positioned within gridRoot).
+            for (int i = 0; i < gridHandleImages.Count; i++)
+            {
+                var img = gridHandleImages[i];
+                if (i >= pointCount) { img.enabled = false; continue; }
+                img.enabled = true;
+                Vector2 p = grid.GetPointByIndex(i);
+                var rt = img.rectTransform;
+                rt.anchoredPosition = new Vector2(p.x * size.x, p.y * size.y);
+
+                bool selected = isSelectedSurface && manager.GridEditMode && manager.SelectedGridPoint == i;
+                rt.sizeDelta = Vector2.one * (selected ? GridSelectedHandleSize : GridHandleSize);
+                Color c = selected ? SelectedColor : UnselectedColor;
+                if (selected) c.a *= pulse;
+                img.color = c;
+            }
+
+            // Lattice lines: horizontal + vertical neighbours.
+            int hLines = rows * (cols - 1);
+            int vLines = cols * (rows - 1);
+            EnsureGridLines(hLines + vLines);
+            int line = 0;
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols - 1; c++)
+                    SetLine(line++, grid.GetPoint(c, r), grid.GetPoint(c + 1, r), size);
+            for (int c = 0; c < cols; c++)
+                for (int r = 0; r < rows - 1; r++)
+                    SetLine(line++, grid.GetPoint(c, r), grid.GetPoint(c, r + 1), size);
+            for (; line < gridLineImages.Count; line++)
+                gridLineImages[line].enabled = false;
+        }
+
+        private void SetLine(int index, Vector2 aNorm, Vector2 bNorm, Vector2 size)
+        {
+            var img = gridLineImages[index];
+            img.enabled = true;
+            Vector2 a = new Vector2(aNorm.x * size.x, aNorm.y * size.y);
+            Vector2 b = new Vector2(bNorm.x * size.x, bNorm.y * size.y);
+            Vector2 mid = (a + b) * 0.5f;
+            Vector2 delta = b - a;
+            var rt = img.rectTransform;
+            rt.anchoredPosition = mid;
+            rt.sizeDelta = new Vector2(delta.magnitude, 2f);
+            rt.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+        }
+
+        private void EnsureGridHandles(int count)
+        {
+            while (gridHandleImages.Count < count)
+            {
+                var go = new GameObject("GridHandle_" + gridHandleImages.Count);
+                go.transform.SetParent(gridRoot, false);
+                go.layer = gridRoot.gameObject.layer;
+                var img = go.AddComponent<Image>();
+                var rt = go.GetComponent<RectTransform>();
+                rt.anchorMin = rt.anchorMax = Vector2.zero; // bottom-left origin
+                gridHandleImages.Add(img);
+            }
+        }
+
+        private void EnsureGridLines(int count)
+        {
+            while (gridLineImages.Count < count)
+            {
+                var go = new GameObject("GridLine_" + gridLineImages.Count);
+                go.transform.SetParent(gridRoot, false);
+                go.transform.SetAsFirstSibling(); // lines behind handles
+                go.layer = gridRoot.gameObject.layer;
+                var img = go.AddComponent<Image>();
+                img.color = GridLineColor;
+                img.raycastTarget = false;
+                var rt = go.GetComponent<RectTransform>();
+                rt.anchorMin = rt.anchorMax = Vector2.zero;
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                gridLineImages.Add(img);
+            }
         }
 
         private void UpdateBlendZones(bool isSelectedSurface)

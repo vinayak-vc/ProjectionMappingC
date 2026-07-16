@@ -14,7 +14,6 @@ namespace vxpmsdk.Components
         public Vector2 BottomRight = new Vector2(1, 0);
 
         private PMSDKMeshWarp warp;
-        private pmsdk_vec3_t[] pointsBuffer = new pmsdk_vec3_t[4];
 
         private void OnEnable()
         {
@@ -26,22 +25,29 @@ namespace vxpmsdk.Components
             if (warp == null || warp.Projector == null || warp.Projector.NativeWarpNode == IntPtr.Zero)
                 return;
 
+            // A finer grid warp, if present and enabled, owns the deformation —
+            // a warp node has a single deformation type, and the N x M grid is the
+            // superset control.
+            var grid = GetComponent<PMSDKGridWarp>();
+            if (grid != null && grid.enabled)
+                return;
+
             PMSDKProjector projector = warp.Projector;
 
-            // Set warp node deformation type to Grid (2)
-            NativeBindings.pmsdk_warpnode_set_deformation_type(projector.NativeWarpNode, 2);
-            IntPtr gridwarp = NativeBindings.pmsdk_warpnode_get_gridwarp(projector.NativeWarpNode);
+            // Perspective (projective) corner pin — deformation type 3. A 2x2 grid
+            // warp would only interpolate bilinearly and shear the texture along the
+            // diagonal on a keystoned quad; a homography foreshortens correctly.
+            NativeBindings.pmsdk_warpnode_set_deformation_type(projector.NativeWarpNode, 3);
+            IntPtr pw = NativeBindings.pmsdk_warpnode_get_perspectivewarp(projector.NativeWarpNode);
 
-            if (gridwarp != IntPtr.Zero)
+            if (pw != IntPtr.Zero)
             {
-                // Fill 2x2 grid (BottomLeft, BottomRight, TopLeft, TopRight)
-                // Grid warp expects coordinates in row-major order starting from y=0
-                pointsBuffer[0] = new pmsdk_vec3_t { x = BottomLeft.x, y = BottomLeft.y, z = 0 };
-                pointsBuffer[1] = new pmsdk_vec3_t { x = BottomRight.x, y = BottomRight.y, z = 0 };
-                pointsBuffer[2] = new pmsdk_vec3_t { x = TopLeft.x, y = TopLeft.y, z = 0 };
-                pointsBuffer[3] = new pmsdk_vec3_t { x = TopRight.x, y = TopRight.y, z = 0 };
-
-                NativeBindings.pmsdk_gridwarp_set_control_points(gridwarp, 2, 2, pointsBuffer);
+                NativeBindings.pmsdk_perspectivewarp_set_corners(
+                    pw,
+                    new pmsdk_vec2_t { x = BottomLeft.x, y = BottomLeft.y },
+                    new pmsdk_vec2_t { x = BottomRight.x, y = BottomRight.y },
+                    new pmsdk_vec2_t { x = TopRight.x, y = TopRight.y },
+                    new pmsdk_vec2_t { x = TopLeft.x, y = TopLeft.y });
             }
         }
     }

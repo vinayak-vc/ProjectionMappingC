@@ -71,6 +71,7 @@ Exit (Esc or F2): auto-save + return to show
 | `Ctrl` + Arrows | Fine ×0.1 |
 | `T` / `Shift+T` | Test pattern: selected surface / all surfaces |
 | `B` | Blend-edit submode: `Tab` cycles edge (L/R/T/B), `←→` width, `↑↓` gamma, `N`/`Shift+N` black level |
+| `G` | Grid-warp submode (N×M): `Tab` cycles control point, arrows/drag move it, `[`/`]` columns, `-`/`=` rows, `R` reset. For curved/irregular surfaces. |
 | `R` / `Ctrl+R` | Reset selected corner / whole surface to identity |
 | `Ctrl+S` | Save now (auto-save also fires on exit) |
 | `Esc` | Exit calibration mode (saves) |

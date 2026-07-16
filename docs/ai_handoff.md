@@ -52,10 +52,26 @@
 - Unity backlog: expose `pmsdk_gridwarp` grids beyond 2×2 in `PMSDKCornerPin` (bezier/grid
   UI), per-projector color correction, and a Game-view-independent preview window.
 
+- **Pro-feature High items (2026-07-16)**: (1) perspective corner pin — native
+  `PerspectiveWarp` (Heckbert homography, `DeformationType::Perspective`, C API
+  `pmsdk_perspectivewarp_set_corners`); `PMSDKCornerPin` now projective, not 2×2 bilinear
+  (D-022); 4 unit tests green. (2) N×M grid warp UI — `PMSDKGridWarp` component +
+  calibration grid mode (`G` key, drag/nudge control points, `[]`/`-=` subdivision),
+  persisted in the calibration JSON. Both **compile + unit-tested but not yet runtime-
+  verified**: the new DLL couldn't be deployed because the open Unity editor holds the
+  native-plugin lock. Deploy step: close Unity → copy
+  build/vs2022/bin/Release/ProjectionMappingSDK.dll into the nested repo's
+  Plugins/Mapping/ → reopen → hit play. Until then, entering play mode with the OLD DLL
+  throws EntryPointNotFound in PMSDKCornerPin (perspective entry points missing).
+
 ## Gotchas for the next agent
 - Unity MCP `manage_editor(play)` sessions can end up PAUSED (`EditorApplication.isPaused`)
   — if play-mode state looks frozen (Update not running, time stuck), check/clear pause
   before debugging phantom bugs.
+- Native plugin DLL is process-locked while the Unity editor is open (loaded via
+  DllImport, never unloaded on domain reload). To update ProjectionMappingSDK.dll you must
+  close Unity, copy, then reopen — there is no hot-swap. Deploy DLL changes while Unity is
+  closed.
 
 ## Project Structure Notes
 - The DLL is completely self-contained.

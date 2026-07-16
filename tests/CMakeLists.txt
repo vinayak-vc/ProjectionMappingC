@@ -24,6 +24,7 @@ add_executable(pmsdk_tests
     Geometry/DynamicMeshTests.cpp
     Geometry/BezierPatchTests.cpp
     Geometry/GridWarpTests.cpp
+    Geometry/PerspectiveWarpTests.cpp
     Geometry/MeshOptimizerTests.cpp
     Warp/ProjectorTests.cpp
     Warp/DeformationFieldTests.cpp

@@ -32,6 +32,7 @@ namespace vxpmsdk.Components
             public PMSDKCornerPin CornerPin;
             public PMSDKEdgeBlend Blend;
             public PMSDKTestPattern TestPattern;
+            public PMSDKGridWarp Grid;
             public Camera ProjectorCamera;
             public PMSDKCalibrationOverlay Overlay;
             public RenderTexture Thumbnail;
@@ -69,6 +70,8 @@ namespace vxpmsdk.Components
 
         public bool CalibrationMode { get; private set; }
         public bool BlendSubmode { get; private set; }
+        public bool GridEditMode { get; private set; }
+        public int SelectedGridPoint { get; private set; }
         public bool HelpVisible { get; private set; }
         public bool Dirty { get; private set; }
         public bool IsDragging => dragging;
@@ -183,15 +186,25 @@ namespace vxpmsdk.Components
 
             if (ctrl && Input.GetKeyDown(KeyCode.S)) { SaveNow(); }
             else if (ctrl && Input.GetKeyDown(KeyCode.Z)) { UndoLast(); }
-            else if (ctrl && Input.GetKeyDown(KeyCode.R)) { ResetSelectedSurface(); }
-            else if (Input.GetKeyDown(KeyCode.R)) { ResetSelectedCorner(); }
+            else if (ctrl && Input.GetKeyDown(KeyCode.R)) { if (GridEditMode) ResetGrid(); else ResetSelectedSurface(); }
+            else if (Input.GetKeyDown(KeyCode.R)) { if (!GridEditMode) ResetSelectedCorner(); }
 
             if (Input.GetKeyDown(KeyCode.PageUp)) SelectSurface(-1);
             if (Input.GetKeyDown(KeyCode.PageDown)) SelectSurface(+1);
             if (Input.GetKeyDown(KeyCode.Tab)) CycleElement(shift ? -1 : +1);
-            if (Input.GetKeyDown(KeyCode.B)) BlendSubmode = !BlendSubmode;
+            if (Input.GetKeyDown(KeyCode.B) && !GridEditMode) BlendSubmode = !BlendSubmode;
+            if (Input.GetKeyDown(KeyCode.G)) ToggleGridMode();
             if (Input.GetKeyDown(KeyCode.T)) ToggleTestPattern(all: shift);
-            if (Input.GetKeyDown(KeyCode.N)) AdjustBlackLevel(shift ? -0.01f : +0.01f);
+            if (Input.GetKeyDown(KeyCode.N) && !GridEditMode) AdjustBlackLevel(shift ? -0.01f : +0.01f);
+
+            // Grid subdivision: [ ] change columns, - = change rows.
+            if (GridEditMode)
+            {
+                if (Input.GetKeyDown(KeyCode.LeftBracket)) ResizeGrid(-1, 0);
+                if (Input.GetKeyDown(KeyCode.RightBracket)) ResizeGrid(+1, 0);
+                if (Input.GetKeyDown(KeyCode.Minus)) ResizeGrid(0, -1);
+                if (Input.GetKeyDown(KeyCode.Equals)) ResizeGrid(0, +1);
+            }
 
             float speed = NudgePerSecond * Time.unscaledDeltaTime;
             if (shift) speed *= CoarseMultiplier;
@@ -201,7 +214,8 @@ namespace vxpmsdk.Components
             float dy = (Input.GetKey(KeyCode.UpArrow) ? 1f : 0f) - (Input.GetKey(KeyCode.DownArrow) ? 1f : 0f);
             if (dx != 0f || dy != 0f)
             {
-                if (BlendSubmode) AdjustBlend(dx * speed, dy * speed);
+                if (GridEditMode) NudgeSelectedGridPoint(new Vector2(dx, dy) * speed);
+                else if (BlendSubmode) AdjustBlend(dx * speed, dy * speed);
                 else NudgeSelectedCorner(new Vector2(dx, dy) * speed);
             }
 
@@ -252,11 +266,73 @@ namespace vxpmsdk.Components
             SelectedSurfaceIndex = Mathf.Clamp(index, 0, surfaces.Count - 1);
         }
 
-        /// <summary>Tab: cycles corner, or blend edge while in blend submode.</summary>
+        /// <summary>Tab: cycles the active element — grid point, blend edge, or corner.</summary>
         public void CycleElement(int delta)
         {
-            if (BlendSubmode) SelectedEdge = (SelectedEdge + delta + 4) % 4;
+            if (GridEditMode)
+            {
+                var g = Selected?.Grid;
+                if (g != null && g.PointCount > 0)
+                    SelectedGridPoint = (SelectedGridPoint + delta + g.PointCount) % g.PointCount;
+            }
+            else if (BlendSubmode) SelectedEdge = (SelectedEdge + delta + 4) % 4;
             else SelectedCorner = (SelectedCorner + delta + 4) % 4;
+        }
+
+        // ---------------- Grid warp (N x M) ---------------------------------------
+
+        /// <summary>Toggle N x M grid-warp editing on the selected surface.</summary>
+        public void ToggleGridMode()
+        {
+            var s = Selected;
+            if (s == null || s.Warp == null) return;
+
+            if (!GridEditMode)
+            {
+                if (s.Grid == null)
+                {
+                    s.Grid = s.Warp.GetComponent<PMSDKGridWarp>();
+                    if (s.Grid == null) s.Grid = s.Warp.gameObject.AddComponent<PMSDKGridWarp>();
+                }
+                s.Grid.enabled = true; // takes over from the corner pin
+                BlendSubmode = false;
+                GridEditMode = true;
+                SelectedGridPoint = Mathf.Clamp(SelectedGridPoint, 0, s.Grid.PointCount - 1);
+            }
+            else
+            {
+                // Leaving grid mode hands the surface back to the corner pin.
+                if (s.Grid != null) s.Grid.enabled = false;
+                GridEditMode = false;
+            }
+            Dirty = true;
+        }
+
+        public void NudgeSelectedGridPoint(Vector2 delta)
+        {
+            var g = Selected?.Grid;
+            if (g == null || SelectedGridPoint >= g.PointCount) return;
+            PushUndoIfNeeded();
+            g.SetPointByIndex(SelectedGridPoint, g.GetPointByIndex(SelectedGridPoint) + delta);
+            Dirty = true;
+        }
+
+        public void ResetGrid()
+        {
+            var g = Selected?.Grid;
+            if (g == null) return;
+            PushUndoIfNeeded();
+            g.ResetGrid();
+            Dirty = true;
+        }
+
+        public void ResizeGrid(int dCols, int dRows)
+        {
+            var g = Selected?.Grid;
+            if (g == null) return;
+            g.Resize(g.Columns + dCols, g.Rows + dRows);
+            SelectedGridPoint = Mathf.Clamp(SelectedGridPoint, 0, g.PointCount - 1);
+            Dirty = true;
         }
 
         public void NudgeSelectedCorner(Vector2 normalizedDelta)
@@ -391,6 +467,16 @@ namespace vxpmsdk.Components
                     gamma = s.Blend != null ? s.Blend.Gamma : 2.2f,
                     blackLevel = s.Blend != null ? s.Blend.BlackLevel : 0f
                 };
+
+                if (s.Grid != null)
+                {
+                    var entry = file.surfaces[i];
+                    entry.gridEnabled = s.Grid.enabled;
+                    entry.gridColumns = s.Grid.Columns;
+                    entry.gridRows = s.Grid.Rows;
+                    entry.gridPoints = new Vector2[s.Grid.PointCount];
+                    for (int p = 0; p < s.Grid.PointCount; p++) entry.gridPoints[p] = s.Grid.GetPointByIndex(p);
+                }
             }
             if (PMSDKCalibrationIO.Save(FilePath, file))
             {
@@ -425,6 +511,28 @@ namespace vxpmsdk.Components
 
         private void TryBeginDrag()
         {
+            if (GridEditMode)
+            {
+                // Pick the nearest grid control point on the selected surface.
+                var s = Selected;
+                if (s?.Grid == null || !TryGetPointerViewport(s, out Vector2 gvp)) return;
+                float best = HandleGrabRadius;
+                int bestPoint = -1;
+                for (int i = 0; i < s.Grid.PointCount; i++)
+                {
+                    float d = Vector2.Distance(gvp, s.Grid.GetPointByIndex(i));
+                    if (d < best) { best = d; bestPoint = i; }
+                }
+                if (bestPoint >= 0)
+                {
+                    SelectedGridPoint = bestPoint;
+                    PushUndoIfNeeded();
+                    dragging = true;
+                    hadFinePosition = false;
+                }
+                return;
+            }
+
             float bestDist = HandleGrabRadius;
             int bestSurface = -1, bestCorner = -1;
             for (int i = 0; i < surfaces.Count; i++)
@@ -458,6 +566,25 @@ namespace vxpmsdk.Components
             {
                 return;
             }
+
+            if (GridEditMode)
+            {
+                if (s.Grid == null || SelectedGridPoint >= s.Grid.PointCount) return;
+                if (fine)
+                {
+                    if (hadFinePosition)
+                        s.Grid.SetPointByIndex(SelectedGridPoint, s.Grid.GetPointByIndex(SelectedGridPoint) + (vp - lastFineViewport) * 0.1f);
+                    lastFineViewport = vp;
+                    hadFinePosition = true;
+                }
+                else
+                {
+                    s.Grid.SetPointByIndex(SelectedGridPoint, vp);
+                }
+                Dirty = true;
+                return;
+            }
+
             if (fine)
             {
                 // Fine drag: apply a tenth of the pointer's movement each frame.
@@ -513,8 +640,11 @@ namespace vxpmsdk.Components
             }
             EnsureServiceCamera();
 
-            Vector2 corner = GetCorner(s.CornerPin, SelectedCorner);
-            Vector3 worldCorner = s.Warp.transform.TransformPoint(new Vector3(corner.x, corner.y, 0f));
+            // Center on the element currently being edited.
+            Vector2 focus = (GridEditMode && s.Grid != null && SelectedGridPoint < s.Grid.PointCount)
+                ? s.Grid.GetPointByIndex(SelectedGridPoint)
+                : GetCorner(s.CornerPin, SelectedCorner);
+            Vector3 worldCorner = s.Warp.transform.TransformPoint(new Vector3(focus.x, focus.y, 0f));
 
             var cam = serviceCamera;
             var proj = s.ProjectorCamera;
@@ -614,6 +744,7 @@ namespace vxpmsdk.Components
                     CornerPin = warp.GetComponent<PMSDKCornerPin>(),
                     Blend = warp.GetComponent<PMSDKEdgeBlend>(),
                     TestPattern = warp.GetComponent<PMSDKTestPattern>(),
+                    Grid = warp.GetComponent<PMSDKGridWarp>(),
                     ProjectorCamera = warp.Projector != null ? warp.Projector.GetComponent<Camera>() : null
                 };
                 if (s.CornerPin == null)
@@ -828,6 +959,23 @@ namespace vxpmsdk.Components
                     match.Blend.BottomEdge = saved.blendBottom;
                     match.Blend.Gamma = saved.gamma;
                     match.Blend.BlackLevel = saved.blackLevel;
+                }
+
+                // Restore a saved grid warp (and let it take over from the corner pin).
+                if (saved.gridEnabled && saved.gridPoints != null && saved.gridPoints.Length == saved.gridColumns * saved.gridRows)
+                {
+                    if (match.Grid == null)
+                    {
+                        match.Grid = match.Warp.GetComponent<PMSDKGridWarp>();
+                        if (match.Grid == null) match.Grid = match.Warp.gameObject.AddComponent<PMSDKGridWarp>();
+                    }
+                    match.Grid.Resize(saved.gridColumns, saved.gridRows);
+                    for (int p = 0; p < saved.gridPoints.Length; p++) match.Grid.SetPointByIndex(p, saved.gridPoints[p]);
+                    match.Grid.enabled = true;
+                }
+                else if (match.Grid != null)
+                {
+                    match.Grid.enabled = false;
                 }
             }
         }

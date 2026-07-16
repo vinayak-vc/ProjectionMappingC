@@ -86,6 +86,23 @@ Inside the Editor, preview via the Game view's Display dropdown instead.
   pattern material/texture are `HideFlags.DontSave`, so toggling it while the
   scene is saved can no longer permanently clobber the screen material.
 
+## 4b. Warp modes (corner pin vs. grid)
+
+A warp surface has one active deformation, driven by whichever component is enabled:
+
+- **`PMSDKCornerPin`** — 4-corner **projective** pin. Pushes the four corners into the
+  native `PerspectiveWarp` (deformation type 3, a homography). Perspective-correct
+  foreshortening; the default for flat surfaces. (Superseded the old 2×2 bilinear grid
+  path, which sheared on keystoned quads — D-022.)
+- **`PMSDKGridWarp`** — N×M **bilinear** grid for curved/irregular surfaces. Disabled by
+  default; when enabled it takes over the warp node (deformation type 2) and the corner
+  pin yields. Control points are normalized raster coords (row-major, y up), serialized
+  with the scene and in the calibration file.
+
+In calibration mode, `G` toggles grid editing on the selected surface: `Tab` cycles the
+control point, arrows/drag move it, `[` `]` change columns, `-` `=` change rows, `R`
+resets. The overlay draws the lattice (handles + lines) on the projector output.
+
 ## 5. SDK Component Hard Constraints (Foolproofing)
 To prevent runtime crashes and silent failures, the SDK enforces strict component dependencies (`[RequireComponent]`) and validation:
 

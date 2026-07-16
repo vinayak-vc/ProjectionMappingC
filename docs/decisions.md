@@ -96,6 +96,23 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
+## D-022 2026-07-16 — Corner pin is projective; grid warp is bilinear; they are distinct deformation modes
+
+The 4-corner pin now uses a true homography (`DeformationType::Perspective`,
+`Geometry::PerspectiveWarp`, Heckbert unit-square→quad map) instead of pushing 4 points
+into a 2×2 bilinear `GridWarp`. Bilinear interpolation of 4 corners shears the texture
+along the quad diagonal on any non-parallelogram (keystoned) quad — visibly wrong and not
+what a projector/media-server corner pin does. Verified by unit test: perspective and
+bilinear agree at the 4 corners but the mesh interior diverges (~0.17 at the midpoint of a
+trapezoid).
+
+The N×M `GridWarp` (bilinear per cell) remains the correct model for curved/irregular
+surfaces and is now exposed at runtime (`PMSDKGridWarp` + calibration grid mode). The two
+are mutually exclusive per warp node (a node has one deformation type): when a
+`PMSDKGridWarp` is enabled it owns the node and `PMSDKCornerPin` yields. C API adds
+`pmsdk_warpnode_get_perspectivewarp` + `pmsdk_perspectivewarp_set_corners` (deformation
+type 3). See docs/unity-architecture.md §Warp modes.
+
 ## D-021 2026-07-16 — Camera auto-align uses a homography, not the native stereo triangulation
 
 On-site auto-align (calibration P3) recovers a camera→projector planar homography from

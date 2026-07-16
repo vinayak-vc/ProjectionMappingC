@@ -22,6 +22,7 @@ namespace vxpmsdk.Components
             "Arrows        nudge corner   [Shift] coarse x5   [Ctrl] fine x0.1\n" +
             "Mouse drag    move handle directly   [Alt] fine drag\n" +
             "B             blend mode: arrows = width / gamma, zones tinted\n" +
+            "G             grid-warp mode: Tab point, arrows move, [ ] cols, - = rows\n" +
             "N / Shift+N   black level up / down\n" +
             "T / Shift+T   test pattern: selected / all\n" +
             "R / Ctrl+R    reset corner / reset surface\n" +
@@ -281,7 +282,14 @@ namespace vxpmsdk.Components
             string line1 = $"PMSDK CALIBRATION   Projector [{manager.SelectedSurfaceIndex + 1}/{manager.Surfaces.Count}]  {s.Id}  (Display {displayNumber})";
 
             string line2;
-            if (manager.BlendSubmode)
+            if (manager.GridEditMode && s.Grid != null)
+            {
+                int col = s.Grid.PointCount > 0 ? manager.SelectedGridPoint % s.Grid.Columns : 0;
+                int row = s.Grid.PointCount > 0 ? manager.SelectedGridPoint / s.Grid.Columns : 0;
+                Vector2 gp = s.Grid.PointCount > 0 ? s.Grid.GetPointByIndex(manager.SelectedGridPoint) : Vector2.zero;
+                line2 = $"GRID {s.Grid.Columns}x{s.Grid.Rows}   point [{col},{row}] ({gp.x:F3}, {gp.y:F3})   arrows/drag move   [ ] cols   - = rows   R reset";
+            }
+            else if (manager.BlendSubmode)
             {
                 string edge = PMSDKCalibrationManager.EdgeNames[manager.SelectedEdge];
                 float gamma = s.Blend != null ? s.Blend.Gamma : 0f;

@@ -20,6 +20,12 @@ namespace vxpmsdk.Components
         public float blendBottom;
         public float gamma = 2.2f;
         public float blackLevel;
+
+        // N x M grid warp (overrides the 4-corner pin while gridEnabled).
+        public bool gridEnabled;
+        public int gridColumns = 3;
+        public int gridRows = 3;
+        public Vector2[] gridPoints;
     }
 
     [Serializable]

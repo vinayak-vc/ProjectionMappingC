@@ -153,6 +153,15 @@ namespace vxpmsdk
         public static extern pmsdk_status_t pmsdk_gridwarp_set_control_points(IntPtr gridwarp, int columns, int rows, pmsdk_vec3_t[] points);
 
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr pmsdk_warpnode_get_perspectivewarp(IntPtr node);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_perspectivewarp_set_corners(
+            IntPtr perspectivewarp,
+            pmsdk_vec2_t bottomLeft, pmsdk_vec2_t bottomRight,
+            pmsdk_vec2_t topRight, pmsdk_vec2_t topLeft);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern pmsdk_status_t pmsdk_warpnode_process_mesh(IntPtr node, IntPtr input_mesh, IntPtr output_mesh);
 
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]

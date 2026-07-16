@@ -56,7 +56,7 @@ PMSDK_API pmsdk_status_t pmsdk_warpnode_add_child(pmsdk_warpnode_t* parent, pmsd
 /**
  * @brief Sets the deformation type for the warp node.
  * @param node The warp node.
- * @param type 0 = None, 1 = Bezier, 2 = Grid.
+ * @param type 0 = None, 1 = Bezier, 2 = Grid, 3 = Perspective.
  * @return PMSDK_SUCCESS on success.
  */
 PMSDK_API pmsdk_status_t pmsdk_warpnode_set_deformation_type(pmsdk_warpnode_t* node, int type);
@@ -77,6 +77,28 @@ PMSDK_API pmsdk_gridwarp_t* pmsdk_warpnode_get_gridwarp(pmsdk_warpnode_t* node);
  * @return PMSDK_SUCCESS on success.
  */
 PMSDK_API pmsdk_status_t pmsdk_gridwarp_set_control_points(pmsdk_gridwarp_t* gridwarp, int columns, int rows, const pmsdk_vec3_t* points);
+
+/**
+ * @brief Retrieves the PerspectiveWarp handle from a WarpNode.
+ * @param node The warp node (must have type Perspective).
+ * @return Handle to the PerspectiveWarp, or nullptr if unavailable.
+ */
+PMSDK_API pmsdk_perspectivewarp_t* pmsdk_warpnode_get_perspectivewarp(pmsdk_warpnode_t* node);
+
+/**
+ * @brief Sets the four target corners of a perspective (projective) corner pin.
+ *
+ * Corners map to the UV corners of the source quad:
+ *   bottomLeft -> (0,0), bottomRight -> (1,0), topRight -> (1,1), topLeft -> (0,1).
+ * Unlike a 2x2 grid warp (bilinear), this produces a perspective-correct mapping.
+ *
+ * @param perspectivewarp The PerspectiveWarp handle.
+ * @return PMSDK_SUCCESS on success.
+ */
+PMSDK_API pmsdk_status_t pmsdk_perspectivewarp_set_corners(
+    pmsdk_perspectivewarp_t* perspectivewarp,
+    pmsdk_vec2_t bottomLeft, pmsdk_vec2_t bottomRight,
+    pmsdk_vec2_t topRight, pmsdk_vec2_t topLeft);
 
 /**
  * @brief Processes an input mesh through a warp node hierarchy.

@@ -150,8 +150,27 @@
 - [ ] Physical projector+webcam smoke test (no hardware available here)
 - [ ] Known pre-existing failure: `DecoderTests.DecodeAndTriangulate` fails at HEAD too (before this change) — triangulation numerics/environment, investigate separately
 
+## Pro-feature gaps — High items (2026-07-16)
+
+### Perspective corner pin ✅ (unit-tested; runtime pending DLL redeploy)
+- [x] Native `Geometry::PerspectiveWarp` (Heckbert unit-square→quad homography), `DeformationType::Perspective`, wired into `DeformationField`
+- [x] C API: `pmsdk_warpnode_get_perspectivewarp`, `pmsdk_perspectivewarp_set_corners` (type 3)
+- [x] `PMSDKCornerPin` switched from 2×2 bilinear grid to perspective (D-022)
+- [x] Tests `Geometry/PerspectiveWarpTests.cpp`: exact corners, center, keystone-vs-bilinear divergence, ApplyDeformation — 4/4 green; full suite 132/133 (only the pre-existing DecodeAndTriangulate fails)
+- [ ] Runtime play-mode visual confirm — blocked on DLL redeploy (Unity holds the native plugin lock; needs editor restart)
+
+### N×M grid warp UI ✅ (compiles; runtime pending DLL redeploy)
+- [x] `PMSDKGridWarp` runtime component (N×M control points, resample-on-resize, serialized, pushes native GridWarp)
+- [x] Calibration grid mode (`G`): select/nudge/drag control points, `[`/`]` cols, `-`/`=` rows, `R` reset; overlay draws lattice handles + lines; loupe + HUD follow the grid point
+- [x] Grid persisted in the calibration JSON (enabled/cols/rows/points) and restored on load
+- [ ] Runtime play-mode confirm — same DLL-redeploy dependency
+
+Note: grid warp uses only pre-existing native entry points, but the perspective corner
+pin needs the new DLL, so both wait on one redeploy + Unity restart.
+
 ## Next Items / Backlog
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
+- [ ] Remaining pro-feature gaps (medium): auto-blend from overlap, dense auto-warp, black-level region + per-channel gamma, color/LUT, output rotation/mirror, OSC/HTTP
 - [ ] Milestone 19: Plugin SDK
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Code coverage job in CI

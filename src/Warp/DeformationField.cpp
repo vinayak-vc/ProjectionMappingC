@@ -8,6 +8,7 @@ struct DeformationField::Impl {
     DeformationType type{DeformationType::None};
     Geometry::BezierPatch bezierPatch;
     Geometry::GridWarp gridWarp;
+    Geometry::PerspectiveWarp perspectiveWarp;
 };
 
 DeformationField::DeformationField() : m_impl(std::make_unique<Impl>()) {}
@@ -27,6 +28,10 @@ Geometry::BezierPatch* DeformationField::GetBezierPatch() {
 
 Geometry::GridWarp* DeformationField::GetGridWarp() {
     return &m_impl->gridWarp;
+}
+
+Geometry::PerspectiveWarp* DeformationField::GetPerspectiveWarp() {
+    return &m_impl->perspectiveWarp;
 }
 
 std::unique_ptr<Geometry::Mesh> DeformationField::ApplyDeformation(const Geometry::Mesh& baseMesh) const {
@@ -54,8 +59,10 @@ void DeformationField::ApplyDeformationInPlace(Geometry::Mesh& mesh) const {
         m_impl->bezierPatch.ApplyDeformation(verts, v_count);
     } else if (m_impl->type == DeformationType::Grid) {
         m_impl->gridWarp.ApplyDeformation(verts, v_count);
+    } else if (m_impl->type == DeformationType::Perspective) {
+        m_impl->perspectiveWarp.ApplyDeformation(verts, v_count);
     }
-    
+
     mesh.RecalculateNormals();
 }
 

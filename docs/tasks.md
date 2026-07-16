@@ -137,10 +137,20 @@
 - [x] Manager `A` / `Shift+A` (selected / all), input gated during sweep, HUD status; `AlignSelectedWithTarget` for explicit target quads
 - [x] Numeric verify: decode roundtrip 16384/16384 (0 errors), homography reproj 1.9e-6
 - [x] Simulated integration verify: recovered identity from skewed corner-pin (err 0.008), explicit sub-rectangle target mapped exactly
-- [ ] Real-hardware loop: add C-API `pmsdk_decoder_get_frame` grayscale readback, wire native webcam into IPMSDKCalibrationCamera, physical smoke test (no hardware here)
+- [x] Real-hardware loop: C-API frame readback + native webcam capture source (see below); physical smoke test still pending (no hardware here)
+
+## Calibration hardening — "item 1" (2026-07-16) ✅
+
+- [x] Native robust Gray-code sequence: `GenerateRobustPattern` ([white, black, pattern, inverse, …]), `DecodeRobust` (per-pixel pattern-vs-inverse bits + white/black shadow mask) — replaces fragile global-threshold decoding for real cameras
+- [x] Camera capture fixes: `CaptureFrameFlushed` (VideoCapture buffers frames; unflushed captures show the previous pattern), `AddImageFromMemory`, `GetLastFrame` readback, `GetImageCount`, `ClearImages`
+- [x] C API: `pmsdk_graycode_get_robust_pattern_count/generate_robust_pattern`, `pmsdk_decoder_capture_frame_flushed/add_image_memory/get_last_frame/get_image_count/clear_images/decode_robust` (raw correspondences for homography auto-align)
+- [x] GoogleTest suite `Calibration/GrayCodeDecoderTests.cpp`: identity roundtrip, albedo+ambient robustness, shadow-mask rejection, sequence-length guard, readback/clear — 6/6 green
+- [x] Unity: `PMSDKNativeWebcamCamera` (IPMSDKCalibrationCamera over native webcam, per-capture fresh buffers), manager `UseNativeWebcam`/`WebcamIndex`/`WebcamFlushFrames`, `PMSDKAutoAlign.UseInversePatterns` (default on) + managed inverse-pattern decode, `Begin()` failure handling
+- [x] Release DLL rebuilt (all 8 new exports verified) and deployed to the Unity plugin folder
+- [ ] Physical projector+webcam smoke test (no hardware available here)
+- [ ] Known pre-existing failure: `DecoderTests.DecodeAndTriangulate` fails at HEAD too (before this change) — triangulation numerics/environment, investigate separately
 
 ## Next Items / Backlog
-- [ ] Auto-align real-hardware path (C-API frame readback + webcam source + physical test)
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
 - [ ] Milestone 19: Plugin SDK
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)

@@ -195,11 +195,29 @@ future true-3D calibration onto complex geometry.
 - `PMSDKSimulatedCamera` — renders an in-scene Unity `Camera` to a texture. No hardware;
   used for testing and for virtual / LED-volume rigs. Assign `ObserverCamera` on the
   manager, or add a scene object named `PMSDK Calibration Observer` with a `Camera`.
-- **Physical webcam** — the native OpenCV decoder (`pmsdk_decoder_open_camera` /
-  `capture_frame`, already bound) is the real-hardware source. Wiring it to
-  `IPMSDKCalibrationCamera` needs one addition to the C API: a per-frame grayscale pixel
-  readback (`pmsdk_decoder_get_frame(handle, byte* out, w, h)`). Until then the managed
-  decode runs on the simulated source; the algorithm is identical.
+- `PMSDKNativeWebcamCamera` — physical webcam through the native OpenCV decoder.
+  Enable with `UseNativeWebcam` (+ `WebcamIndex`) on the calibration manager. Captures
+  flush the VideoCapture buffer first (`pmsdk_decoder_capture_frame_flushed`) — without
+  flushing, the frame after a pattern change still shows the *previous* pattern and
+  corrupts the decode — then read back via `pmsdk_decoder_get_last_frame`.
+
+### Robustness hardening (2026-07-16, "item 1")
+Professional structured-light practice (OpenCV `structured_light`, VIOSO, academic
+standard) never decodes with a global threshold. The SDK now matches it:
+- **Native**: `GrayCode::GenerateRobustPattern` emits `[white, black, p0, p0inv, …]`
+  (2 + 2·N frames); `GrayCodeDecoder::DecodeRobust` decides each bit by
+  pattern-vs-inverse per pixel and rejects pixels below a white/black contrast gate
+  (shadow mask). New C API: `pmsdk_graycode_get_robust_pattern_count` /
+  `generate_robust_pattern`, `pmsdk_decoder_capture_frame_flushed`, `add_image_memory`,
+  `get_last_frame`, `get_image_count`, `clear_images`, and `pmsdk_decoder_decode_robust`
+  (returns raw camera→projector correspondences for homography solves — no metric
+  calibration needed). Unit-tested: identity roundtrip, albedo+ambient survival
+  (25–100% albedo gradient + ambient offset decodes perfectly), shadow-mask rejection.
+- **Managed**: `PMSDKGrayCodeDecode.Decode` gained the same inverse-pattern mode;
+  `PMSDKAutoAlign.UseInversePatterns` (default ON) projects each pattern's inverse and
+  decodes pattern-vs-inverse. The legacy midpoint mode remains for tests.
+- The old single-threshold `Decode(threshold)` and `decode_and_triangulate` remain for
+  compatibility but should not be used with real cameras.
 
 ### Verification (2026-07-16, no hardware)
 - **Numeric**: Gray encode→decode roundtrip 16 384/16 384 pixels, 0 mismatches;

@@ -42,6 +42,20 @@ PMSDK_API size_t pmsdk_graycode_get_pattern_count(const pmsdk_graycode_t* handle
  */
 PMSDK_API pmsdk_status_t pmsdk_graycode_generate_pattern(const pmsdk_graycode_t* handle, size_t index, uint8_t* outPixels);
 
+/**
+ * @brief Number of patterns in the ROBUST sequence: all-white + all-black
+ * references, then every Gray-code pattern followed by its inverse
+ * (2 + 2 * pattern_count). Required input for pmsdk_decoder_decode_robust.
+ */
+PMSDK_API size_t pmsdk_graycode_get_robust_pattern_count(const pmsdk_graycode_t* handle);
+
+/**
+ * @brief Generates a pattern of the robust sequence.
+ * Layout: 0 = white ref, 1 = black ref, 2+2k = pattern k, 3+2k = inverse of pattern k.
+ * @param outPixels Pre-allocated buffer of (width * height) bytes.
+ */
+PMSDK_API pmsdk_status_t pmsdk_graycode_generate_robust_pattern(const pmsdk_graycode_t* handle, size_t index, uint8_t* outPixels);
+
 // -----------------------------------------------------------------------------
 // Calibrator
 // -----------------------------------------------------------------------------
@@ -127,11 +141,67 @@ PMSDK_API pmsdk_status_t pmsdk_decoder_capture_frame(pmsdk_decoder_t* handle);
 PMSDK_API void pmsdk_decoder_close_camera(pmsdk_decoder_t* handle);
 
 /**
+ * @brief Captures a frame after grabbing and discarding buffered frames first.
+ * cv::VideoCapture buffers internally; without flushing, the capture after a
+ * pattern change often shows the PREVIOUS pattern. Use 2-3 flush frames.
+ */
+PMSDK_API pmsdk_status_t pmsdk_decoder_capture_frame_flushed(pmsdk_decoder_t* handle, int flushFrames);
+
+/**
  * @brief Adds an image to the decoder by its file path.
  * @param filepath Null-terminated C-string of the image path.
  * @return PMSDK_SUCCESS if loaded.
  */
 PMSDK_API pmsdk_status_t pmsdk_decoder_add_image(pmsdk_decoder_t* handle, const char* filepath);
+
+/**
+ * @brief Adds an 8-bit grayscale image supplied by the host (row-major, top-left origin).
+ */
+PMSDK_API pmsdk_status_t pmsdk_decoder_add_image_memory(pmsdk_decoder_t* handle, const uint8_t* pixels, int width, int height);
+
+/**
+ * @brief Reads back the most recently captured/added frame as 8-bit grayscale.
+ *
+ * Call once with outPixels == NULL to receive the dimensions in inOutWidth /
+ * inOutHeight, then again with a buffer of exactly (width * height) bytes and
+ * the same dimensions.
+ *
+ * @return PMSDK_SUCCESS, or PMSDK_ERROR_INVALID_ARGUMENT if no frame exists or
+ * the supplied dimensions do not match the frame.
+ */
+PMSDK_API pmsdk_status_t pmsdk_decoder_get_last_frame(const pmsdk_decoder_t* handle, uint8_t* outPixels, int* inOutWidth, int* inOutHeight);
+
+/** @brief Number of images currently accumulated in the decoder. */
+PMSDK_API size_t pmsdk_decoder_get_image_count(const pmsdk_decoder_t* handle);
+
+/** @brief Discards all accumulated images (camera stays open). */
+PMSDK_API void pmsdk_decoder_clear_images(pmsdk_decoder_t* handle);
+
+/**
+ * @brief Robust decode over a robust capture sequence (see
+ * pmsdk_graycode_generate_robust_pattern): images must be
+ * [white, black, p0, p0inv, p1, p1inv, ...].
+ *
+ * Bits are decided per pixel by pattern-vs-inverse comparison and pixels whose
+ * white-black contrast is below minContrast are rejected (shadow mask), which
+ * makes the decode robust to ambient light and surface albedo — unlike
+ * pmsdk_decoder_decode_and_triangulate's single global threshold.
+ *
+ * Returns raw camera->projector correspondences (no triangulation), suitable
+ * for homography-based auto-align (docs/calibration-ux-design.md §9).
+ *
+ * @param minContrast Minimum white-black difference (0-255) for a lit pixel.
+ * @param outCameraPoints Array of maxPoints camera pixels (x, y).
+ * @param outProjectorPoints Array of maxPoints projector pixels (x, y).
+ * @param outCount Receives the TOTAL number of matches found (may exceed maxPoints; only maxPoints are written).
+ */
+PMSDK_API pmsdk_status_t pmsdk_decoder_decode_robust(
+    const pmsdk_decoder_t* handle,
+    int minContrast,
+    pmsdk_vec2_t* outCameraPoints,
+    pmsdk_vec2_t* outProjectorPoints,
+    size_t* outCount,
+    size_t maxPoints);
 
 /**
  * @brief Decodes the accumulated images and triangulates into 3D points.

@@ -89,10 +89,28 @@ namespace vxpmsdk.Components
             byte[][] captures, byte[] white, byte[] black,
             int camW, int camH, int projW, int projH, int minContrast = 30)
         {
+            return Decode(captures, null, white, black, camW, camH, projW, projH, minContrast);
+        }
+
+        /// <summary>
+        /// Decode with optional inverse-pattern captures (professional robust mode).
+        ///
+        /// When <paramref name="inverseCaptures"/> is supplied, each bit is decided by
+        /// comparing the pattern capture against its inverse capture per pixel —
+        /// per-pixel albedo and illumination cancel out, which is far more robust on
+        /// real surfaces than thresholding against the white/black midpoint. The
+        /// white/black references still provide the shadow mask (contrast gate).
+        /// Pass null to fall back to midpoint thresholding.
+        /// </summary>
+        public static Correspondence[] Decode(
+            byte[][] captures, byte[][] inverseCaptures, byte[] white, byte[] black,
+            int camW, int camH, int projW, int projH, int minContrast = 30)
+        {
             int colBits = BitsFor(projW);
             int rowBits = BitsFor(projH);
             int pixels = camW * camH;
             var result = new Correspondence[pixels];
+            bool robust = inverseCaptures != null;
 
             for (int i = 0; i < pixels; i++)
             {
@@ -109,13 +127,19 @@ namespace vxpmsdk.Components
                 for (int bit = 0; bit < colBits; bit++)
                 {
                     grayCol <<= 1;
-                    if (captures[bit][i] > mid) grayCol |= 1;
+                    bool on = robust
+                        ? captures[bit][i] > inverseCaptures[bit][i]
+                        : captures[bit][i] > mid;
+                    if (on) grayCol |= 1;
                 }
                 int grayRow = 0;
                 for (int bit = 0; bit < rowBits; bit++)
                 {
                     grayRow <<= 1;
-                    if (captures[colBits + bit][i] > mid) grayRow |= 1;
+                    bool on = robust
+                        ? captures[colBits + bit][i] > inverseCaptures[colBits + bit][i]
+                        : captures[colBits + bit][i] > mid;
+                    if (on) grayRow |= 1;
                 }
 
                 int px = GrayToBinary(grayCol, colBits);

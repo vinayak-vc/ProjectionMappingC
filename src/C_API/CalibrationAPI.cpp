@@ -3,6 +3,7 @@
 #include "PMSDK/Calibration/GrayCode.h"
 #include "PMSDK/Calibration/GrayCodeDecoder.h"
 #include <algorithm>
+#include <cstring>
 #include <string>
 
 using namespace pmsdk;
@@ -64,6 +65,35 @@ PMSDK_API pmsdk_status_t pmsdk_graycode_generate_pattern(const pmsdk_graycode_t*
         std::vector<uint8_t> pixels = handle->obj.GeneratePattern(index);
         std::memcpy(outPixels, pixels.data(), pixels.size());
         
+        return PMSDK_SUCCESS;
+    } catch (...) {
+        return PMSDK_ERROR_UNKNOWN;
+    }
+}
+
+PMSDK_API size_t pmsdk_graycode_get_robust_pattern_count(const pmsdk_graycode_t* handle) {
+    try {
+        if (!handle) {
+            return 0;
+        }
+        return handle->obj.GetRobustPatternCount();
+    } catch (...) {
+        return 0;
+    }
+}
+
+PMSDK_API pmsdk_status_t pmsdk_graycode_generate_robust_pattern(const pmsdk_graycode_t* handle, size_t index, uint8_t* outPixels) {
+    try {
+        if (!handle || !outPixels) {
+            return PMSDK_ERROR_INVALID_ARGUMENT;
+        }
+        if (index >= handle->obj.GetRobustPatternCount()) {
+            return PMSDK_ERROR_INVALID_ARGUMENT;
+        }
+
+        std::vector<uint8_t> pixels = handle->obj.GenerateRobustPattern(index);
+        std::memcpy(outPixels, pixels.data(), pixels.size());
+
         return PMSDK_SUCCESS;
     } catch (...) {
         return PMSDK_ERROR_UNKNOWN;
@@ -209,6 +239,18 @@ PMSDK_API void pmsdk_decoder_close_camera(pmsdk_decoder_t* handle) {
     }
 }
 
+PMSDK_API pmsdk_status_t pmsdk_decoder_capture_frame_flushed(pmsdk_decoder_t* handle, int flushFrames) {
+    try {
+        if (!handle || flushFrames < 0) return PMSDK_ERROR_INVALID_ARGUMENT;
+        if (handle->obj.CaptureFrameFlushed(flushFrames)) {
+            return PMSDK_SUCCESS;
+        }
+        return PMSDK_ERROR_UNKNOWN;
+    } catch (...) {
+        return PMSDK_ERROR_UNKNOWN;
+    }
+}
+
 PMSDK_API pmsdk_status_t pmsdk_decoder_add_image(pmsdk_decoder_t* handle, const char* filepath) {
     try {
         if (!handle || !filepath) return PMSDK_ERROR_INVALID_ARGUMENT;
@@ -216,6 +258,93 @@ PMSDK_API pmsdk_status_t pmsdk_decoder_add_image(pmsdk_decoder_t* handle, const 
             return PMSDK_SUCCESS;
         }
         return PMSDK_ERROR_UNKNOWN;
+    } catch (...) {
+        return PMSDK_ERROR_UNKNOWN;
+    }
+}
+
+PMSDK_API pmsdk_status_t pmsdk_decoder_add_image_memory(pmsdk_decoder_t* handle, const uint8_t* pixels, int width, int height) {
+    try {
+        if (!handle || !pixels || width <= 0 || height <= 0) return PMSDK_ERROR_INVALID_ARGUMENT;
+        if (handle->obj.AddImageFromMemory(pixels, width, height)) {
+            return PMSDK_SUCCESS;
+        }
+        return PMSDK_ERROR_UNKNOWN;
+    } catch (...) {
+        return PMSDK_ERROR_UNKNOWN;
+    }
+}
+
+PMSDK_API pmsdk_status_t pmsdk_decoder_get_last_frame(const pmsdk_decoder_t* handle, uint8_t* outPixels, int* inOutWidth, int* inOutHeight) {
+    try {
+        if (!handle || !inOutWidth || !inOutHeight) return PMSDK_ERROR_INVALID_ARGUMENT;
+
+        std::vector<uint8_t> pixels;
+        int w = 0, h = 0;
+        if (!handle->obj.GetLastFrame(pixels, w, h)) {
+            return PMSDK_ERROR_INVALID_ARGUMENT; // no frame available
+        }
+
+        if (!outPixels) {
+            // Dimension query.
+            *inOutWidth = w;
+            *inOutHeight = h;
+            return PMSDK_SUCCESS;
+        }
+
+        if (*inOutWidth != w || *inOutHeight != h) {
+            // Caller's buffer was sized for different dimensions.
+            *inOutWidth = w;
+            *inOutHeight = h;
+            return PMSDK_ERROR_INVALID_ARGUMENT;
+        }
+
+        std::memcpy(outPixels, pixels.data(), pixels.size());
+        return PMSDK_SUCCESS;
+    } catch (...) {
+        return PMSDK_ERROR_UNKNOWN;
+    }
+}
+
+PMSDK_API size_t pmsdk_decoder_get_image_count(const pmsdk_decoder_t* handle) {
+    try {
+        if (!handle) return 0;
+        return handle->obj.GetImageCount();
+    } catch (...) {
+        return 0;
+    }
+}
+
+PMSDK_API void pmsdk_decoder_clear_images(pmsdk_decoder_t* handle) {
+    if (handle) {
+        handle->obj.ClearImages();
+    }
+}
+
+PMSDK_API pmsdk_status_t pmsdk_decoder_decode_robust(
+    const pmsdk_decoder_t* handle,
+    int minContrast,
+    pmsdk_vec2_t* outCameraPoints,
+    pmsdk_vec2_t* outProjectorPoints,
+    size_t* outCount,
+    size_t maxPoints)
+{
+    try {
+        if (!handle || !outCameraPoints || !outProjectorPoints || !outCount) {
+            return PMSDK_ERROR_INVALID_ARGUMENT;
+        }
+
+        auto matches = handle->obj.DecodeRobust(minContrast);
+
+        size_t count = std::min<size_t>(matches.size(), maxPoints);
+        *outCount = matches.size(); // total found, even if truncated
+
+        for (size_t i = 0; i < count; ++i) {
+            outCameraPoints[i] = {matches[i].cameraPoint.x, matches[i].cameraPoint.y};
+            outProjectorPoints[i] = {matches[i].projectorPoint.x, matches[i].projectorPoint.y};
+        }
+
+        return PMSDK_SUCCESS;
     } catch (...) {
         return PMSDK_ERROR_UNKNOWN;
     }

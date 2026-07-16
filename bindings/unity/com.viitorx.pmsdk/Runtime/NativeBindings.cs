@@ -208,5 +208,36 @@ namespace vxpmsdk
             float[] camIntrinsics, float[] camExtrinsics,
             float[] projIntrinsics, float[] projExtrinsics,
             [Out] pmsdk_vec3_t[] outPoints, out UIntPtr outCount, UIntPtr maxPoints);
+
+        // --- Robust calibration additions (see CalibrationAPI.h) ---
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern UIntPtr pmsdk_graycode_get_robust_pattern_count(IntPtr handle);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_graycode_generate_robust_pattern(IntPtr handle, UIntPtr index, byte[] outPixels);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_decoder_capture_frame_flushed(IntPtr handle, int flushFrames);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_decoder_add_image_memory(IntPtr handle, byte[] pixels, int width, int height);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_decoder_get_last_frame(IntPtr handle, [Out] byte[] outPixels, ref int inOutWidth, ref int inOutHeight);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern UIntPtr pmsdk_decoder_get_image_count(IntPtr handle);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void pmsdk_decoder_clear_images(IntPtr handle);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern pmsdk_status_t pmsdk_decoder_decode_robust(
+            IntPtr handle,
+            int minContrast,
+            [Out] pmsdk_vec2_t[] outCameraPoints,
+            [Out] pmsdk_vec2_t[] outProjectorPoints,
+            out UIntPtr outCount,
+            UIntPtr maxPoints);
     }
 }

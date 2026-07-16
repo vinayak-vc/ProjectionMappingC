@@ -55,7 +55,13 @@ namespace vxpmsdk.Components
         public float LoupeZoom = 0.15f;
 
         [Header("Auto-Align (P3)")]
-        [Tooltip("Observer camera for camera-assisted auto-align. If null, a scene object named 'PMSDK Calibration Observer' with a Camera is used. In a build this is a virtual/simulated observer; a physical webcam path goes through the native decoder (see docs).")]
+        [Tooltip("Use a physical webcam (via the native OpenCV decoder) as the auto-align observer. When off, the simulated ObserverCamera below is used.")]
+        public bool UseNativeWebcam;
+        [Tooltip("OS index of the webcam when UseNativeWebcam is on.")]
+        public int WebcamIndex;
+        [Tooltip("Frames grabbed and discarded before each webcam capture (VideoCapture buffers frames; without flushing, captures show the previous pattern).")]
+        public int WebcamFlushFrames = 2;
+        [Tooltip("Observer camera for simulated auto-align. If null, a scene object named 'PMSDK Calibration Observer' with a Camera is used.")]
         public Camera ObserverCamera;
         [Tooltip("Capture resolution for the simulated observer camera.")]
         public int ObserverWidth = 640;
@@ -648,12 +654,16 @@ namespace vxpmsdk.Components
         public void StartAutoAlign(bool all)
         {
             if (IsAutoAligning) return;
-            Camera observer = ResolveObserverCamera();
-            if (observer == null)
+            Camera observer = null;
+            if (!UseNativeWebcam)
             {
-                AutoAlignStatus = "Auto-align needs an observer camera (assign ObserverCamera or add a 'PMSDK Calibration Observer' Camera).";
-                Debug.LogWarning("[PMSDK] " + AutoAlignStatus);
-                return;
+                observer = ResolveObserverCamera();
+                if (observer == null)
+                {
+                    AutoAlignStatus = "Auto-align needs an observer camera (assign ObserverCamera, add a 'PMSDK Calibration Observer' Camera, or enable UseNativeWebcam).";
+                    Debug.LogWarning("[PMSDK] " + AutoAlignStatus);
+                    return;
+                }
             }
             EnsureAutoAlign();
             StartCoroutine(AutoAlignRoutine(all, observer, null));
@@ -667,8 +677,12 @@ namespace vxpmsdk.Components
         public void AlignSelectedWithTarget(Vector2[] targetCornersCameraNorm)
         {
             if (IsAutoAligning) return;
-            Camera observer = ResolveObserverCamera();
-            if (observer == null) return;
+            Camera observer = null;
+            if (!UseNativeWebcam)
+            {
+                observer = ResolveObserverCamera();
+                if (observer == null) return;
+            }
             EnsureAutoAlign();
             StartCoroutine(AutoAlignRoutine(false, observer, targetCornersCameraNorm));
         }
@@ -687,7 +701,9 @@ namespace vxpmsdk.Components
             foreach (var s in toAlign)
             {
                 AutoAlignStatus = $"Auto-aligning {s.Id}…";
-                var cam = new PMSDKSimulatedCamera(observer, Mathf.Max(64, ObserverWidth), Mathf.Max(64, ObserverHeight));
+                IPMSDKCalibrationCamera cam = UseNativeWebcam
+                    ? new PMSDKNativeWebcamCamera(WebcamIndex, WebcamFlushFrames)
+                    : new PMSDKSimulatedCamera(observer, Mathf.Max(64, ObserverWidth), Mathf.Max(64, ObserverHeight));
                 PMSDKAutoAlign.Result captured = default;
                 bool done = false;
                 yield return autoAlign.AlignSurface(s, cam, target, r => { captured = r; done = true; });

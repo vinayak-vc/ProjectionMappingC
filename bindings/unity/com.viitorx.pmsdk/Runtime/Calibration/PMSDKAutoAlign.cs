@@ -42,6 +42,8 @@ namespace vxpmsdk.Components
         public int SettleFrames = 2;
         [Tooltip("Minimum white-black contrast (0..255) for a camera pixel to count as lit by this projector.")]
         public int MinContrast = 30;
+        [Tooltip("Also project each pattern's inverse and decode by pattern-vs-inverse comparison (robust against ambient light and surface albedo; doubles the pattern count). Standard professional practice — leave on for physical cameras.")]
+        public bool UseInversePatterns = true;
 
         public bool IsRunning { get; private set; }
 
@@ -64,6 +66,14 @@ namespace vxpmsdk.Components
             if (surface == null || surface.CornerPin == null || surface.Warp == null || camera == null)
             {
                 result.Message = "Missing surface, corner pin, warp, or camera.";
+                onDone?.Invoke(result);
+                IsRunning = false;
+                yield break;
+            }
+
+            if (!camera.Begin())
+            {
+                result.Message = "Capture source failed to start (webcam missing/busy, or observer camera invalid).";
                 onDone?.Invoke(result);
                 IsRunning = false;
                 yield break;
@@ -97,8 +107,6 @@ namespace vxpmsdk.Components
             };
             if (renderer != null) renderer.sharedMaterial = patternMat;
 
-            camera.Begin();
-
             int projW = PatternResolution, projH = PatternResolution;
             int count = PMSDKGrayCodeDecode.PatternCount(projW, projH);
             int camW = camera.Width, camH = camera.Height;
@@ -114,13 +122,22 @@ namespace vxpmsdk.Components
             yield return DisplayAndSettle(patternTex, patternMat, pixels);
             byte[] black = camera.CaptureLuminance();
 
-            // gray-code patterns
+            // gray-code patterns (+ inverses in robust mode)
             var captures = new byte[count][];
+            var inverseCaptures = UseInversePatterns ? new byte[count][] : null;
+            var inversePixels = UseInversePatterns ? new byte[pixels.Length] : null;
             for (int k = 0; k < count; k++)
             {
                 PMSDKGrayCodeDecode.GeneratePattern(k, projW, projH, pixels);
                 yield return DisplayAndSettle(patternTex, patternMat, pixels);
                 captures[k] = camera.CaptureLuminance();
+
+                if (UseInversePatterns)
+                {
+                    for (int i = 0; i < pixels.Length; i++) inversePixels[i] = (byte)(255 - pixels[i]);
+                    yield return DisplayAndSettle(patternTex, patternMat, inversePixels);
+                    inverseCaptures[k] = camera.CaptureLuminance();
+                }
             }
 
             camera.End();
@@ -133,7 +150,7 @@ namespace vxpmsdk.Components
             Object.Destroy(patternTex);
 
             // --- decode + fit camera->projector homography ---
-            var corr = PMSDKGrayCodeDecode.Decode(captures, white, black, camW, camH, projW, projH, MinContrast);
+            var corr = PMSDKGrayCodeDecode.Decode(captures, inverseCaptures, white, black, camW, camH, projW, projH, MinContrast);
 
             var camPts = new List<Vector2>();
             var projPts = new List<Vector2>();

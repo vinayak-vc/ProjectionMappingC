@@ -32,9 +32,15 @@
   (Display.RelativeMouseAt), Ctrl+Z undo. `PMSDKCornerPinUI` superseded.
   **P3 camera auto-align** (`A` key): Gray-code structured light → managed decode →
   camera→projector homography → corner-pin. Homography, NOT native metric triangulation
-  (D-021). Capture abstracted; simulated Unity-camera source ships, real webcam needs a
-  C-API frame-readback addition (`pmsdk_decoder_get_frame`). Simulation-verified only —
-  no physical hardware loop yet. Design + key map: docs/calibration-ux-design.md §9.
+  (D-021). Design + key map: docs/calibration-ux-design.md §9.
+- **Calibration hardening "item 1" (2026-07-16)**: native robust decode
+  (pattern-vs-inverse bits + white/black shadow mask, `DecodeRobust`), capture-buffer
+  flushing, frame readback, `pmsdk_decoder_decode_robust` C API; Unity
+  `PMSDKNativeWebcamCamera` + manager `UseNativeWebcam`; `PMSDKAutoAlign` projects
+  inverse patterns by default. 6 new native tests green; DLL redeployed to the Unity
+  plugin folder. Simulated loop verified; **physical projector+webcam smoke test still
+  pending** (no hardware). Pre-existing failure `DecoderTests.DecodeAndTriangulate`
+  fails at HEAD before these changes — separate investigation.
   Gotcha: never parent ScreenSpaceCamera overlay canvases under a warp surface — its
   16:9 X-scale leaks into canvas geometry (blend zones rendered outside the frustum).
 

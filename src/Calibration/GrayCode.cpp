@@ -40,29 +40,62 @@ size_t GrayCode::GetPatternCount() const {
     return m_impl->colBits + m_impl->rowBits;
 }
 
-std::vector<uint8_t> GrayCode::GeneratePattern(size_t index) const {
-    std::vector<uint8_t> buffer(m_impl->width * m_impl->height, 0);
-    
-    if (index >= GetPatternCount()) {
-        return buffer;
-    }
+namespace {
 
-    bool isColumn = (int)index < m_impl->colBits;
-    int bitIndex = isColumn ? m_impl->colBits - 1 - (int)index : m_impl->rowBits - 1 - ((int)index - m_impl->colBits);
+std::vector<uint8_t> GenerateBitPattern(int width, int height, int colBits, int rowBits,
+                                        size_t index, bool inverted) {
+    std::vector<uint8_t> buffer(static_cast<size_t>(width) * height, 0);
 
-    for (int y = 0; y < m_impl->height; ++y) {
-        for (int x = 0; x < m_impl->width; ++x) {
+    bool isColumn = (int)index < colBits;
+    int bitIndex = isColumn ? colBits - 1 - (int)index : rowBits - 1 - ((int)index - colBits);
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
             int val = isColumn ? x : y;
-            
+
             // Convert to Gray code: G = (B >> 1) ^ B
             int grayVal = (val >> 1) ^ val;
-            
+
             bool bit = (grayVal & (1 << bitIndex)) != 0;
-            buffer[y * m_impl->width + x] = bit ? 255 : 0;
+            if (inverted) bit = !bit;
+            buffer[y * width + x] = bit ? 255 : 0;
         }
     }
 
     return buffer;
+}
+
+} // namespace
+
+std::vector<uint8_t> GrayCode::GeneratePattern(size_t index) const {
+    if (index >= GetPatternCount()) {
+        return std::vector<uint8_t>(static_cast<size_t>(m_impl->width) * m_impl->height, 0);
+    }
+    return GenerateBitPattern(m_impl->width, m_impl->height, m_impl->colBits, m_impl->rowBits,
+                              index, /*inverted=*/false);
+}
+
+size_t GrayCode::GetRobustPatternCount() const {
+    return 2 + 2 * GetPatternCount();
+}
+
+std::vector<uint8_t> GrayCode::GenerateRobustPattern(size_t index) const {
+    const size_t pixelCount = static_cast<size_t>(m_impl->width) * m_impl->height;
+
+    if (index >= GetRobustPatternCount()) {
+        return std::vector<uint8_t>(pixelCount, 0);
+    }
+    if (index == 0) {
+        return std::vector<uint8_t>(pixelCount, 255); // all-white reference
+    }
+    if (index == 1) {
+        return std::vector<uint8_t>(pixelCount, 0);   // all-black reference
+    }
+
+    size_t patternIndex = (index - 2) / 2;
+    bool inverted = ((index - 2) % 2) == 1;
+    return GenerateBitPattern(m_impl->width, m_impl->height, m_impl->colBits, m_impl->rowBits,
+                              patternIndex, inverted);
 }
 
 } // namespace pmsdk::Calibration

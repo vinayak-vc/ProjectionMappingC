@@ -119,10 +119,14 @@ To prevent runtime crashes and silent failures, the SDK enforces strict componen
 - **`PMSDKDisplayActivator`**: activates Displays 2+ in standalone builds.
 - **`PMSDKVelocityCap`**: applies `Rigidbody.maxLinearVelocity` at runtime (demo content).
 - **`PMSDKCalibrationManager`** (+ `PMSDKCalibrationOverlay`, `PMSDKCalibrationHUD`):
-  runtime on-site calibration — F2 toggles calibration mode, keyboard-only corner/blend
-  editing, JSON persistence in `persistentDataPath`, auto-enters on first run.
-  Full design + key map: docs/calibration-ux-design.md. Scenes carry one
-  "PMSDK Runtime Services" object (manager + display activator).
+  runtime on-site calibration — F2 toggles calibration mode; corner-pin (mouse + keyboard),
+  edge-blend (`B`), N×M grid warp (`G`), camera auto-align (`A`), and mark-target-rectangle
+  (`M`) submodes; JSON persistence in `persistentDataPath`, auto-enters on first run.
+  Camera capture abstracted via `IPMSDKCalibrationCamera` (`PMSDKSimulatedCamera` /
+  `PMSDKNativeWebcamCamera`). Full design + key map: docs/calibration-ux-design.md.
+  Scenes carry one "PMSDK Runtime Services" object (manager + display activator).
+- **`PMSDKGridWarp`**: N×M bilinear grid warp component (curved surfaces); disabled by
+  default, takes over the warp node when enabled (see §4b).
 - **`PMSDKCornerPinUI`**: superseded by the calibration system; the manager disables any
   instance it finds at startup. Kept only for source compatibility.
 

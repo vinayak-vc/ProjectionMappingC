@@ -1,9 +1,16 @@
 # AI Agent Handoff Document
 
-## Current State (2026-07-15)
+## Current State (2026-07-16)
 
-**Last Completed Milestone**: Milestone 18 (Performance optimization) + Unity demo overhaul
-**Current Task**: Ready for Milestone 19 (Plugin SDK).
+**Last Completed**: Milestones 1-18 + 20; Unity raster-space rig; on-site calibration
+P1-P3; robust structured-light decode + webcam path; perspective corner pin; N×M grid
+warp UI; mark-target-rectangle UI.
+**Current Task**: Milestone 19 (Plugin SDK) still open. Immediate pending step: redeploy
+the rebuilt DLL (needs Unity closed — plugin lock) then run the play-mode pass on
+perspective / grid / mark-target and commit+push the DLL to the nested repo.
+**Verified**: native robust-decode + perspective are unit-tested (green); Unity C#
+compiles clean; sim auto-align verified. Not yet: play-mode runtime for the DLL-dependent
+features, and any physical camera loop.
 
 ## Current State
 - The Core, Math, Geometry, Warp, Blend, Serialization, and Calibration modules are implemented.

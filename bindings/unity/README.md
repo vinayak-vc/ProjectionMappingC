@@ -20,42 +20,85 @@ Our native SDK is superior for interactive installations because:
 
 ---
 
-## Multi-Projector Setup Guide (Step-by-Step)
-Follow these steps to set up a seamless, multi-projector overlapping display natively in Unity.
+## How the rig works (two-space architecture)
 
-### Step 1: Physical Hardware & Windows Setup
-1. Turn on your PC and projectors, and connect them to your GPU.
-2. Open Windows **Display Settings**.
-3. Under "Multiple displays", select **Extend these displays** (do *not* duplicate or use Nvidia Surround).
-4. Click "Identify" to note your display numbers (e.g., Display 1 = Monitor, Display 2 = Left Projector, Display 3 = Right Projector).
+Content and projector output live in two isolated layers (details:
+`docs/unity-architecture.md`):
 
-### Step 2: Unity Scene Setup
-1. In your Unity scene, create two 3D Planes (`GameObject > 3D Object > Plane`) side-by-side representing your screens.
-2. Select the Left Plane. From the top menu, click **Tools > Projection Mapping > Setup Wizard**, then click **Setup Projector & Mesh Warp**.
-3. Select the Right Plane and do the same. This generates Projector Cameras pointing at your planes and attaches the `PMSDKMeshWarp` script.
+1. **Content camera** renders your 3D scene (Water layer) into a `Projection_RT`
+   RenderTexture — it never drives a display.
+2. **Warp surfaces** are unit quads (identity rotation, 16:9 scale) that sample a slice
+   of that RT. The native engine rewrites their vertices every frame into normalized
+   projector raster space; a warp surface is NOT a 3D plane you tilt.
+3. **Projector cameras** are **orthographic**, frame their warp surface exactly, clear to
+   black, and route to Display 2/3 via `targetDisplay`.
+4. A **PMSDK Runtime Services** object (`PMSDKDisplayActivator` + `PMSDKCalibrationManager`)
+   activates the extra displays in builds and runs on-site calibration.
 
-### Step 3: Routing Cameras to Projectors
-1. Select the Projector Camera for the Left screen. In the Inspector, change the **Target Display** dropdown to **Display 2**.
-2. Select the Projector Camera for the Right screen and change its **Target Display** to **Display 3**.
-3. Press **Play** in Unity. Unity will automatically output to both physical projectors via your GPU!
+Build the whole rig in one click: **Tools > Projection Mapping > Generate Demo Scene**.
+Or add `PMSDKMeshWarp` to a surface and press **Auto-Configure Full SDK Dependencies** in
+its inspector. Two example scenes ship: `WarpAndBlendExample` and `ProBuilderMappingDemo`.
 
-### Step 4: Corner Pinning (Physical Alignment)
-1. Select both Plane objects and click `Add Component`. Add the **PMSDKTestPattern** script. This renders a high-visibility calibration checkerboard with borders, crosshairs, and aspect ratio circles.
-2. Click `Add Component` again and add **PMSDKCornerPin**.
-3. Look at your physical wall. In the Unity Inspector, adjust the X and Y values for the Top-Left, Top-Right, Bottom-Left, and Bottom-Right corners of both projectors. 
-4. Drag these virtual corners until the red borders form a perfect, squared-off rectangle on the wall and the center crosshairs align.
+## Multi-Projector Setup (Step-by-Step)
 
-### Step 5: Edge Blending
-1. Select both Plane objects and add the **PMSDKEdgeBlend** component.
-2. For the Left projector, increase the **Right Edge** slider (e.g., 0.1).
-3. For the Right projector, increase the **Left Edge** slider (e.g., 0.1).
-4. The C++ SDK will instantly blend the overlapping pixels seamlessly. You can adjust the **Gamma** slider to match your projector's luminance curve.
-5. Disable the **PMSDKTestPattern** component to restore your original video/game content!
+### Step 1: Physical hardware & Windows
+1. Turn on the PC and projectors; connect each to a GPU output.
+2. Windows **Display Settings** → **Extend these displays** (never Duplicate/Nvidia Surround).
+3. "Identify" to note display numbers (Display 1 = control monitor, Display 2/3 = projectors).
+
+### Step 2: Generate the rig
+1. **Tools > Projection Mapping > Generate Demo Scene** (or Auto-Configure your own surfaces).
+2. Confirm each projector camera's **Target Display** (Left = Display 2, Right = Display 3).
+3. Press **Play** — content routes to the projectors; the display activator lights the extra outputs.
+
+### Step 3: On-site calibration (runtime, keyboard-driven, works in builds)
+
+All calibration is a runtime mode — no Inspector needed, so it works in a shipped build.
+On first run with no saved calibration it enters automatically; otherwise press **F2**.
+The operator console appears on Display 1; handles + an "identify" badge appear on each
+projector output. Calibration is saved to `Application.persistentDataPath/pmsdk_calibration.json`
+and reloaded silently on every later boot. Full key map: `docs/calibration-ux-design.md`.
+
+| Key | Action |
+|---|---|
+| `F2` | enter/exit calibration (auto-saves on exit) |
+| `PgUp`/`PgDn` | select projector |
+| `Tab` + arrows / mouse | move the selected corner (perspective corner pin) |
+| `Shift`/`Ctrl` | coarse / fine step |
+| `B` | edge-blend mode (edge width, gamma, black level) |
+| `G` | N×M grid warp for curved/irregular surfaces |
+| `A` / `Shift+A` | camera auto-align: selected / all projectors |
+| `M` | mark the target rectangle in the camera view, then `A` |
+| `Ctrl+Z` / `Ctrl+S` | undo / save |
+
+### Step 4: Manual corner pin + blend
+- Select a projector, drag its 4 corners (or arrow-nudge) until the image squares up on
+  the wall. The corner pin is a true **perspective** map (foreshortens correctly).
+- `B` for edge blend: raise the overlapping edge on each projector (~0.1) until the seam
+  disappears; tune **gamma** to your projector's luminance curve.
+- `G` if the surface is curved: subdivide (`[` `]` columns, `-` `=` rows) and drag interior
+  grid points.
 
 ---
 
-## Advanced: GrayCode Calibration
-This SDK supports automatic GrayCode generation and decoding to automatically triangulate your physical projection surface using a camera!
-1. Open the `Tools > Projection Mapping > GrayCode Calibration` window.
-2. Select your Camera Index and click `Open Camera` (the SDK connects directly via C++ `cv::VideoCapture` to ensure zero lag in Unity).
-3. Capture frames and decode. The projector will flash GrayCode patterns, and the C++ engine will automatically generate a pixel-perfect 3D mesh of your real-world surface!
+## Camera auto-align (structured light)
+
+A **plain 2D webcam is enough — no depth camera needed.** Auto-align projects Gray-code
+patterns, decodes what the camera sees, and solves a camera→projector homography.
+
+1. On `PMSDKCalibrationManager`, set **UseNativeWebcam = true** and **WebcamIndex**
+   (the SDK opens the camera directly via C++ `cv::VideoCapture`; frames are buffer-flushed
+   so each capture matches the displayed pattern).
+2. Dim the room (structured light needs contrast; low-contrast pixels are masked out).
+3. `F2` to calibrate, then:
+   - `M` → drag the 4 preview corners onto the physical screen edges (optional; skip to
+     fill the whole projection).
+   - `A` (or `Shift+A` for all) → the projector flashes white/black + Gray patterns (and
+     inverses), the camera captures, and the corner pin snaps to the solution.
+4. Touch up by hand, `Ctrl+S` to save.
+
+Best results: lock the webcam's focus/exposure, 1080p, positioned to see the whole
+projection. The decode is robust to surface albedo and ambient light (per-pixel
+pattern-vs-inverse comparison + shadow mask). The native metric-triangulation path (full
+3D point cloud) remains available but needs a calibrated camera+projector and is not used
+for on-site corner alignment.

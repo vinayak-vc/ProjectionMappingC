@@ -22,9 +22,29 @@ before the next begins.
 | 15 | Sample applications | ✅ done (2026-07-13) |
 | 16 | Advanced OpenCV calibration wrappers | ✅ done (2026-07-13) |
 | 17 | GrayCode Decoder & Triangulation | ✅ done (2026-07-13) |
-| 18 | Performance optimization | pending |
+| 18 | Performance optimization (SIMD, `par_unseq`) | ✅ done (2026-07-14) |
 | 19 | Plugin SDK | pending |
-| 20 | Release packaging | pending |
+| 20 | Release packaging | ✅ done (2026-07-14) |
+
+## Post-1.0 — Unity integration & pro-feature parity (2026-07-15/16)
+
+Driven by the Unity host work and a gap audit against Resolume / MadMapper / VIOSO.
+
+| Item | Status |
+|---|---|
+| Raster-space projector rig (ortho cameras, split-slice RT, UnlitWarp shader, display activator) | ✅ done |
+| On-site calibration P1 — runtime keyboard mode, JSON persistence, auto-enter, HUD | ✅ done |
+| On-site calibration P2 — mouse drag, undo, loupe, thumbnails, blend-zone tint | ✅ done |
+| On-site calibration P3 — camera auto-align (Gray-code → homography) | ✅ done (sim-verified) |
+| Robust structured-light decode (inverse patterns + shadow mask) + webcam capture path | ✅ done (unit-tested) |
+| Perspective corner pin (homography, replaces bilinear) | ✅ done (unit-tested; runtime pending DLL redeploy) |
+| N×M grid warp UI (curved surfaces) | ✅ done (runtime pending DLL redeploy) |
+| Mark-target-rectangle UI (map onto a specific physical screen) | ✅ done (runtime pending DLL redeploy) |
+
+Remaining pro-feature gaps (medium/low): auto-blend from camera overlap, dense auto-warp,
+per-channel gamma / luminance maps / black-level region, color/LUT matching, output
+rotation/mirroring, OSC/HTTP remote, named presets, NDI/Spout, extra test patterns.
+See docs/tasks.md.
 
 ## Dependency plan (vcpkg manifest features)
 

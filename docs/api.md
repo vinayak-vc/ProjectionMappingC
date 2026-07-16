@@ -17,11 +17,20 @@
  * @subsection cpp_api C++ API
  * The internal C++ API provides the heavy lifting. All classes reside within 
  * the `pmsdk::` namespace. 
- * - **Geometry**: `pmsdk::Geometry::Mesh`, `DynamicMesh`, `BezierPatch`, `GridWarp`
- * - **Warp**: `pmsdk::Warp::WarpNode`, `Projector`, `DeformationField`
+ * - **Geometry**: `pmsdk::Geometry::Mesh`, `DynamicMesh`, `BezierPatch`, `GridWarp`, `PerspectiveWarp`
+ * - **Warp**: `pmsdk::Warp::WarpNode`, `Projector`, `DeformationField` (None/Bezier/Grid/Perspective)
  * - **Blend**: `pmsdk::Blend::BlendConfig`, `EdgeBlend`
- * - **Calibration**: `pmsdk::Calibration::Calibrator`, `GrayCode`
+ * - **Calibration**: `pmsdk::Calibration::Calibrator`, `GrayCode` (robust sequence), `GrayCodeDecoder` (`DecodeRobust`)
  * - **Serialization**: `pmsdk::Serialization::*`
+ *
+ * @subsection recent_api Recent C-API additions (2026-07-16)
+ * - Warp: `pmsdk_warpnode_get_perspectivewarp`, `pmsdk_perspectivewarp_set_corners`
+ *   (deformation type 3 = projective corner pin).
+ * - Calibration (robust structured light): `pmsdk_graycode_get_robust_pattern_count`,
+ *   `pmsdk_graycode_generate_robust_pattern`, `pmsdk_decoder_capture_frame_flushed`,
+ *   `pmsdk_decoder_add_image_memory`, `pmsdk_decoder_get_last_frame`,
+ *   `pmsdk_decoder_get_image_count`, `pmsdk_decoder_clear_images`,
+ *   `pmsdk_decoder_decode_robust` (raw camera→projector correspondences for homography auto-align).
  * 
  * @subsection c_api C API
  * The public interface is strictly C-linkage. Objects are managed via opaque 

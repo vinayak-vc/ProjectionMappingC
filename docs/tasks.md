@@ -168,6 +168,11 @@
 Note: grid warp uses only pre-existing native entry points, but the perspective corner
 pin needs the new DLL, so both wait on one redeploy + Unity restart.
 
+### Mark-target-rectangle UI ✅ (compiles; runtime pending same DLL redeploy)
+- [x] Calibration mark-target submode (`M`): live camera preview on the operator console with 4 draggable/nudgeable corners (`Tab`/arrows/mouse), `A` aligns the projection to the marked rectangle, `R` reset, `M`/`Esc` cancel
+- [x] Per-surface target corners with UI→camera-space flip into `AlignSelectedWithTarget`; preview via the shared `IPMSDKCalibrationCamera` (freed before the sweep); persisted in the calibration JSON
+- [x] Pure C# (no new native) — but play-mode still gated on the perspective-DLL redeploy since the corner pin runs on entry
+
 ## Next Items / Backlog
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
 - [ ] Remaining pro-feature gaps (medium): auto-blend from overlap, dense auto-warp, black-level region + per-channel gamma, color/LUT, output rotation/mirror, OSC/HTTP

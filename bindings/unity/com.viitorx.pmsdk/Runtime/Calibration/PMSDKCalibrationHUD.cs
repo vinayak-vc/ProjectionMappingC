@@ -27,6 +27,7 @@ namespace vxpmsdk.Components
             "T / Shift+T   test pattern: selected / all\n" +
             "R / Ctrl+R    reset corner / reset surface\n" +
             "A / Shift+A   auto-align (camera): selected / all\n" +
+            "M             mark target rectangle in the camera view, then A\n" +
             "Ctrl+Z        undo\n" +
             "Ctrl+S        save          Esc  exit (auto-saves)";
 
@@ -40,6 +41,17 @@ namespace vxpmsdk.Components
         private RawImage loupeImage;
         private GameObject loupePanel;
         private RectTransform thumbRow;
+
+        // Target-mark preview (camera view + 4 draggable corner markers).
+        private GameObject targetPanel;
+        private RawImage targetPreview;
+        private RectTransform targetPreviewRect;
+        private Text targetInstruction;
+        private readonly RectTransform[] targetMarkers = new RectTransform[4];
+        private readonly Image[] targetMarkerImages = new Image[4];
+        private readonly Text[] targetMarkerLabels = new Text[4];
+        private bool draggingTarget;
+        private static readonly string[] TargetCornerNames = { "TL", "TR", "BR", "BL" };
         private readonly List<RawImage> thumbImages = new List<RawImage>();
         private readonly List<Image> thumbFrames = new List<Image>();
 
@@ -129,6 +141,8 @@ namespace vxpmsdk.Components
             thumbRow.anchorMax = new Vector2(0f, 0f);
             thumbRow.pivot = new Vector2(0f, 0f);
             thumbRow.anchoredPosition = new Vector2(8f, 8f);
+
+            BuildTargetPanel(canvasObj.transform, font);
 
             var helpPanel = new GameObject("HelpPanel");
             helpPanel.transform.SetParent(canvasObj.transform, false);
@@ -222,6 +236,125 @@ namespace vxpmsdk.Components
             }
         }
 
+        private void BuildTargetPanel(Transform parent, Font font)
+        {
+            targetPanel = new GameObject("TargetPanel");
+            targetPanel.transform.SetParent(parent, false);
+            targetPanel.layer = ((RectTransform)parent).gameObject.layer;
+            var bg = targetPanel.AddComponent<Image>();
+            bg.color = new Color(0f, 0f, 0f, 0.85f);
+            var panelRect = targetPanel.GetComponent<RectTransform>();
+            panelRect.anchorMin = panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.sizeDelta = new Vector2(760f, 470f);
+
+            var title = CreateText(targetPanel.transform, font, 22, TextAnchor.UpperCenter);
+            title.text = "MARK TARGET RECTANGLE — drag the 4 corners onto the screen edges";
+            var titleRect = title.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.anchoredPosition = new Vector2(0f, -8f);
+            titleRect.sizeDelta = new Vector2(0f, 28f);
+
+            // Camera preview (16:9), centered.
+            var previewObj = new GameObject("Preview");
+            previewObj.transform.SetParent(targetPanel.transform, false);
+            previewObj.layer = targetPanel.layer;
+            targetPreview = previewObj.AddComponent<RawImage>();
+            targetPreview.color = Color.white;
+            // Camera luminance is top-left origin; flip V so the preview shows upright.
+            targetPreview.uvRect = new Rect(0f, 1f, 1f, -1f);
+            targetPreviewRect = targetPreview.GetComponent<RectTransform>();
+            targetPreviewRect.anchorMin = targetPreviewRect.anchorMax = new Vector2(0.5f, 0.5f);
+            targetPreviewRect.sizeDelta = new Vector2(680f, 383f);
+            targetPreviewRect.anchoredPosition = new Vector2(0f, -6f);
+
+            for (int i = 0; i < 4; i++)
+            {
+                var m = new GameObject("TargetMarker_" + TargetCornerNames[i]);
+                m.transform.SetParent(targetPreviewRect, false);
+                m.layer = targetPanel.layer;
+                targetMarkerImages[i] = m.AddComponent<Image>();
+                targetMarkerImages[i].raycastTarget = false;
+                targetMarkers[i] = m.GetComponent<RectTransform>();
+                targetMarkers[i].sizeDelta = new Vector2(22f, 22f);
+
+                var label = CreateText(m.transform, font, 14, TextAnchor.LowerLeft);
+                label.raycastTarget = false;
+                label.text = TargetCornerNames[i];
+                var lr = label.GetComponent<RectTransform>();
+                lr.anchorMin = lr.anchorMax = new Vector2(0.5f, 0.5f);
+                lr.anchoredPosition = new Vector2(14f, 14f);
+                lr.sizeDelta = new Vector2(40f, 18f);
+                targetMarkerLabels[i] = label;
+            }
+
+            targetInstruction = CreateText(targetPanel.transform, font, 16, TextAnchor.LowerCenter);
+            var instrRect = targetInstruction.GetComponent<RectTransform>();
+            instrRect.anchorMin = new Vector2(0f, 0f);
+            instrRect.anchorMax = new Vector2(1f, 0f);
+            instrRect.pivot = new Vector2(0.5f, 0f);
+            instrRect.anchoredPosition = new Vector2(0f, 8f);
+            instrRect.sizeDelta = new Vector2(0f, 24f);
+            targetInstruction.text = "Tab select   arrows/drag move   A align to target   R reset   M/Esc cancel";
+
+            targetPanel.SetActive(false);
+        }
+
+        private void UpdateTargetPanel()
+        {
+            bool active = manager.TargetMarkMode;
+            targetPanel.SetActive(active);
+            if (!active) { draggingTarget = false; return; }
+
+            targetPreview.texture = manager.TargetPreview;
+
+            Vector2 size = targetPreviewRect.rect.size;
+            for (int i = 0; i < 4; i++)
+            {
+                Vector2 p = manager.GetTargetCorner(i); // UI-normalized, bottom-left
+                // Preview rect pivot is centre; convert 0..1 to centre-relative pixels.
+                targetMarkers[i].anchoredPosition = new Vector2((p.x - 0.5f) * size.x, (p.y - 0.5f) * size.y);
+                bool sel = manager.SelectedTargetCorner == i;
+                targetMarkers[i].sizeDelta = Vector2.one * (sel ? 34f : 22f);
+                targetMarkerImages[i].color = sel ? new Color(1f, 0.9f, 0.1f, 0.95f) : new Color(0f, 1f, 0.4f, 0.8f);
+            }
+
+            HandleTargetMouse(size);
+        }
+
+        private void HandleTargetMouse(Vector2 size)
+        {
+            if (Input.GetMouseButtonDown(0))
+            {
+                if (RectTransformUtility.RectangleContainsScreenPoint(targetPreviewRect, Input.mousePosition, null))
+                {
+                    // Select the nearest corner and begin dragging it.
+                    Vector2 n = LocalToNormalized(size);
+                    int best = 0; float bestD = float.MaxValue;
+                    for (int i = 0; i < 4; i++)
+                    {
+                        float d = Vector2.Distance(n, manager.GetTargetCorner(i));
+                        if (d < bestD) { bestD = d; best = i; }
+                    }
+                    manager.SelectTargetCorner(best);
+                    draggingTarget = true;
+                }
+            }
+            else if (draggingTarget && Input.GetMouseButton(0))
+            {
+                manager.SetTargetCorner(manager.SelectedTargetCorner, LocalToNormalized(size));
+            }
+            if (Input.GetMouseButtonUp(0)) draggingTarget = false;
+        }
+
+        private Vector2 LocalToNormalized(Vector2 size)
+        {
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(targetPreviewRect, Input.mousePosition, null, out Vector2 local);
+            // local is centre-relative; convert to 0..1 bottom-left.
+            return new Vector2(Mathf.Clamp01(local.x / size.x + 0.5f), Mathf.Clamp01(local.y / size.y + 0.5f));
+        }
+
         private static Text CreateText(Transform parent, Font font, int size, TextAnchor anchor)
         {
             var go = new GameObject("Text");
@@ -245,11 +378,18 @@ namespace vxpmsdk.Components
             }
 
             helpTextUi.transform.parent.gameObject.SetActive(manager.HelpVisible);
+            UpdateTargetPanel();
 
             var s = manager.Selected;
             if (s == null)
             {
                 statusText.text = "PMSDK CALIBRATION — no surfaces found";
+                return;
+            }
+
+            if (manager.TargetMarkMode)
+            {
+                statusText.text = "PMSDK CALIBRATION — MARK TARGET\nPlace the 4 corners on the physical screen, then A to align " + s.Id + ".";
                 return;
             }
 

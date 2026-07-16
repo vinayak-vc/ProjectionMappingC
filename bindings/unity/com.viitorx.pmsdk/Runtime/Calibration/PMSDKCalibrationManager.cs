@@ -36,6 +36,11 @@ namespace vxpmsdk.Components
             public Camera ProjectorCamera;
             public PMSDKCalibrationOverlay Overlay;
             public RenderTexture Thumbnail;
+            // Target rectangle in the observing camera's view (UI-normalized,
+            // bottom-left origin, order TL,TR,BR,BL) where this projector should
+            // land. null = auto-align uses the full observed projection.
+            public Vector2[] TargetCorners;
+            public bool HasTarget;
             public string Id => Warp != null ? Warp.gameObject.name : "<missing>";
         }
 
@@ -72,6 +77,9 @@ namespace vxpmsdk.Components
         public bool BlendSubmode { get; private set; }
         public bool GridEditMode { get; private set; }
         public int SelectedGridPoint { get; private set; }
+        public bool TargetMarkMode { get; private set; }
+        public int SelectedTargetCorner { get; private set; }
+        public Texture2D TargetPreview { get; private set; }
         public bool HelpVisible { get; private set; }
         public bool Dirty { get; private set; }
         public bool IsDragging => dragging;
@@ -94,6 +102,7 @@ namespace vxpmsdk.Components
         private readonly List<Surface> surfaces = new List<Surface>();
         private PMSDKCalibrationHUD hud;
         private PMSDKAutoAlign autoAlign;
+        private IPMSDKCalibrationCamera previewCam;
 
         // Undo (P2): coalesced snapshots of the selected surface.
         private struct UndoEntry
@@ -175,13 +184,34 @@ namespace vxpmsdk.Components
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape)) { ExitCalibration(); return; }
-            if (Input.GetKeyDown(KeyCode.F1)) HelpVisible = !HelpVisible;
-
             bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
             bool alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
 
+            // --- Target-mark submode: pick where the projection should land in the
+            // camera view, then A aligns to it. Owns Esc/A while active. ---
+            if (TargetMarkMode)
+            {
+                UpdateTargetPreview();
+                if (Input.GetKeyDown(KeyCode.M) || Input.GetKeyDown(KeyCode.Escape)) { ExitTargetMarkMode(); return; }
+                if (Input.GetKeyDown(KeyCode.F1)) HelpVisible = !HelpVisible;
+                if (Input.GetKeyDown(KeyCode.Tab)) SelectedTargetCorner = (SelectedTargetCorner + (shift ? 3 : 1)) % 4;
+                if (Input.GetKeyDown(KeyCode.R)) ResetTarget();
+                if (Input.GetKeyDown(KeyCode.A)) { RunAlignWithMarkedTarget(); return; }
+
+                float tgtSpeed = NudgePerSecond * Time.unscaledDeltaTime;
+                if (shift) tgtSpeed *= CoarseMultiplier;
+                if (ctrl) tgtSpeed *= FineMultiplier;
+                float tdx = (Input.GetKey(KeyCode.RightArrow) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftArrow) ? 1f : 0f);
+                float tdy = (Input.GetKey(KeyCode.UpArrow) ? 1f : 0f) - (Input.GetKey(KeyCode.DownArrow) ? 1f : 0f);
+                if (tdx != 0f || tdy != 0f) NudgeTargetCorner(new Vector2(tdx, tdy) * tgtSpeed);
+                return; // target-mark mode consumes input
+            }
+
+            if (Input.GetKeyDown(KeyCode.Escape)) { ExitCalibration(); return; }
+            if (Input.GetKeyDown(KeyCode.F1)) HelpVisible = !HelpVisible;
+
+            if (Input.GetKeyDown(KeyCode.M)) { EnterTargetMarkMode(); return; }
             if (Input.GetKeyDown(KeyCode.A)) { StartAutoAlign(all: shift); return; }
 
             if (ctrl && Input.GetKeyDown(KeyCode.S)) { SaveNow(); }
@@ -243,6 +273,7 @@ namespace vxpmsdk.Components
 
         public void ExitCalibration()
         {
+            if (TargetMarkMode) ExitTargetMarkMode();
             if (Dirty)
             {
                 SaveNow();
@@ -333,6 +364,144 @@ namespace vxpmsdk.Components
             g.Resize(g.Columns + dCols, g.Rows + dRows);
             SelectedGridPoint = Mathf.Clamp(SelectedGridPoint, 0, g.PointCount - 1);
             Dirty = true;
+        }
+
+        // ---------------- Target-rectangle marking --------------------------------
+
+        /// <summary>
+        /// Enter target-mark mode for the selected surface: opens a live camera
+        /// preview on the operator console with four draggable corners the operator
+        /// places on the physical screen edges. A then aligns the projection to that
+        /// rectangle instead of the full observed area.
+        /// </summary>
+        public void EnterTargetMarkMode()
+        {
+            var s = Selected;
+            if (s == null || s.Warp == null) return;
+
+            previewCam = UseNativeWebcam
+                ? new PMSDKNativeWebcamCamera(WebcamIndex, WebcamFlushFrames)
+                : (IPMSDKCalibrationCamera)MakeSimObserver();
+            if (previewCam == null || !previewCam.Begin())
+            {
+                previewCam = null;
+                AutoAlignStatus = "Target marking needs a camera (enable UseNativeWebcam or assign an observer camera).";
+                Debug.LogWarning("[PMSDK] " + AutoAlignStatus);
+                return;
+            }
+
+            EnsureTarget(s);
+            TargetMarkMode = true;
+            GridEditMode = false;
+            BlendSubmode = false;
+            SelectedTargetCorner = 0;
+        }
+
+        public void ExitTargetMarkMode()
+        {
+            StopPreview();
+            TargetMarkMode = false;
+        }
+
+        public void SelectTargetCorner(int i) => SelectedTargetCorner = Mathf.Clamp(i, 0, 3);
+
+        /// <summary>Set a target corner (UI-normalized, bottom-left origin).</summary>
+        public void SetTargetCorner(int i, Vector2 uiNormalized)
+        {
+            var s = Selected;
+            if (s == null) return;
+            EnsureTarget(s);
+            uiNormalized.x = Mathf.Clamp01(uiNormalized.x);
+            uiNormalized.y = Mathf.Clamp01(uiNormalized.y);
+            s.TargetCorners[Mathf.Clamp(i, 0, 3)] = uiNormalized;
+            s.HasTarget = true;
+            Dirty = true;
+        }
+
+        public Vector2 GetTargetCorner(int i)
+        {
+            var s = Selected;
+            EnsureTarget(s);
+            return s.TargetCorners[Mathf.Clamp(i, 0, 3)];
+        }
+
+        public void NudgeTargetCorner(Vector2 delta)
+        {
+            SetTargetCorner(SelectedTargetCorner, GetTargetCorner(SelectedTargetCorner) + delta);
+        }
+
+        public void ResetTarget()
+        {
+            var s = Selected;
+            if (s == null) return;
+            s.TargetCorners = FullFrameTarget();
+            s.HasTarget = false;
+            Dirty = true;
+        }
+
+        /// <summary>Run auto-align on the selected surface using the marked target rectangle.</summary>
+        private void RunAlignWithMarkedTarget()
+        {
+            var s = Selected;
+            if (s == null) return;
+            EnsureTarget(s);
+            // Convert UI-normalized (bottom-left) TL,TR,BR,BL to the camera-normalized
+            // (top-left origin) space AlignSelectedWithTarget expects.
+            var t = s.TargetCorners;
+            var cameraTarget = new[]
+            {
+                new Vector2(t[0].x, 1f - t[0].y), // TL
+                new Vector2(t[1].x, 1f - t[1].y), // TR
+                new Vector2(t[2].x, 1f - t[2].y), // BR
+                new Vector2(t[3].x, 1f - t[3].y)  // BL
+            };
+            StopPreview();
+            TargetMarkMode = false;
+            AlignSelectedWithTarget(cameraTarget);
+        }
+
+        private void EnsureTarget(Surface s)
+        {
+            if (s != null && (s.TargetCorners == null || s.TargetCorners.Length != 4))
+            {
+                s.TargetCorners = FullFrameTarget();
+            }
+        }
+
+        // Full-frame target in UI-normalized bottom-left order TL,TR,BR,BL.
+        private static Vector2[] FullFrameTarget()
+        {
+            return new[] { new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0), new Vector2(0, 0) };
+        }
+
+        private PMSDKSimulatedCamera MakeSimObserver()
+        {
+            var observer = ResolveObserverCamera();
+            if (observer == null) return null;
+            return new PMSDKSimulatedCamera(observer, Mathf.Max(64, ObserverWidth), Mathf.Max(64, ObserverHeight));
+        }
+
+        private void UpdateTargetPreview()
+        {
+            if (previewCam == null) return;
+            byte[] lum = previewCam.CaptureLuminance();
+            int w = previewCam.Width, h = previewCam.Height;
+            if (lum == null || lum.Length != w * h) return;
+            if (TargetPreview == null || TargetPreview.width != w || TargetPreview.height != h)
+            {
+                TargetPreview = new Texture2D(w, h, TextureFormat.R8, false) { name = "PMSDK_TargetPreview" };
+            }
+            TargetPreview.SetPixelData(lum, 0);
+            TargetPreview.Apply(false);
+        }
+
+        private void StopPreview()
+        {
+            if (previewCam != null)
+            {
+                previewCam.End();
+                previewCam = null;
+            }
         }
 
         public void NudgeSelectedCorner(Vector2 normalizedDelta)
@@ -476,6 +645,12 @@ namespace vxpmsdk.Components
                     entry.gridRows = s.Grid.Rows;
                     entry.gridPoints = new Vector2[s.Grid.PointCount];
                     for (int p = 0; p < s.Grid.PointCount; p++) entry.gridPoints[p] = s.Grid.GetPointByIndex(p);
+                }
+
+                if (s.HasTarget && s.TargetCorners != null && s.TargetCorners.Length == 4)
+                {
+                    file.surfaces[i].hasTarget = true;
+                    file.surfaces[i].targetCorners = (Vector2[])s.TargetCorners.Clone();
                 }
             }
             if (PMSDKCalibrationIO.Save(FilePath, file))
@@ -976,6 +1151,12 @@ namespace vxpmsdk.Components
                 else if (match.Grid != null)
                 {
                     match.Grid.enabled = false;
+                }
+
+                if (saved.hasTarget && saved.targetCorners != null && saved.targetCorners.Length == 4)
+                {
+                    match.TargetCorners = (Vector2[])saved.targetCorners.Clone();
+                    match.HasTarget = true;
                 }
             }
         }

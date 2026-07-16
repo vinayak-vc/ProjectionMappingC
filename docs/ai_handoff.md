@@ -57,9 +57,12 @@
   `pmsdk_perspectivewarp_set_corners`); `PMSDKCornerPin` now projective, not 2×2 bilinear
   (D-022); 4 unit tests green. (2) N×M grid warp UI — `PMSDKGridWarp` component +
   calibration grid mode (`G` key, drag/nudge control points, `[]`/`-=` subdivision),
-  persisted in the calibration JSON. Both **compile + unit-tested but not yet runtime-
-  verified**: the new DLL couldn't be deployed because the open Unity editor holds the
-  native-plugin lock. Deploy step: close Unity → copy
+  persisted in the calibration JSON. (3) mark-target-rectangle UI — calibration `M`
+  submode: live camera preview on the operator console with 4 draggable corners →
+  `AlignSelectedWithTarget`, so the projection can be mapped onto a specific physical
+  screen instead of the full throw; persisted in the JSON. All **compile + unit-tested
+  but not yet runtime-verified**: the new DLL couldn't be deployed because the open Unity
+  editor holds the native-plugin lock. Deploy step: close Unity → copy
   build/vs2022/bin/Release/ProjectionMappingSDK.dll into the nested repo's
   Plugins/Mapping/ → reopen → hit play. Until then, entering play mode with the OLD DLL
   throws EntryPointNotFound in PMSDKCornerPin (perspective entry points missing).

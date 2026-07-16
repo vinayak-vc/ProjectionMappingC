@@ -72,6 +72,7 @@ Exit (Esc or F2): auto-save + return to show
 | `T` / `Shift+T` | Test pattern: selected surface / all surfaces |
 | `B` | Blend-edit submode: `Tab` cycles edge (L/R/T/B), `←→` width, `↑↓` gamma, `N`/`Shift+N` black level |
 | `G` | Grid-warp submode (N×M): `Tab` cycles control point, arrows/drag move it, `[`/`]` columns, `-`/`=` rows, `R` reset. For curved/irregular surfaces. |
+| `M` | Mark-target submode: live camera preview on the operator console with 4 draggable corners. Place them on the physical screen edges, then `A` aligns the projection to that rectangle. `Tab` select, arrows/drag move, `R` reset, `M`/`Esc` cancel. |
 | `R` / `Ctrl+R` | Reset selected corner / whole surface to identity |
 | `Ctrl+S` | Save now (auto-save also fires on exit) |
 | `Esc` | Exit calibration mode (saves) |
@@ -183,6 +184,17 @@ Target corners come from the caller (`AlignSelectedWithTarget`): the physical sc
 bounds as seen by the camera, or an operator-marked quad. With no target
 (`StartAutoAlign`) it uses the bounding box of the lit region — an identity check that
 reproduces the current projection.
+
+**Marking the target (`M`).** To map the projection onto a specific physical rectangle
+(a real screen inside the projector's throw), press `M`: the operator console shows a
+live camera preview with four draggable corners. Drag them onto the screen's edges,
+then `A` runs the sweep and maps the projector→camera homography so the output fills
+that rectangle. Marker positions are UI-normalized (bottom-left); the manager flips them
+to the camera-normalized top-left space `AlignSelectedWithTarget` expects, and persists
+them in the calibration file (camera-placement-dependent, but saved so re-aligning an
+unmoved camera needs no re-marking). The preview source is the same
+`IPMSDKCalibrationCamera` as auto-align (simulated observer or native webcam), so it is
+freed before the sweep opens the camera.
 
 ### Why homography, not the native stereo triangulation
 `pmsdk_decoder_decode_and_triangulate` produces a metric 3D point cloud but needs a

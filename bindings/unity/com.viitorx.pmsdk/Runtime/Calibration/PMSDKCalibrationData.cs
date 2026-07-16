@@ -26,6 +26,12 @@ namespace vxpmsdk.Components
         public int gridColumns = 3;
         public int gridRows = 3;
         public Vector2[] gridPoints;
+
+        // Camera-view target rectangle (UI-normalized, bottom-left, TL,TR,BR,BL).
+        // Camera-placement-dependent, but saved so re-aligning without moving the
+        // camera doesn't require re-marking.
+        public bool hasTarget;
+        public Vector2[] targetCorners;
     }
 
     [Serializable]

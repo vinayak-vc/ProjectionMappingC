@@ -37,7 +37,17 @@ Content and projector output live in two isolated layers (details:
 
 Build the whole rig in one click: **Tools > Projection Mapping > Generate Demo Scene**.
 Or add `PMSDKMeshWarp` to a surface and press **Auto-Configure Full SDK Dependencies** in
-its inspector. Two example scenes ship: `WarpAndBlendExample` and `ProBuilderMappingDemo`.
+its inspector. Example scenes: `WarpAndBlendExample`, `ProBuilderMappingDemo`, and
+`ObjectMappingDemo` (object mapping / spatial AR — see below).
+
+### Two modes: screen warp vs object mapping
+- **Screen warp** (WarpAndBlend / ProBuilder demos): content renders to a RenderTexture,
+  which is warped/blended onto flat projection surfaces. For walls, screens, panoramas.
+- **Object mapping** (`ObjectMappingDemo`): a projector camera at the projector's pose
+  renders a **virtual twin** of a physical 3D object directly to its display, so the image
+  wraps the object's real faces. For mapping onto sculptures, buildings, props — the thing
+  flat capture-based tools (Resolume/MadMapper via Spout) cannot do. Register the twin to
+  the physical object with corner-pin/grid warp + camera calibration.
 
 ## Multi-Projector Setup (Step-by-Step)
 

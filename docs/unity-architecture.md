@@ -160,3 +160,12 @@ correct (gain/offset + per-channel gamma). The **edge-blend ramp exponent is
 - `WarpAndBlendExample` — minimal two-projector rig (content: bouncing cube).
 - `ProBuilderMappingDemo` — same rig with a ProBuilder-built content stage
   (back wall, pillars, arch, stairs) to demonstrate real content mapping.
+- `ObjectMappingDemo` — **object mapping (spatial AR)**: instead of the
+  content-RT → flat-screen rig, a projector camera at the projector's pose
+  renders a virtual twin of a physical object (ProBuilder monument) directly to
+  its display, so the projected image wraps the real object's faces. This is the
+  "true 3D mapping" case flat capture-based tools can't do. `PMSDKProjector`
+  carries the projector lens/throw; corner-pin/grid warp + camera calibration
+  register the virtual twin to the physical object. Mapping content is animated
+  by `PMSDKMappingContentAnimator` (hue wave + brightness pulse + reveal sweep).
+  Runs in a dim scene (emissive content dominates, as in a real dark venue).

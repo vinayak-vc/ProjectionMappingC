@@ -207,6 +207,12 @@ pin needs the new DLL, so both wait on one redeploy + Unity restart.
   until a real install needs it.
 - [x] z-fix DLL redeployed to the nested repo + pushed (nested `02176ef`).
 
+## Demo scenes (2026-07-16)
+- [x] `ObjectMappingDemo` — object mapping / spatial AR: projector cam renders a virtual
+  twin of a ProBuilder monument directly to its display (content wraps the object faces).
+  `PMSDKMappingContentAnimator` drives the mapping content; scene self-contained in the
+  nested repo. Verified in play mode. Shows the "true 3D mapping" differentiator.
+
 ## Next Items / Backlog
 - [ ] Real-hardware calibration smoke test (projector + webcam) — the last unverified link
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)

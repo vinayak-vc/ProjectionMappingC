@@ -21,6 +21,7 @@ of tools): geometry, warping, edge blending, calibration, and project serializat
 - [Calibration UX (`calibration-ux-design.md`)](calibration-ux-design.md) - Runtime on-site calibration design, key map, camera auto-align (P1-P3).
 - [Decisions (`decisions.md`)](decisions.md) - Architecture decision records (e.g., C-API over P/Invoke; D-020..D-022 for the Unity rig, homography auto-align, projective corner pin).
 - [AI Handoff (`ai_handoff.md`)](ai_handoff.md) - State capture for the next agent session.
+- [Dev Setup (`dev-setup.md`)](dev-setup.md) - New machine / new agent: clone, build, deploy, MCP.
 
 ## Deliverables
 

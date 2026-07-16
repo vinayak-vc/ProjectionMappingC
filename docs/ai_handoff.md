@@ -2,12 +2,22 @@
 
 ## Current State (2026-07-16)
 
+New machine / new agent: see `docs/dev-setup.md` for environment setup; repo layout and
+gotchas are in `AGENTS.md`. Everything needed to continue is in git (this repo + the nested
+game repo).
+
 **Last Completed**: Milestones 1-18 + 20; Unity raster-space rig; on-site calibration
-P1-P3; robust structured-light decode + webcam path; perspective corner pin; N×M grid
-warp UI; mark-target-rectangle UI.
-**Current Task**: Milestone 19 (Plugin SDK) still open. Immediate pending step: redeploy
-the rebuilt DLL (needs Unity closed — plugin lock) then run the play-mode pass on
-perspective / grid / mark-target and commit+push the DLL to the nested repo.
+P1-P3; robust structured-light decode + webcam path; **pro-feature gap list 8/12** (all
+High + all Medium: perspective corner pin, N×M grid UI, auto-blend, blend-gamma fix, color
+correction, output rotation/mirror, dense auto-warp) + mark-target UI.
+**Runtime-verified** (play mode): perspective corner pin, color correction, output rotation.
+**Unit/ math-verified**: grid, auto-blend, dense-warp, blend-gamma, Gray-code decode.
+**NOT verified**: real projector+camera loop (no hardware), mark-target/webcam runtime,
+per-frame warp-readback perf at scale.
+**Current Task**: Milestone 19 (Plugin SDK) open. Immediate pending: (a) redeploy the z-fix
+DLL to the nested repo (needs Unity closed — plugin lock) and commit it there; (b) sim
+closed-loop calibration test + warp-readback profiling (both no-hardware); (c) real-hardware
+calibration smoke test when hardware is available.
 **Verified**: native robust-decode + perspective are unit-tested (green); Unity C#
 compiles clean; sim auto-align verified. Not yet: play-mode runtime for the DLL-dependent
 features, and any physical camera loop.

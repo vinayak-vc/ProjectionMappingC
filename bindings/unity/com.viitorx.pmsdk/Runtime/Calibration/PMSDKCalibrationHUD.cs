@@ -26,6 +26,7 @@ namespace vxpmsdk.Components
             "N / Shift+N   black level up / down\n" +
             "T / Shift+T   test pattern: selected / all\n" +
             "Y / Shift+Y   cycle pattern: checker/focus/convergence/bars/ramp/solids\n" +
+            "C             canvas reference: end-to-end level plus across ALL projectors\n" +
             "R / Ctrl+R    reset corner / reset surface\n" +
             "A / Shift+A   auto-align (camera): selected / all\n" +
             "M             mark target rectangle in the camera view, then A\n" +

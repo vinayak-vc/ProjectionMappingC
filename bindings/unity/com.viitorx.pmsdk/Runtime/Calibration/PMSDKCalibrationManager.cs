@@ -241,6 +241,7 @@ namespace vxpmsdk.Components
             if (Input.GetKeyDown(KeyCode.G)) ToggleGridMode();
             if (Input.GetKeyDown(KeyCode.T)) ToggleTestPattern(all: shift);
             if (Input.GetKeyDown(KeyCode.Y)) CycleTestPattern(shift ? -1 : +1);
+            if (Input.GetKeyDown(KeyCode.C)) ToggleCanvasReference();
             if (Input.GetKeyDown(KeyCode.N) && !GridEditMode) AdjustBlackLevel(shift ? -0.01f : +0.01f);
 
             // Grid subdivision: [ ] change columns, - = change rows.
@@ -583,6 +584,27 @@ namespace vxpmsdk.Components
             if (!tp.enabled) tp.enabled = true;
             tp.CyclePattern(delta);
             AutoAlignStatus = $"Test pattern: {tp.Pattern}";
+        }
+
+        /// <summary>
+        /// Toggle the CANVAS-SPACE reference pattern (end-to-end plus + level lines).
+        /// Unlike per-raster test patterns, its lines are pre-warped through every
+        /// projector's corner pin, so they land straight and seam-continuous on the
+        /// physical wall even when the projectors are tilted — any kink/step at a
+        /// seam is a calibration residual to touch up.
+        /// </summary>
+        public void ToggleCanvasReference()
+        {
+            var pattern = GetComponent<PMSDKCanvasReferencePattern>();
+            if (pattern == null)
+            {
+                if (GetComponent<PMSDKExternalContent>() == null) gameObject.AddComponent<PMSDKExternalContent>();
+                pattern = gameObject.AddComponent<PMSDKCanvasReferencePattern>();
+            }
+            pattern.Toggle();
+            AutoAlignStatus = pattern.Active
+                ? "Canvas reference ON — lines are wall-space; a kink at a seam = pin residual."
+                : "Canvas reference off.";
         }
 
         public void ToggleTestPattern(bool all)

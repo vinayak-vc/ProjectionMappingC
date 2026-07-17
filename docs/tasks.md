@@ -277,6 +277,11 @@ displays, `ProBuilderMappingDemo` content.
   `pmsdk_decoder_set_property` (exposure lock); shared-canvas multi-projector align in
   the package instead of the game repo.
 
+## Canvas-space reference pattern (2026-07-17) ✅
+
+- [x] `PMSDKCanvasReferencePattern` — end-to-end plus + level/vertical reference lines rasterized in SHARED canvas space, fed through `PMSDKExternalContent` so every projector shows its warped slice: lines land straight and seam-continuous on the physical wall even with tilted projectors (addresses the on-wall "horizontal line isn't horizontal" problem from the hardware run). `C` toggles in calibration mode. Deterministic rasterizer test (28/28 suite). Verified in play: skewed pin → pattern pre-warps in raster (i.e. straight on wall); centre plus falls in the overlap of both slices.
+- Note: level is relative to the canvas; if the auto-align camera was tilted, verify once against a laser level / chalk line.
+
 ## Next Items / Backlog
 - [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)

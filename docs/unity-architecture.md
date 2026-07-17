@@ -148,6 +148,16 @@ correct (gain/offset + per-channel gamma). The **edge-blend ramp exponent is
 1/projectorGamma** so two projectors' light sums to full across the overlap; setting
 `PMSDKEdgeBlend.Gamma` to the projector's gamma (~2.2) removes the dark seam (D-023).
 `_BlackLevel` is a uniform floor (true per-region black-level compensation is future).
+- **`PMSDKTestPattern`** (+ `PMSDKTestPatterns`): professional pattern set — alignment
+  checker, focus grid, convergence targets, SMPTE-style color bars, gray ramp/wedge,
+  solids. `Y`/`Shift+Y` cycles the pattern in calibration mode.
+- **`PMSDKExternalContent`**: projects an EXTERNAL texture (NDI/Spout receiver, video,
+  any RT) instead of the internal content RT — per-projector slicing, blend and color
+  still apply; restores the original on disable.
+- **`PMSDKSpoutIn` / `PMSDKNdiIn`**: optional bridges from KlakSpout / KlakNDI receivers
+  into `PMSDKExternalContent`. Separate asmdefs compile only when `jp.keijiro.klak.spout`
+  / `jp.keijiro.klak.ndi` are installed (versionDefines) — no hard dependency. For
+  output, attach a Klak sender to the projector camera directly.
 - **`PMSDKCornerPinUI`**: superseded by the calibration system; the manager disables any
   instance it finds at startup. Kept only for source compatibility.
 

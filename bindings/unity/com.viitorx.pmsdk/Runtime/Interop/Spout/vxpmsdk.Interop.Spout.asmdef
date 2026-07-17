@@ -1,0 +1,25 @@
+{
+    "name": "vxpmsdk.Interop.Spout",
+    "rootNamespace": "vxpmsdk",
+    "references": [
+        "vxpmsdk",
+        "Klak.Spout"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "PMSDK_KLAK_SPOUT"
+    ],
+    "versionDefines": [
+        {
+            "name": "jp.keijiro.klak.spout",
+            "expression": "",
+            "define": "PMSDK_KLAK_SPOUT"
+        }
+    ],
+    "noEngineReferences": false
+}

@@ -18,10 +18,13 @@ per-frame warp-readback perf at scale.
 "UE will do later"). Latest batch (2026-07-17): fixed the long-red triangulation test
 (real SDK bug — CV_32F read as double), Unity Test Framework suite 21/21 green, named
 presets + A/B (live-verified), OSC remote (loopback-verified 5/5), ObjectMappingDemo
-second projector (two-angle coverage). Native suite 133/133. Pro-feature gap list 10/12
-(remaining Low: NDI/Spout, extra test patterns). Remaining elsewhere: real-hardware
-calibration smoke test (only unverified link), GPU warp path for extreme scale,
-per-region black-level.
+second projector (two-angle coverage). Native suite 133/133; Unity suite 27/27. **Pro-feature gap list 12/12 implemented**
+(2026-07-17: #12 pattern set — focus/convergence/SMPTE-bars/ramp/solids, Y cycles,
+pixel-tested + bars verified on output; #11 interop — PMSDKExternalContent verified live,
+Klak Spout/NDI adapters compile-gated via versionDefines but NOT tested against the real
+packages here). Remaining elsewhere: real-hardware calibration smoke test (only unverified
+link), Klak adapter loopback once a host installs KlakSpout, GPU warp path for extreme
+scale, per-region black-level.
 **Verified**: native robust-decode + perspective are unit-tested (green); Unity C#
 compiles clean; sim auto-align verified. Not yet: play-mode runtime for the DLL-dependent
 features, and any physical camera loop.

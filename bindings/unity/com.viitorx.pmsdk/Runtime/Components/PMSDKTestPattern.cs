@@ -6,6 +6,10 @@ namespace vxpmsdk.Components
     [RequireComponent(typeof(MeshRenderer))]
     public class PMSDKTestPattern : MonoBehaviour
     {
+        [Header("Pattern")]
+        [Tooltip("Professional pattern set: alignment checker, focus grid, convergence targets, SMPTE-style bars, gray ramp, solids. Cycle with Y in calibration mode.")]
+        public PMSDKTestPatternType Pattern = PMSDKTestPatternType.Checkerboard;
+
         [Header("Grid Settings")]
         public int GridSize = 8;
         public Color Color1 = Color.white;
@@ -86,6 +90,21 @@ namespace vxpmsdk.Components
             }
         }
 
+        /// <summary>Advance to the next pattern type (wraps) and regenerate.</summary>
+        public void CyclePattern(int delta = 1)
+        {
+            int count = System.Enum.GetValues(typeof(PMSDKTestPatternType)).Length;
+            Pattern = (PMSDKTestPatternType)(((int)Pattern + delta + count) % count);
+            Regenerate();
+        }
+
+        /// <summary>Regenerate the pattern texture in place (after changing Pattern/knobs).</summary>
+        public void Regenerate()
+        {
+            if (testTexture == null) return;
+            FillPattern();
+        }
+
         private void GenerateTestPattern()
         {
             int texSize = 1024;
@@ -93,66 +112,20 @@ namespace vxpmsdk.Components
             testTexture.hideFlags = HideFlags.DontSave;
             testTexture.filterMode = FilterMode.Point;
             testTexture.wrapMode = TextureWrapMode.Clamp;
+            FillPattern();
+        }
 
+        private void FillPattern()
+        {
+            int texSize = testTexture.width;
             Color[] pixels = new Color[texSize * texSize];
-
-            int cellPixelSize = texSize / GridSize;
-            float centerX = texSize / 2f;
-            float centerY = texSize / 2f;
-            float radius = (texSize / 2f) * 0.9f;
-            float radiusSq = radius * radius;
-            float innerRadiusSq = (radius - 4) * (radius - 4);
-
-            for (int y = 0; y < texSize; y++)
-            {
-                for (int x = 0; x < texSize; x++)
+            PMSDKTestPatterns.Generate(Pattern, pixels, texSize, GridSize, Color1, Color2,
+                new PMSDKTestPatterns.Overlays
                 {
-                    int index = y * texSize + x;
-                    Color pColor = Color1;
-
-                    // 1. Checkerboard
-                    int cx = x / cellPixelSize;
-                    int cy = y / cellPixelSize;
-                    if ((cx + cy) % 2 == 1)
-                    {
-                        pColor = Color2;
-                    }
-
-                    // 2. Circle
-                    if (ShowCircle)
-                    {
-                        float dx = x - centerX;
-                        float dy = y - centerY;
-                        float distSq = dx * dx + dy * dy;
-                        if (distSq <= radiusSq && distSq >= innerRadiusSq)
-                        {
-                            pColor = CircleColor;
-                        }
-                    }
-
-                    // 3. Crosshair (2 pixels thick)
-                    if (ShowCrosshair)
-                    {
-                        if (x == texSize / 2 || x == (texSize / 2) - 1 || 
-                            y == texSize / 2 || y == (texSize / 2) - 1)
-                        {
-                            pColor = CrosshairColor;
-                        }
-                    }
-
-                    // 4. Border (4 pixels thick)
-                    if (ShowBorder)
-                    {
-                        if (x < 4 || x >= texSize - 4 || y < 4 || y >= texSize - 4)
-                        {
-                            pColor = BorderColor;
-                        }
-                    }
-
-                    pixels[index] = pColor;
-                }
-            }
-
+                    Border = ShowBorder, BorderColor = BorderColor,
+                    Crosshair = ShowCrosshair, CrosshairColor = CrosshairColor,
+                    Circle = ShowCircle, CircleColor = CircleColor
+                });
             testTexture.SetPixels(pixels);
             testTexture.Apply();
         }

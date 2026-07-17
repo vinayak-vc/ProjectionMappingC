@@ -96,6 +96,37 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
+## D-025 2026-07-17 — Real-room auto-align needs consensus fitting and shared-canvas targets
+
+First run on physical hardware (2× UST projectors, one wall, Logitech C270) exposed two
+gaps in the P3 auto-align design that simulation could never show.
+
+(1) **Consensus fitting.** Ultra-short-throw projectors spill decodable light onto the
+floor and ceiling. Those pixels pass the shadow mask and decode into perfectly VALID
+correspondences — but they lie on different planes than the wall, so the single
+least-squares homography inside `PMSDKAutoAlign` is poisoned wholesale (measured reproj
+100–2700 px where the sim gave 0.39 px). A RANSAC consensus fit over the same
+correspondence set (300 iterations, 4-point samples, ~0.02 raster-normalized inlier
+tolerance) recovers RMS 0.55 px with ~half the points rejected as off-wall spill.
+Robust fitting is not an optimization here; on real walls it is a correctness
+requirement. Currently implemented game-side (`PMSDKWallCanvasAlign` in the nested
+repo); should be upstreamed into `PMSDKAutoAlign` as the default fit.
+
+(2) **Shared-canvas targets.** Null-target align recovers each projector's own footprint
+individually — correct per projector, but N projectors on one wall then each map their
+full raster onto their own throw, and the split-slice content does NOT meet in the
+overlap. The multi-projector case needs one wall canvas (outer corners of the union of
+observed quads, projectively parametrized) and per-projector targets equal to each
+content slice of that canvas (slice bounds = the split-slice material scale/offset).
+With that, blend bands coincide by construction and the analytic blend width
+(overlap/slice) is exact — no measured auto-blend needed on a flat wall.
+
+Also codified from the same run: during any sweep, blank all other projectors, freeze
+animated content, and hide overlay badges (all three contaminate the decode); settle
+must cover projector input lag + webcam exposure + USB buffering (hundreds of ms — use
+generous `SettleFrames`, ideally time-based); room lights off (webcam auto-exposure
+otherwise equalizes the white/black references).
+
 ## D-024 2026-07-16 — Projector-pose calibration solves against Unity's camera, not OpenCV
 
 Object mapping needs the virtual projector camera's pose+FOV to match the real projector

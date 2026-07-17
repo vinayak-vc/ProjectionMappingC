@@ -82,6 +82,66 @@ namespace vxpmsdk.Components
             return false;
         }
 
+        // ---------------- Named presets ----------------
+        // Presets are sibling files of the main calibration file:
+        //   pmsdk_preset_<name>.json
+        // so cues like "day"/"night"/"rehearsal" can be saved and recalled on site.
+
+        private const string PresetPrefix = "pmsdk_preset_";
+
+        /// <summary>Filesystem-safe preset name (invalid chars replaced with '_').</summary>
+        public static string SanitizePresetName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return "default";
+            var sb = new System.Text.StringBuilder(name.Length);
+            foreach (char c in name.Trim())
+            {
+                bool bad = c == '.' || System.Array.IndexOf(Path.GetInvalidFileNameChars(), c) >= 0;
+                sb.Append(bad ? '_' : c);
+            }
+            return sb.Length == 0 ? "default" : sb.ToString();
+        }
+
+        /// <summary>Path of the named preset, next to the main calibration file.</summary>
+        public static string PresetPath(string basePath, string name)
+        {
+            string dir = Path.GetDirectoryName(basePath);
+            if (string.IsNullOrEmpty(dir)) dir = ".";
+            return Path.Combine(dir, PresetPrefix + SanitizePresetName(name) + ".json");
+        }
+
+        /// <summary>Names of all presets stored next to the main calibration file.</summary>
+        public static string[] ListPresets(string basePath)
+        {
+            try
+            {
+                string dir = Path.GetDirectoryName(basePath);
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return new string[0];
+                var files = Directory.GetFiles(dir, PresetPrefix + "*.json");
+                var names = new string[files.Length];
+                for (int i = 0; i < files.Length; i++)
+                {
+                    string f = Path.GetFileNameWithoutExtension(files[i]);
+                    names[i] = f.Substring(PresetPrefix.Length);
+                }
+                System.Array.Sort(names, System.StringComparer.OrdinalIgnoreCase);
+                return names;
+            }
+            catch { return new string[0]; }
+        }
+
+        public static bool DeletePreset(string basePath, string name)
+        {
+            try
+            {
+                string p = PresetPath(basePath, name);
+                if (!File.Exists(p)) return false;
+                File.Delete(p);
+                return true;
+            }
+            catch { return false; }
+        }
+
         public static PMSDKCalibrationFile Load(string path)
         {
             try

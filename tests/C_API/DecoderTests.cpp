@@ -64,25 +64,34 @@ TEST_F(DecoderTests, DecodeAndTriangulate) {
         EXPECT_EQ(status, PMSDK_SUCCESS);
     }
     
-    // Mock intrinsics and extrinsics
+    // Geometry note: the decoded correspondence is the identity map (camera pixel
+    // (x,y) sees projector pixel (x,y)). With identical intrinsics and a pure
+    // translation baseline, identical pixels mean PARALLEL rays -> triangulation
+    // at infinity (w ~ 0), which the SDK correctly filters out. To make the test
+    // geometry convergent and deterministic, shift the projector's principal
+    // point: cam ray x = X.x/X.z + 2, proj ray x = (X.x+10)/X.z + 1; equal pixels
+    // force 10/X.z = 1, i.e. every triangulated point lies at depth z = 10.
     float camIntr[4] = {1.0f, 1.0f, 2.0f, 2.0f}; // fx, fy, cx, cy
     float camExtr[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}; // rvec, tvec (camera at origin)
-    
-    float projIntr[4] = {1.0f, 1.0f, 2.0f, 2.0f};
+
+    float projIntr[4] = {1.0f, 1.0f, 1.0f, 2.0f}; // cx = 1 (see note above)
     float projExtr[6] = {0.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f}; // projector translated by 10 on X
-    
+
     std::vector<pmsdk_vec3_t> points(100);
     size_t count = 0;
-    
+
     pmsdk_status_t status = pmsdk_decoder_decode_and_triangulate(
         decoder, 127,
         camIntr, camExtr,
         projIntr, projExtr,
         points.data(), &count, points.size()
     );
-    
+
     EXPECT_EQ(status, PMSDK_SUCCESS);
     EXPECT_EQ(count, 16); // 4x4 image, all should match and triangulate
-    
+    for (size_t i = 0; i < count; ++i) {
+        EXPECT_NEAR(points[i].z, 10.0f, 1e-3f); // convergent geometry puts every point at z=10
+    }
+
     pmsdk_decoder_destroy(decoder);
 }

@@ -296,6 +296,14 @@ std::vector<Math::Vector3> GrayCodeDecoder::Triangulate(
     cv::Mat points4D;
     cv::triangulatePoints(P1, P2, pts1, pts2, points4D);
 
+    // triangulatePoints returns a matrix whose depth follows the input POINTS
+    // (Point2f -> CV_32F), not the projection matrices. Reading it as double
+    // without converting misinterprets float pairs as doubles -> garbage w ->
+    // every point filtered. Normalize to CV_64F before reading.
+    if (points4D.depth() != CV_64F) {
+        points4D.convertTo(points4D, CV_64F);
+    }
+
     for (int i = 0; i < points4D.cols; ++i) {
         double w = points4D.at<double>(3, i);
         if (std::abs(w) > 1e-6) {

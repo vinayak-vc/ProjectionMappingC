@@ -218,6 +218,16 @@ pin needs the new DLL, so both wait on one redeploy + Unity restart.
   `PMSDKMappingContentAnimator` drives the mapping content; scene self-contained in the
   nested repo. Verified in play mode. Shows the "true 3D mapping" differentiator.
 
+## Quality + reach batch (2026-07-17) ✅
+
+- [x] Fixed long-red `DecoderTests.DecodeAndTriangulate` — exposed a REAL SDK bug: `cv::triangulatePoints` output depth follows the input points (CV_32F), was read as double → garbage w → always-empty cloud. Plus degenerate test geometry (parallel rays) replaced with convergent geometry (z=10 assertion). Native suite 133/133.
+- [x] Unity Test Framework regression suite (`vxpmsdk.Tests.Editor`, 21 tests green): homography, gray decode (+inverse/albedo/shadow), auto-blend (2/3-projector/no-overlap), dense-warp, pose solver, calibration IO, presets, OSC codec. Host project needs the package in manifest `testables`.
+- [x] Named presets/cues (gap #10): `pmsdk_preset_<name>.json` siblings of the calibration file; manager `SavePreset/LoadPreset/ListPresets` + `ToggleAB` (pre-load snapshot swap). Keys: Ctrl+1..4 load, Ctrl+Shift+1..4 save, V = A/B. Live-verified (load restores, A/B flips both ways).
+- [x] OSC remote (gap #9): dependency-free OSC 1.0 codec (`PMSDKOsc`, unit-tested) + `PMSDKOscServer` UDP listener (background thread → main-thread dispatch) covering calibration/surface/corner/blend/test-pattern/auto-align/presets/AB. Loopback-verified: 5/5 packets received and applied.
+- [x] ObjectMappingDemo second projector: `PMSDK_Projector_B` (side angle, Display 3) with its own pose calibrator sharing the 9 anchors — two-angle coverage verified in play mode.
+
+Pro-feature gap list: **10 of 12** (remaining: NDI/Spout, extra test patterns — both Low).
+
 ## Next Items / Backlog
 - [ ] Real-hardware calibration smoke test (projector + webcam) — the last unverified link
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)

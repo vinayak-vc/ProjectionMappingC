@@ -226,5 +226,48 @@ namespace vxpmsdk.Tests
         {
             Assert.IsNull(PMSDKCalibrationIO.Load(Path.Combine(Path.GetTempPath(), "pmsdk_does_not_exist_12345.json")));
         }
+
+        // ---------- presets ----------
+
+        [Test]
+        public void Presets_SanitizeAndPath()
+        {
+            Assert.AreEqual("day_show", PMSDKCalibrationIO.SanitizePresetName("day/show"));
+            Assert.AreEqual("default", PMSDKCalibrationIO.SanitizePresetName("   "));
+            string basePath = Path.Combine(Path.GetTempPath(), "pmsdk_calibration.json");
+            StringAssert.EndsWith("pmsdk_preset_night.json", PMSDKCalibrationIO.PresetPath(basePath, "night"));
+        }
+
+        [Test]
+        public void Presets_SaveListLoadDeleteRoundtrip()
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "pmsdk_preset_tests_" + System.Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            string basePath = Path.Combine(dir, "pmsdk_calibration.json");
+            try
+            {
+                var file = new PMSDKCalibrationFile
+                {
+                    surfaces = new[] { new PMSDKSurfaceCalibration { id = "S", blendRight = 0.33f } }
+                };
+                Assert.IsTrue(PMSDKCalibrationIO.Save(PMSDKCalibrationIO.PresetPath(basePath, "day"), file));
+                file.surfaces[0].blendRight = 0.11f;
+                Assert.IsTrue(PMSDKCalibrationIO.Save(PMSDKCalibrationIO.PresetPath(basePath, "night"), file));
+
+                var names = PMSDKCalibrationIO.ListPresets(basePath);
+                CollectionAssert.AreEquivalent(new[] { "day", "night" }, names);
+
+                var day = PMSDKCalibrationIO.Load(PMSDKCalibrationIO.PresetPath(basePath, "day"));
+                Assert.AreEqual(0.33f, day.surfaces[0].blendRight, 1e-5f);
+
+                Assert.IsTrue(PMSDKCalibrationIO.DeletePreset(basePath, "day"));
+                CollectionAssert.AreEquivalent(new[] { "night" }, PMSDKCalibrationIO.ListPresets(basePath));
+                Assert.IsFalse(PMSDKCalibrationIO.DeletePreset(basePath, "day"));
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
     }
 }

@@ -29,6 +29,8 @@ namespace vxpmsdk.Components
             "A / Shift+A   auto-align (camera): selected / all\n" +
             "M             mark target rectangle in the camera view, then A\n" +
             "Ctrl+Z        undo\n" +
+            "Ctrl+1..4     load preset slot   Ctrl+Shift+1..4  save preset slot\n" +
+            "V             A/B compare (swap with pre-preset state)\n" +
             "Ctrl+S        save          Esc  exit (auto-saves)";
 
         private const float ThumbWidth = 192f;

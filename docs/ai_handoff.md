@@ -24,6 +24,27 @@ for extreme scale; (c) low-priority gaps (OSC/presets/NDI/test patterns, per-reg
 compiles clean; sim auto-align verified. Not yet: play-mode runtime for the DLL-dependent
 features, and any physical camera loop.
 
+## Machine note (2026-07-17) — current layout on this machine
+
+Paths in older sections and AGENTS.md refer to the previous machine. Current layout:
+
+- SDK repo: `C:/Unity/ProjectionMappingC`, branch `main` (PR #5 merged `release-management`).
+- Unity project: `C:/Unity/Multi Projector` (template — never commit).
+- Nested game repo: `C:/Unity/Multi Projector/Assets/Games/ProjectionMapping-unity`, branch `main`.
+- **Package reference gotcha**: `Packages/manifest.json` points `com.viitorx.pmsdk` at the
+  v1.0.3 release archive (`C:/Unity/ProjectionMappingSDK_v1.0.3_Windows/...`), NOT this
+  repo's `bindings/unity` source. Repoint the manifest (or refresh the release folder)
+  before expecting package-source edits to reach Unity.
+- vcpkg submodule arrived broken after the copy (missing `.git/modules`, dangling gitdir;
+  `git status` failed). Fixed 2026-07-17: re-init in place, shallow fetch of the pinned
+  `97b19ca`, then `git submodule absorbgitdirs`.
+- **Demo assets**: the canonical `PMSDKDemo/` now lives inside the nested repo with the
+  original GUIDs (the demo scenes reference them) and the newer UnlitWarp material
+  properties. A stale duplicate at root `Assets/PMSDKDemo` had caused Unity to regenerate
+  GUIDs on the nested copy (meta churn); it was deleted. Re-running the demo generator
+  recreates root `Assets/PMSDKDemo` with fresh GUIDs — harmless, but never commit that
+  copy into the nested repo over the canonical one.
+
 ## Current State
 - The Core, Math, Geometry, Warp, Blend, Serialization, and Calibration modules are implemented.
 - We have fully decoupled OpenCV behind a strict PImpl interface to prevent ABI spillage.

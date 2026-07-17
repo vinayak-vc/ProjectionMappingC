@@ -20,12 +20,14 @@ blended on one wall, RMS 0.55/0.57 px, editor-driven, calibration persisted. See
 "UE will do later"). Latest batch (2026-07-17): fixed the long-red triangulation test
 (real SDK bug — CV_32F read as double), Unity Test Framework suite 21/21 green, named
 presets + A/B (live-verified), OSC remote (loopback-verified 5/5), ObjectMappingDemo
-second projector (two-angle coverage). Native suite 133/133. Pro-feature gap list 10/12
-(remaining Low: NDI/Spout, extra test patterns). Remaining elsewhere: GPU warp path for
-extreme scale, per-region black-level.
-**Verified**: native robust-decode + perspective are unit-tested (green); Unity C#
-compiles clean; sim auto-align verified. Not yet: play-mode runtime for the DLL-dependent
-features, and any physical camera loop.
+second projector (two-angle coverage). Native suite 133/133; Unity suite 27/27.
+**Pro-feature gap list 12/12 implemented** (2026-07-17: #12 pattern set —
+focus/convergence/SMPTE-bars/ramp/solids, Y cycles, pixel-tested + bars verified on
+output; #11 interop — PMSDKExternalContent verified live, Klak Spout/NDI adapters
+compile-gated via versionDefines but NOT tested against the real packages here).
+Remaining elsewhere: Klak adapter loopback once a host installs KlakSpout, GPU warp path
+for extreme scale, per-region black-level, and upstreaming the D-025 hardware findings
+(RANSAC consensus fit into `PMSDKAutoAlign`, time-based settle, C-API exposure lock).
 
 ## Machine note (2026-07-17) — current layout on this machine
 

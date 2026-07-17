@@ -240,6 +240,7 @@ namespace vxpmsdk.Components
             if (Input.GetKeyDown(KeyCode.B) && !GridEditMode) BlendSubmode = !BlendSubmode;
             if (Input.GetKeyDown(KeyCode.G)) ToggleGridMode();
             if (Input.GetKeyDown(KeyCode.T)) ToggleTestPattern(all: shift);
+            if (Input.GetKeyDown(KeyCode.Y)) CycleTestPattern(shift ? -1 : +1);
             if (Input.GetKeyDown(KeyCode.N) && !GridEditMode) AdjustBlackLevel(shift ? -0.01f : +0.01f);
 
             // Grid subdivision: [ ] change columns, - = change rows.
@@ -572,6 +573,16 @@ namespace vxpmsdk.Components
             PushUndoIfNeeded();
             s.Blend.BlackLevel = Mathf.Clamp(s.Blend.BlackLevel + delta, 0f, 0.5f);
             Dirty = true;
+        }
+
+        /// <summary>Cycle the selected surface's pattern type (enables the pattern if off).</summary>
+        public void CycleTestPattern(int delta)
+        {
+            var tp = Selected?.TestPattern;
+            if (tp == null) return;
+            if (!tp.enabled) tp.enabled = true;
+            tp.CyclePattern(delta);
+            AutoAlignStatus = $"Test pattern: {tp.Pattern}";
         }
 
         public void ToggleTestPattern(bool all)

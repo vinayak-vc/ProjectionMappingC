@@ -226,7 +226,12 @@ pin needs the new DLL, so both wait on one redeploy + Unity restart.
 - [x] OSC remote (gap #9): dependency-free OSC 1.0 codec (`PMSDKOsc`, unit-tested) + `PMSDKOscServer` UDP listener (background thread → main-thread dispatch) covering calibration/surface/corner/blend/test-pattern/auto-align/presets/AB. Loopback-verified: 5/5 packets received and applied.
 - [x] ObjectMappingDemo second projector: `PMSDK_Projector_B` (side angle, Display 3) with its own pose calibrator sharing the 9 anchors — two-angle coverage verified in play mode.
 
-Pro-feature gap list: **10 of 12** (remaining: NDI/Spout, extra test patterns — both Low).
+## Final two Low gaps (2026-07-17) ✅
+
+- [x] #12 Test patterns: `PMSDKTestPatterns` static rasterizers — Checkerboard (+overlays), FocusGrid (1-px lattice + diagonals), Convergence (9 crosshair+circle targets), SMPTE-style ColorBars (75% bars + W/K/R/G/B strip), GrayRamp (continuous + 16-step wedge), solids (W/K/R/G/B). `Y`/`Shift+Y` cycles in calibration mode; 6 deterministic pixel tests; ColorBars verified visually on the projector output.
+- [x] #11 NDI/Spout interop: `PMSDKExternalContent` (feeds any external texture into all warp surfaces in place of the content RT, per-projector slicing/blend/color intact — verified live: swap + restore). Adapters `PMSDKSpoutIn`/`PMSDKNdiIn` bridge KlakSpout/KlakNDI receivers, in separate asmdefs compile-gated by versionDefines (`jp.keijiro.klak.spout`/`jp.keijiro.klak.ndi`) — zero hard dependency; NOT compiled/tested against the real Klak packages here (none installed). Output side: attach a Klak sender to the projector camera directly.
+
+Pro-feature gap list: **12 of 12 implemented** (caveats: Klak adapters untested without the packages; camera path still needs real hardware).
 
 ## Real-hardware two-projector wall blend — VERIFIED (2026-07-17) ✅
 
@@ -273,8 +278,8 @@ displays, `ProBuilderMappingDemo` content.
   the package instead of the game repo.
 
 ## Next Items / Backlog
+- [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
-- [ ] Remaining gaps (low): OSC/HTTP remote, named presets/cues, NDI/Spout, extra test patterns
 - [ ] True per-region black-level compensation (current `_BlackLevel` is a uniform floor)
 - [ ] GPU warp path for extreme projector counts / grid density
 - [ ] Milestone 19: Plugin SDK

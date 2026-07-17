@@ -1,0 +1,25 @@
+{
+    "name": "vxpmsdk.Interop.Ndi",
+    "rootNamespace": "vxpmsdk",
+    "references": [
+        "vxpmsdk",
+        "Klak.Ndi"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "PMSDK_KLAK_NDI"
+    ],
+    "versionDefines": [
+        {
+            "name": "jp.keijiro.klak.ndi",
+            "expression": "",
+            "define": "PMSDK_KLAK_NDI"
+        }
+    ],
+    "noEngineReferences": false
+}

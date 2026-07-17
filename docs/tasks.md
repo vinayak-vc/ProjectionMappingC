@@ -228,8 +228,51 @@ pin needs the new DLL, so both wait on one redeploy + Unity restart.
 
 Pro-feature gap list: **10 of 12** (remaining: NDI/Spout, extra test patterns — both Low).
 
+## Real-hardware two-projector wall blend — VERIFIED (2026-07-17) ✅
+
+The physical projector + webcam loop — the roadmap's last unverified link — ran
+successfully on real hardware: two ultra-short-throw 1080p projectors side by side on
+the floor, both aimed at one wall with ~15% physical overlap, observed by a Logitech
+C270 (640×480 via the native `pmsdk_decoder_*` capture path) from ~4 m back, room dark.
+Entirely editor-driven (no build): fullscreen Game-view popups on the projector
+displays, `ProBuilderMappingDemo` content.
+
+- [x] End result: single continuous canvas across both projectors; corner-pin fit
+  **RMS 0.55 px (left) / 0.57 px (right)** on the 128-px calibration raster
+  (1689/3542 and 1452/2420 RANSAC inliers); blend bands coincide by construction;
+  animated content crosses the seam without doubling. Calibration persisted to JSON.
+- [x] Real-world failure modes found and fixed (none of these exist in simulation —
+  details in `docs/ai_handoff.md` and D-025):
+  1. **Light spill** (the fit killer): UST projectors light the floor/ceiling; that
+     spill decodes into VALID correspondences lying on other planes, and the plain
+     least-squares homography inside `PMSDKAutoAlign` is poisoned by them (observed
+     reproj 100–2700 px). Fixed with a RANSAC consensus fit (~45–55% inlier rate).
+  2. **Frame-based settle is too short on real chains**: projector input lag + webcam
+     exposure + USB buffering total hundreds of ms; captures landed on stale patterns
+     (intermittent garbage decodes). `SettleFrames=45` + `flushFrames=5` works at
+     editor frame rates; a time-based settle in `PMSDKAutoAlign` would be sturdier.
+  3. **Webcam auto-exposure vs white/black references**: AE partially equalizes the
+     two reference captures (mask starvation with lights on — 47 valid points).
+     Lights off is mandatory; exposure lock via the C API would remove the caveat.
+  4. **`StartAutoAlign(all)` does not produce a shared canvas**: null-target align
+     only recovers each projector's own footprint. Two projectors on one wall need
+     slice targets on a common canvas (see `PMSDKWallCanvasAlign` below).
+  5. During any sweep the OTHER projector must be blanked and animated content frozen
+     (its light modulates the overlap mid-sweep), and overlay badges hidden (they
+     project on top of the patterns).
+- [x] New game-repo tooling (nested repo `ProjectionMapping-unity/Scripts/`):
+  `PMSDKWallCanvasAlign` — F4 hotkey; one Gray-code sweep per projector (other one
+  blanked, physics frozen, overlays hidden) → RANSAC camera→projector fits → shared
+  canvas from the outer corners of the two observed quads → each projector corner-
+  pinned onto its content slice (slice bounds read from the split-slice material
+  scale/offset) → analytic blend widths (overlap/slice) → `SaveNow()`.
+  `PMSDKFullscreenPreview` (editor) — borderless Game view per non-primary monitor
+  via `GameView.showToolbar=false`, left-to-right → Display 2, 3.
+- [ ] Upstream candidates: RANSAC option inside `PMSDKAutoAlign`; time-based settle;
+  `pmsdk_decoder_set_property` (exposure lock); shared-canvas multi-projector align in
+  the package instead of the game repo.
+
 ## Next Items / Backlog
-- [ ] Real-hardware calibration smoke test (projector + webcam) — the last unverified link
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
 - [ ] Remaining gaps (low): OSC/HTTP remote, named presets/cues, NDI/Spout, extra test patterns
 - [ ] True per-region black-level compensation (current `_BlackLevel` is a uniform floor)

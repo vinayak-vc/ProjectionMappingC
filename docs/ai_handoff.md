@@ -12,16 +12,17 @@ High + all Medium: perspective corner pin, N×M grid UI, auto-blend, blend-gamma
 correction, output rotation/mirror, dense auto-warp) + mark-target UI.
 **Runtime-verified** (play mode): perspective corner pin, color correction, output rotation.
 **Unit/ math-verified**: grid, auto-blend, dense-warp, blend-gamma, Gray-code decode.
-**NOT verified**: real projector+camera loop (no hardware), mark-target/webcam runtime,
-per-frame warp-readback perf at scale.
+**NOT verified**: mark-target runtime, per-frame warp-readback perf at scale.
+**HARDWARE-VERIFIED (2026-07-17)**: the real projector+webcam loop — two UST projectors
+blended on one wall, RMS 0.55/0.57 px, editor-driven, calibration persisted. See
+"Real-hardware run" section below for the workflow and the four real-world gotchas.
 **Current Task**: Milestone 19 (Plugin SDK = UE5 bindings) is the main open track (user:
 "UE will do later"). Latest batch (2026-07-17): fixed the long-red triangulation test
 (real SDK bug — CV_32F read as double), Unity Test Framework suite 21/21 green, named
 presets + A/B (live-verified), OSC remote (loopback-verified 5/5), ObjectMappingDemo
 second projector (two-angle coverage). Native suite 133/133. Pro-feature gap list 10/12
-(remaining Low: NDI/Spout, extra test patterns). Remaining elsewhere: real-hardware
-calibration smoke test (only unverified link), GPU warp path for extreme scale,
-per-region black-level.
+(remaining Low: NDI/Spout, extra test patterns). Remaining elsewhere: GPU warp path for
+extreme scale, per-region black-level.
 **Verified**: native robust-decode + perspective are unit-tested (green); Unity C#
 compiles clean; sim auto-align verified. Not yet: play-mode runtime for the DLL-dependent
 features, and any physical camera loop.
@@ -33,10 +34,10 @@ Paths in older sections and AGENTS.md refer to the previous machine. Current lay
 - SDK repo: `C:/Unity/ProjectionMappingC`, branch `main` (PR #5 merged `release-management`).
 - Unity project: `C:/Unity/Multi Projector` (template — never commit).
 - Nested game repo: `C:/Unity/Multi Projector/Assets/Games/ProjectionMapping-unity`, branch `main`.
-- **Package reference gotcha**: `Packages/manifest.json` points `com.viitorx.pmsdk` at the
-  v1.0.3 release archive (`C:/Unity/ProjectionMappingSDK_v1.0.3_Windows/...`), NOT this
-  repo's `bindings/unity` source. Repoint the manifest (or refresh the release folder)
-  before expecting package-source edits to reach Unity.
+- Package reference: `Packages/manifest.json` now points `com.viitorx.pmsdk` at THIS
+  repo's source (`file:C:/Unity/ProjectionMappingC/bindings/unity/com.viitorx.pmsdk`) —
+  package edits reach Unity directly. (It briefly pointed at the v1.0.3 release archive
+  right after the machine move; that gotcha is resolved.)
 - vcpkg submodule arrived broken after the copy (missing `.git/modules`, dangling gitdir;
   `git status` failed). Fixed 2026-07-17: re-init in place, shallow fetch of the pinned
   `97b19ca`, then `git submodule absorbgitdirs`.
@@ -46,6 +47,49 @@ Paths in older sections and AGENTS.md refer to the previous machine. Current lay
   GUIDs on the nested copy (meta churn); it was deleted. Re-running the demo generator
   recreates root `Assets/PMSDKDemo` with fresh GUIDs — harmless, but never commit that
   copy into the nested repo over the canonical one.
+- `ProBuilderMappingDemo` scene: commit `02176ef` had accidentally regenerated the scene
+  WITHOUT the ProBuilder stage; restored 2026-07-17 from `3512932` (PB_Stage +
+  5 embedded pb_Meshes) — nested commit `1d57868`.
+
+## Real-hardware run (2026-07-17) — two-projector wall blend, editor-driven
+
+First physical validation of the whole calibration stack. Setup: two ultra-short-throw
+1080p projectors on the floor aiming at one wall (~15% physical overlap, Windows
+extended desktop, both forced to 1920×1080 — at their native 1920×1200 the 16:9 raster
+gets edge-cropped), Logitech C270 as observer ~4 m back facing the wall, room dark.
+No build needed: `Tools > Projection Mapping > Fullscreen Previews > Open` puts a
+borderless Game view on each projector (`GameView.showToolbar=false` internally — do
+NOT try y-offset tricks, the window manager clamps popups back onto the screen).
+
+**Result**: one continuous canvas, corner-pin RMS 0.55 px (left) / 0.57 px (right) on
+the 128-px raster, blend bands coincident by construction, calibration saved to
+`%USERPROFILE%/AppData/LocalLow/ViitorCloud/Projection mapping/pmsdk_calibration.json`.
+
+**Operator workflow (repeatable without an agent)**: play `ProBuilderMappingDemo`,
+open the fullscreen previews, place the webcam so it sees BOTH full projections with
+margin, lights off, press **F4** (`PMSDKWallCanvasAlign` on "PMSDK Runtime Services",
+nested repo). Two Gray-code sweeps (~1–2 min, other projector auto-blanked), then the
+canvas mapping + blend widths apply and save automatically. `A`/`Shift+A` (package
+auto-align) only RECOVERS each projector's own footprint — it does not build the
+shared canvas; use F4 for the wall workflow. F2 = manual touch-up, Ctrl+S saves.
+
+**Why the first attempts failed — the four real-world gotchas (also D-025)**:
+1. Floor/ceiling **light spill decodes as valid correspondences** on other planes →
+   plain least-squares fit poisoned (reproj 100–2700 px). RANSAC consensus fit fixes
+   it (~half the points rejected as spill). Upstream into `PMSDKAutoAlign` eventually.
+2. **Settle time**: projector input lag + webcam exposure + USB buffering ≈ hundreds
+   of ms; the default `SettleFrames=2` captures stale patterns. Use `SettleFrames≈45`,
+   `flushFrames≈5` (frame-based — fps-dependent; time-based settle would be sturdier).
+3. **Webcam auto-exposure** partially equalizes the white/black reference frames →
+   shadow mask starves (47 valid px with lights on). Lights off is mandatory; a C-API
+   exposure lock (`pmsdk_decoder_set_property`) would remove the caveat.
+4. During a sweep, **blank the other projector, freeze animated content, hide overlay
+   badges** — all three otherwise contaminate the decode (animated content in the
+   overlap is the worst).
+
+Also learned: OpenCV device indices ≠ Unity `WebCamTexture` order (Meta Quest virtual
+cameras don't consume OpenCV indices — the C270 was index 0); `pmsdk_decoder_create`
+runs fine but `open_camera` fails while any other app holds the camera.
 
 ## Current State
 - The Core, Math, Geometry, Warp, Blend, Serialization, and Calibration modules are implemented.

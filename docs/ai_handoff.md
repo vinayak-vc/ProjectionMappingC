@@ -28,6 +28,12 @@ compile-gated via versionDefines but NOT tested against the real packages here).
 Remaining elsewhere: Klak adapter loopback once a host installs KlakSpout, GPU warp path
 for extreme scale, per-region black-level, and upstreaming the D-025 hardware findings
 (RANSAC consensus fit into `PMSDKAutoAlign`, time-based settle, C-API exposure lock).
+**NEXT DEVELOPMENT (planned, user-approved, not implemented): camera-measured luminance
+compensation** — per-projector wall luminance maps from the sweep's all-white captures →
+per-projector gain texture in `PMSDK/UnlitWarp`, so the blend seam disappears on bright
+content (gamma alone cannot fix spatial vignetting; seen on the real wall). Full plan:
+docs/tasks.md §NEXT DEVELOPMENT. Suggested branch: bundle with D-025 upstreaming +
+N-projector wall-canvas generalization.
 
 ## Machine note (2026-07-17) — current layout on this machine
 

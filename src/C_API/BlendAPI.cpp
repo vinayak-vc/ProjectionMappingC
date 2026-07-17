@@ -1,5 +1,6 @@
 #include "PMSDK/C_API/BlendAPI.h"
 #include "PMSDK/Blend/BlendConfig.h"
+#include "PMSDK/Geometry/Mesh.h"
 
 using namespace pmsdk::Blend;
 
@@ -45,6 +46,26 @@ PMSDK_API pmsdk_edgeblend_t* pmsdk_blendconfig_get_bottom_edge(pmsdk_blendconfig
 PMSDK_API float pmsdk_blendconfig_evaluate(const pmsdk_blendconfig_t* config, float u, float v) {
     if (config) return reinterpret_cast<const BlendConfig*>(config)->Evaluate(u, v);
     return 1.0f;
+}
+
+PMSDK_API pmsdk_status_t pmsdk_blendconfig_apply_to_mesh(const pmsdk_blendconfig_t* config, pmsdk_mesh_t* mesh) {
+    if (!config || !mesh) return PMSDK_ERROR_INVALID_ARGUMENT;
+    
+    auto* cppConfig = reinterpret_cast<const BlendConfig*>(config);
+    auto* cppMesh = reinterpret_cast<pmsdk::Geometry::Mesh*>(mesh);
+    
+    size_t vertexCount = 0;
+    auto* vertices = cppMesh->GetVerticesMutable(&vertexCount);
+    
+    if (vertices && vertexCount > 0) {
+        #pragma omp parallel for
+        for (int i = 0; i < static_cast<int>(vertexCount); ++i) {
+            float alpha = cppConfig->Evaluate(vertices[i].uv.x, vertices[i].uv.y);
+            vertices[i].color.w = alpha;
+        }
+    }
+    
+    return PMSDK_SUCCESS;
 }
 
 PMSDK_API void pmsdk_edgeblend_set_size(pmsdk_edgeblend_t* edge, float size) {

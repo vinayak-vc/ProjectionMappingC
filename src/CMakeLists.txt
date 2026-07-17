@@ -20,6 +20,7 @@ target_sources(pmsdk PRIVATE
     Geometry/DynamicMesh.cpp
     Geometry/BezierPatch.cpp
     Geometry/GridWarp.cpp
+    Geometry/PerspectiveWarp.cpp
     Geometry/MeshOptimizer.cpp
     Warp/Projector.cpp
     Warp/DeformationField.cpp

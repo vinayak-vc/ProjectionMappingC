@@ -1,5 +1,6 @@
 #include "PMSDK/Calibration/GrayCodeDecoder.h"
 #include <opencv2/opencv.hpp>
+#include <cstring>
 #include <iostream>
 
 namespace pmsdk::Calibration {
@@ -52,16 +53,30 @@ bool GrayCodeDecoder::OpenCamera(int cameraIndex) {
 }
 
 bool GrayCodeDecoder::CaptureFrame() {
+    return CaptureFrameFlushed(0);
+}
+
+bool GrayCodeDecoder::CaptureFrameFlushed(int flushFrames) {
     if (!m_impl->capture.isOpened()) {
         return false;
+    }
+    // Discard buffered frames: VideoCapture queues frames internally, so after
+    // the projected pattern changes a plain read() often still returns the
+    // previous pattern.
+    for (int i = 0; i < flushFrames; ++i) {
+        m_impl->capture.grab();
     }
     cv::Mat frame;
     if (!m_impl->capture.read(frame)) {
         return false;
     }
-    
+
     cv::Mat gray;
-    cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+    if (frame.channels() == 1) {
+        gray = frame;
+    } else {
+        cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+    }
     m_impl->images.push_back(gray);
     return true;
 }
@@ -79,6 +94,42 @@ bool GrayCodeDecoder::AddImage(const std::string& filepath) {
     }
     m_impl->images.push_back(img);
     return true;
+}
+
+bool GrayCodeDecoder::AddImageFromMemory(const uint8_t* pixels, int width, int height) {
+    if (!pixels || width <= 0 || height <= 0) {
+        return false;
+    }
+    // clone(): the Mat wrapping host memory is only valid for this call.
+    cv::Mat img(height, width, CV_8UC1, const_cast<uint8_t*>(pixels));
+    m_impl->images.push_back(img.clone());
+    return true;
+}
+
+bool GrayCodeDecoder::GetLastFrame(std::vector<uint8_t>& outPixels, int& outWidth, int& outHeight) const {
+    if (m_impl->images.empty()) {
+        return false;
+    }
+    const cv::Mat& img = m_impl->images.back();
+    outWidth = img.cols;
+    outHeight = img.rows;
+    outPixels.resize(static_cast<size_t>(img.cols) * img.rows);
+    if (img.isContinuous()) {
+        std::memcpy(outPixels.data(), img.data, outPixels.size());
+    } else {
+        for (int y = 0; y < img.rows; ++y) {
+            std::memcpy(outPixels.data() + static_cast<size_t>(y) * img.cols, img.ptr<uint8_t>(y), img.cols);
+        }
+    }
+    return true;
+}
+
+size_t GrayCodeDecoder::GetImageCount() const {
+    return m_impl->images.size();
+}
+
+void GrayCodeDecoder::ClearImages() {
+    m_impl->images.clear();
 }
 
 std::vector<PointMatch> GrayCodeDecoder::Decode(int threshold) const {
@@ -122,6 +173,69 @@ std::vector<PointMatch> GrayCodeDecoder::Decode(int threshold) const {
 
             if (projX < m_impl->width && projY < m_impl->height) {
                 matches.push_back({{static_cast<float>(x), static_cast<float>(y)}, 
+                                   {static_cast<float>(projX), static_cast<float>(projY)}});
+            }
+        }
+    }
+
+    return matches;
+}
+
+std::vector<PointMatch> GrayCodeDecoder::DecodeRobust(int minContrast) const {
+    std::vector<PointMatch> matches;
+    const size_t bitPatterns = static_cast<size_t>(m_impl->colBits + m_impl->rowBits);
+    const size_t requiredImages = 2 + 2 * bitPatterns; // white, black, (pattern, inverse) pairs
+
+    if (m_impl->images.size() != requiredImages) {
+        return matches;
+    }
+
+    const int camWidth = m_impl->images[0].cols;
+    const int camHeight = m_impl->images[0].rows;
+    for (const auto& img : m_impl->images) {
+        if (img.cols != camWidth || img.rows != camHeight) {
+            return matches;
+        }
+    }
+
+    const cv::Mat& white = m_impl->images[0];
+    const cv::Mat& black = m_impl->images[1];
+
+    for (int y = 0; y < camHeight; ++y) {
+        for (int x = 0; x < camWidth; ++x) {
+            // Shadow mask: pixels this projector never lit (low white-black
+            // contrast) must not decode — otherwise ambient light and other
+            // projectors produce garbage correspondences.
+            int contrast = static_cast<int>(white.at<uint8_t>(y, x)) - static_cast<int>(black.at<uint8_t>(y, x));
+            if (contrast < minContrast) {
+                continue;
+            }
+
+            // Each bit: pattern vs inverse per pixel — no global threshold, so
+            // per-pixel albedo and illumination cancel out.
+            int projXGray = 0;
+            for (int i = 0; i < m_impl->colBits; ++i) {
+                const cv::Mat& pattern = m_impl->images[2 + 2 * i];
+                const cv::Mat& inverse = m_impl->images[3 + 2 * i];
+                if (pattern.at<uint8_t>(y, x) > inverse.at<uint8_t>(y, x)) {
+                    projXGray |= (1 << (m_impl->colBits - 1 - i));
+                }
+            }
+
+            int projYGray = 0;
+            for (int i = 0; i < m_impl->rowBits; ++i) {
+                const cv::Mat& pattern = m_impl->images[2 + 2 * (m_impl->colBits + i)];
+                const cv::Mat& inverse = m_impl->images[3 + 2 * (m_impl->colBits + i)];
+                if (pattern.at<uint8_t>(y, x) > inverse.at<uint8_t>(y, x)) {
+                    projYGray |= (1 << (m_impl->rowBits - 1 - i));
+                }
+            }
+
+            int projX = grayToBinary(projXGray);
+            int projY = grayToBinary(projYGray);
+
+            if (projX < m_impl->width && projY < m_impl->height) {
+                matches.push_back({{static_cast<float>(x), static_cast<float>(y)},
                                    {static_cast<float>(projX), static_cast<float>(projY)}});
             }
         }

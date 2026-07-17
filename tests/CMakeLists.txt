@@ -24,6 +24,7 @@ add_executable(pmsdk_tests
     Geometry/DynamicMeshTests.cpp
     Geometry/BezierPatchTests.cpp
     Geometry/GridWarpTests.cpp
+    Geometry/PerspectiveWarpTests.cpp
     Geometry/MeshOptimizerTests.cpp
     Warp/ProjectorTests.cpp
     Warp/DeformationFieldTests.cpp
@@ -38,6 +39,7 @@ add_executable(pmsdk_tests
     Calibration/IntrinsicsTests.cpp
     Calibration/ExtrinsicsTests.cpp
     Calibration/GrayCodeTests.cpp
+    Calibration/GrayCodeDecoderTests.cpp
     C_API/GeometryAPITests.cpp
     C_API/WarpAPITests.cpp
     C_API/CalibrationAPITests.cpp

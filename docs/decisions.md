@@ -96,6 +96,82 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
+## D-024 2026-07-16 — Projector-pose calibration solves against Unity's camera, not OpenCV
+
+Object mapping needs the virtual projector camera's pose+FOV to match the real projector
+so the virtual twin overlays the physical object. Rather than expose OpenCV
+`solvePnP`/`calibrateCamera` extrinsics through the C API (which the C API does not
+currently return) and then convert OpenCV↔Unity coordinate conventions, the solve is done
+directly in managed code as reprojection minimization over Unity's own
+`Camera.WorldToViewportPoint` (`PMSDKPoseSolver`, Levenberg–Marquardt over
+[posXYZ, eulerXYZ, fov] with a numeric Jacobian). This removes the coordinate-conversion
+class of bugs, needs no native rebuild, and is fully sim-verifiable. Verified closed-loop:
+noise-free recovery is exact (0 px, exact pose/FOV); with 0.5% marking noise, ~3 px
+reprojection / 0.03 m / 0.3° FOV. Trade-off: needs a rough initial pose (operator aims the
+projector cam near the object first) and is iterative, not closed-form — fine for a
+one-time on-site calibration. `PMSDKProjectorPoseCalibrator` drives the workflow (place
+anchors on the twin → mark each in the output → solve → apply); fine registration then uses
+corner-pin/grid warp as usual.
+
+## D-023 2026-07-16 — Edge-blend ramp exponent is 1/projectorGamma (fixes the dark seam)
+
+The projector shader blends in linear framebuffer space (output = content × alpha) and
+two projectors' emitted light adds after each applies its ~2.2 display gamma. For the
+overlap to sum to full brightness the ramps must satisfy alpha_A^γ + alpha_B^γ = 1, i.e.
+alpha(x) = x^(1/γ). The native `EdgeBlend` Power curve computes `pow(x, gammaArg)`, so the
+Unity `PMSDKEdgeBlend` now exposes **projector gamma** (default 2.2) and passes
+`1/gamma` as the ramp exponent. Previously the default fed 2.2 straight in, giving
+`pow(x,2.2)` — a visibly DARK seam (0.5^2.2×2 ≈ 0.43 at the centre). This was the cause of
+the reported black strip. Black level is a uniform shader floor (`_BlackLevel`); true
+per-region black-level compensation is future work. Per-channel gamma + gain/offset live
+in `PMSDKColorCorrection`; output rotation/mirror in `PMSDKOutputTransform`; all fold into
+the one `PMSDK/UnlitWarp` fragment pipeline.
+
+## D-022 2026-07-16 — Corner pin is projective; grid warp is bilinear; they are distinct deformation modes
+
+The 4-corner pin now uses a true homography (`DeformationType::Perspective`,
+`Geometry::PerspectiveWarp`, Heckbert unit-square→quad map) instead of pushing 4 points
+into a 2×2 bilinear `GridWarp`. Bilinear interpolation of 4 corners shears the texture
+along the quad diagonal on any non-parallelogram (keystoned) quad — visibly wrong and not
+what a projector/media-server corner pin does. Verified by unit test: perspective and
+bilinear agree at the 4 corners but the mesh interior diverges (~0.17 at the midpoint of a
+trapezoid).
+
+The N×M `GridWarp` (bilinear per cell) remains the correct model for curved/irregular
+surfaces and is now exposed at runtime (`PMSDKGridWarp` + calibration grid mode). The two
+are mutually exclusive per warp node (a node has one deformation type): when a
+`PMSDKGridWarp` is enabled it owns the node and `PMSDKCornerPin` yields. C API adds
+`pmsdk_warpnode_get_perspectivewarp` + `pmsdk_perspectivewarp_set_corners` (deformation
+type 3). See docs/unity-architecture.md §Warp modes.
+
+## D-021 2026-07-16 — Camera auto-align uses a homography, not the native stereo triangulation
+
+On-site auto-align (calibration P3) recovers a camera→projector planar homography from
+Gray-code correspondence and maps target corners into the corner-pin. It deliberately
+does NOT use `pmsdk_decoder_decode_and_triangulate`: that produces a metric 3D point
+cloud but requires a fully calibrated camera AND projector (intrinsics + extrinsics),
+which an on-site technician cannot supply quickly. A homography needs zero calibration,
+matches the model the corner-pin already implements, and is sufficient for flat/quasi-flat
+mapping surfaces. Gray decode is reimplemented in managed C# (bit-compatible with
+src/Calibration/GrayCode.cpp) so the correspondence pipeline is deterministic and testable
+without hardware. The native triangulation path remains for future true-3D calibration
+onto complex geometry. Capture is abstracted (`IPMSDKCalibrationCamera`): a simulated
+Unity-camera source ships now (works for virtual/LED-volume rigs and testing); the
+physical webcam source needs a per-frame grayscale readback added to the C API
+(`pmsdk_decoder_get_frame`). See docs/calibration-ux-design.md §9.
+
+## D-020 2026-07-15 — Unity renders warped meshes in normalized raster space with orthographic projector cameras
+
+The native warp engine's output contract is `position = gridwarp(uv)`: processed meshes
+always land on a normalized [0,1]² XY quad, regardless of the input mesh's 3D pose. The
+original Unity demo rig (3D planes + perspective projector cameras) therefore rendered the
+warped quad edge-on — projector outputs were pure black in play mode. The Unity integration
+now standardizes on: identity-rotation warp surfaces scaled to raster aspect (16:9, 1, 1),
+orthographic projector cameras framing the unit quad, split-slice RT materials with an
+overlap band, and the `PMSDK/UnlitWarp` shader (native edge blend writes vertex ALPHA only;
+stock Unlit/Texture ignores it). Multi-display output requires `PMSDKDisplayActivator`
+(Display.Activate is mandatory in standalone builds). See docs/unity-architecture.md §2–4.
+
 ## D-019 2026-07-13 — Direct SDK Camera Capture for Structured Light
 
 Instead of requiring the host engine (Unity/Unreal) to capture WebCam frames, allocate large `Texture2D` memory on the main thread, and serialize/pass them to the SDK, we enabled the `GrayCodeDecoder` to directly bind to the physical camera hardware using OpenCV's `cv::VideoCapture`. This keeps memory and frame extraction strictly off the host's main thread, drastically improving performance.

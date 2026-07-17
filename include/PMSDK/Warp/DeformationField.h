@@ -4,6 +4,7 @@
 #include "PMSDK/Geometry/Mesh.h"
 #include "PMSDK/Geometry/BezierPatch.h"
 #include "PMSDK/Geometry/GridWarp.h"
+#include "PMSDK/Geometry/PerspectiveWarp.h"
 #include <memory>
 #include <variant>
 
@@ -13,9 +14,10 @@ namespace pmsdk::Warp {
  * @brief Specifies the type of deformation applied.
  */
 enum class DeformationType {
-    None,   /**< No deformation applied. */
-    Bezier, /**< Cubic Bezier Patch deformation. */
-    Grid    /**< Bilinear Grid Warp deformation. */
+    None,        /**< No deformation applied. */
+    Bezier,      /**< Cubic Bezier Patch deformation. */
+    Grid,        /**< Bilinear Grid Warp deformation. */
+    Perspective  /**< Projective (homography) corner-pin deformation. */
 };
 
 /**
@@ -52,6 +54,12 @@ public:
      * @return A pointer to the GridWarp (valid if type is Grid).
      */
     PMSDK_API Geometry::GridWarp* GetGridWarp();
+
+    /**
+     * @brief Gets the underlying PerspectiveWarp instance.
+     * @return A pointer to the PerspectiveWarp (valid if type is Perspective).
+     */
+    PMSDK_API Geometry::PerspectiveWarp* GetPerspectiveWarp();
 
     /**
      * @brief Applies the active deformation to a base mesh.

@@ -44,6 +44,9 @@ typedef enum pmsdk_curve_type_t {
 
 /** @brief Opaque handle to a DeformationField object. */
 typedef struct pmsdk_deformationfield_t pmsdk_deformationfield_t;
+typedef struct pmsdk_gridwarp_t pmsdk_gridwarp_t;
+typedef struct pmsdk_bezierpatch_t pmsdk_bezierpatch_t;
+typedef struct pmsdk_perspectivewarp_t pmsdk_perspectivewarp_t;
 
 /** @brief 2D vector for UV coordinates. */
 typedef struct {

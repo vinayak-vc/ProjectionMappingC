@@ -14,12 +14,14 @@ correction, output rotation/mirror, dense auto-warp) + mark-target UI.
 **Unit/ math-verified**: grid, auto-blend, dense-warp, blend-gamma, Gray-code decode.
 **NOT verified**: real projector+camera loop (no hardware), mark-target/webcam runtime,
 per-frame warp-readback perf at scale.
-**Current Task**: Milestone 19 (Plugin SDK) open. Done since last note: z-fix DLL deployed +
-committed to the nested repo (`02176ef`); sim closed-loop auto-align verified with an
-off-axis perspective observer (312 pts, 0.39 px reproj); warp-readback profiled and the
-per-frame GC allocation removed (`PMSDKMeshWarp` caches its vertex/color arrays). Remaining:
-(a) real-hardware calibration smoke test (only unverified link); (b) optional GPU warp path
-for extreme scale; (c) low-priority gaps (OSC/presets/NDI/test patterns, per-region black).
+**Current Task**: Milestone 19 (Plugin SDK = UE5 bindings) is the main open track (user:
+"UE will do later"). Latest batch (2026-07-17): fixed the long-red triangulation test
+(real SDK bug — CV_32F read as double), Unity Test Framework suite 21/21 green, named
+presets + A/B (live-verified), OSC remote (loopback-verified 5/5), ObjectMappingDemo
+second projector (two-angle coverage). Native suite 133/133. Pro-feature gap list 10/12
+(remaining Low: NDI/Spout, extra test patterns). Remaining elsewhere: real-hardware
+calibration smoke test (only unverified link), GPU warp path for extreme scale,
+per-region black-level.
 **Verified**: native robust-decode + perspective are unit-tested (green); Unity C#
 compiles clean; sim auto-align verified. Not yet: play-mode runtime for the DLL-dependent
 features, and any physical camera loop.

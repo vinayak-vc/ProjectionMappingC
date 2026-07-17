@@ -218,6 +218,17 @@ namespace vxpmsdk.Components
             if (Input.GetKeyDown(KeyCode.M)) { EnterTargetMarkMode(); return; }
             if (Input.GetKeyDown(KeyCode.A)) { StartAutoAlign(all: shift); return; }
 
+            // Preset slots 1..4: Ctrl+n load, Ctrl+Shift+n save. V = A/B compare.
+            for (int slot = 0; slot < 4; slot++)
+            {
+                if (ctrl && Input.GetKeyDown(KeyCode.Alpha1 + slot))
+                {
+                    if (shift) SavePreset("slot" + (slot + 1));
+                    else LoadPreset("slot" + (slot + 1));
+                }
+            }
+            if (Input.GetKeyDown(KeyCode.V)) ToggleAB();
+
             if (ctrl && Input.GetKeyDown(KeyCode.S)) { SaveNow(); }
             else if (ctrl && Input.GetKeyDown(KeyCode.Z)) { UndoLast(); }
             else if (ctrl && Input.GetKeyDown(KeyCode.R)) { if (GridEditMode) ResetGrid(); else ResetSelectedSurface(); }
@@ -299,6 +310,12 @@ namespace vxpmsdk.Components
         {
             if (surfaces.Count == 0) return;
             SelectedSurfaceIndex = Mathf.Clamp(index, 0, surfaces.Count - 1);
+        }
+
+        /// <summary>Select a corner directly (0=TL 1=TR 2=BR 3=BL) — used by remote control.</summary>
+        public void SetSelectedCorner(int corner)
+        {
+            SelectedCorner = Mathf.Clamp(corner, 0, 3);
         }
 
         /// <summary>Tab: cycles the active element — grid point, blend edge, or corner.</summary>
@@ -621,6 +638,16 @@ namespace vxpmsdk.Components
 
         public void SaveNow()
         {
+            if (PMSDKCalibrationIO.Save(FilePath, BuildFile()))
+            {
+                Dirty = false;
+                Debug.Log($"[PMSDK] Calibration saved to '{FilePath}'.");
+            }
+        }
+
+        /// <summary>Snapshot the live calibration state of every surface into a file payload.</summary>
+        private PMSDKCalibrationFile BuildFile()
+        {
             var file = new PMSDKCalibrationFile { surfaces = new PMSDKSurfaceCalibration[surfaces.Count] };
             for (int i = 0; i < surfaces.Count; i++)
             {
@@ -657,12 +684,60 @@ namespace vxpmsdk.Components
                     file.surfaces[i].targetCorners = (Vector2[])s.TargetCorners.Clone();
                 }
             }
-            if (PMSDKCalibrationIO.Save(FilePath, file))
-            {
-                Dirty = false;
-                Debug.Log($"[PMSDK] Calibration saved to '{FilePath}'.");
-            }
+            return file;
         }
+
+        // ---------------- Named presets + A/B ---------------------------------------
+
+        /// <summary>Save the live calibration under a named preset (cue).</summary>
+        public bool SavePreset(string name)
+        {
+            string path = PMSDKCalibrationIO.PresetPath(FilePath, name);
+            bool ok = PMSDKCalibrationIO.Save(path, BuildFile());
+            AutoAlignStatus = ok ? $"Preset '{PMSDKCalibrationIO.SanitizePresetName(name)}' saved." : $"Preset save FAILED ({name}).";
+            Debug.Log("[PMSDK] " + AutoAlignStatus);
+            return ok;
+        }
+
+        /// <summary>
+        /// Load a named preset. The pre-load live state is kept as the A/B snapshot so
+        /// ToggleAB can flip back for instant comparison.
+        /// </summary>
+        public bool LoadPreset(string name)
+        {
+            string path = PMSDKCalibrationIO.PresetPath(FilePath, name);
+            var file = PMSDKCalibrationIO.Load(path);
+            if (file == null)
+            {
+                AutoAlignStatus = $"Preset '{PMSDKCalibrationIO.SanitizePresetName(name)}' not found.";
+                return false;
+            }
+            abSnapshot = BuildFile();
+            ApplyFile(file);
+            Dirty = true;
+            AutoAlignStatus = $"Preset '{PMSDKCalibrationIO.SanitizePresetName(name)}' loaded. V = compare with previous.";
+            Debug.Log("[PMSDK] " + AutoAlignStatus);
+            return true;
+        }
+
+        /// <summary>Swap the live state with the A/B snapshot (instant before/after compare).</summary>
+        public void ToggleAB()
+        {
+            if (abSnapshot == null)
+            {
+                AutoAlignStatus = "No A/B snapshot yet — load a preset first (Ctrl+1..4).";
+                return;
+            }
+            var current = BuildFile();
+            ApplyFile(abSnapshot);
+            abSnapshot = current;
+            Dirty = true;
+            AutoAlignStatus = "A/B swapped (V to flip back).";
+        }
+
+        public string[] ListPresets() => PMSDKCalibrationIO.ListPresets(FilePath);
+
+        private PMSDKCalibrationFile abSnapshot;
 
         // ---------------- Mouse drag (P2) ------------------------------------------
 

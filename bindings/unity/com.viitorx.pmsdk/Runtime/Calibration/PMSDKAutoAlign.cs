@@ -37,6 +37,10 @@ namespace vxpmsdk.Components
             // Decoded camera->projector correspondence, retained for auto-blend
             // (overlap detection across projectors). Null if the sweep failed.
             public PMSDKGrayCodeDecode.Correspondence[] Correspondence;
+            // All-white camera capture (row-major luminance 0..255, top-left origin,
+            // camW*camH) — the shadow-mask reference, reused as a per-projector wall
+            // luminance map for camera-measured luminance compensation.
+            public byte[] White;
             public int CamW, CamH, ProjW, ProjH;
         }
 
@@ -156,6 +160,7 @@ namespace vxpmsdk.Components
             // --- decode + fit camera->projector homography ---
             var corr = PMSDKGrayCodeDecode.Decode(captures, inverseCaptures, white, black, camW, camH, projW, projH, MinContrast);
             result.Correspondence = corr;
+            result.White = white;
             result.CamW = camW; result.CamH = camH; result.ProjW = projW; result.ProjH = projH;
 
             var camPts = new List<Vector2>();

@@ -46,8 +46,16 @@ Driven by the Unity host work and a gap audit against Resolume / MadMapper / VIO
 | Output rotation / mirroring (portrait/ceiling/rear) | ✅ done (compiled; runtime pending DLL) |
 | Dense auto-warp (fit N×M grid from camera, curved surfaces) | ✅ done (compiled; numeric test pending MCP reconnect) |
 
-Remaining pro-feature gaps (low): OSC/HTTP remote, named presets/cues, NDI/Spout, extra
-test patterns; plus true per-region black-level compensation. See docs/tasks.md.
+All 12 pro-feature gaps implemented (see docs/tasks.md for verification caveats).
+
+**Camera-measured luminance compensation (implemented 2026-07-21, D-027)** — the sweep's
+all-white captures become per-projector wall luminance maps; `PMSDKLuminanceCompensation`
+derives a per-projector gain map (global robust-min target, dim-only) that `PMSDK/UnlitWarp`
+multiplies in raster space via `_GainTex`, so the blended wall reads as one even light
+source (fixes the residual seam band gamma tuning cannot). Opt-in via
+`AutoLuminanceAfterAlignAll`; persisted quantized in the calibration JSON. Related
+follow-ups: per-region black-level (doubled projector-black on dark content is still open),
+D-025 upstreaming (RANSAC/settle/exposure), N-projector wall-canvas align.
 
 Pro-feature gap list: **8 of 12 done** (all 3 High + auto-blend, blend-gamma, color,
 rotation, dense-warp).

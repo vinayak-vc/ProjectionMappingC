@@ -74,6 +74,7 @@ Exit (Esc or F2): auto-save + return to show
 | `G` | Grid-warp submode (N×M): `Tab` cycles control point, arrows/drag move it, `[`/`]` columns, `-`/`=` rows, `R` reset. For curved/irregular surfaces. |
 | `M` | Mark-target submode: live camera preview on the operator console with 4 draggable corners. Place them on the physical screen edges, then `A` aligns the projection to that rectangle. `Tab` select, arrows/drag move, `R` reset, `M`/`Esc` cancel. |
 | `R` / `Ctrl+R` | Reset selected corner / whole surface to identity |
+| `C` | Canvas reference: end-to-end level plus + grid drawn in SHARED wall-canvas space (pre-warped through every pin) — lands straight/seam-continuous on the wall even with tilted projectors; a kink at a seam = pin residual to touch up. Level relative to the canvas; check once against a laser level for true gravity-level. |
 | `Ctrl+1..4` / `Ctrl+Shift+1..4` | Load / save preset slot (named cues; files `pmsdk_preset_<name>.json`) |
 | `V` | A/B compare — swap live state with the pre-preset-load snapshot |
 | `Ctrl+S` | Save now (auto-save also fires on exit) |

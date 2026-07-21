@@ -91,6 +91,32 @@ namespace vxpmsdk.Tests
         }
 
         [Test]
+        public void CanvasReference_PlusSpansFullWidthAndHeight()
+        {
+            int w = 512, h = 128;
+            var px = new Color[w * h];
+            var line = Color.white;
+            var plus = new Color(1f, 0.9f, 0.1f, 1f);
+            var bg = Color.black;
+            PMSDKCanvasReferencePattern.Fill(px, w, h, plus: true, hLines: 1, vLines: 3,
+                thickness: 3, line: line, plusColor: plus, bg: bg);
+
+            // Centre horizontal line spans the ENTIRE width (end-to-end level reference).
+            int cy = h / 2;
+            for (int x = 0; x < w; x += 16)
+                Assert.AreEqual(plus, px[cy * w + x], $"plus row broken at x={x}");
+            // Centre vertical line spans the entire height.
+            int cx = w / 2;
+            for (int y = 0; y < h; y += 16)
+                Assert.AreEqual(plus, px[y * w + cx], $"plus column broken at y={y}");
+            // Reference h-line at 1/2 (hLines=1) coincides with centre; v-line at w/4.
+            int vx = w * 1 / 4;
+            Assert.AreEqual(line, px[8 * w + vx]);
+            // Background where nothing is drawn.
+            Assert.AreEqual(bg, px[8 * w + 8]);
+        }
+
+        [Test]
         public void GrayRamp_MonotonicTop_SteppedBottom()
         {
             var p = Gen(PMSDKTestPatternType.GrayRamp);

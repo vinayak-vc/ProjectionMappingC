@@ -277,6 +277,49 @@ displays, `ProBuilderMappingDemo` content.
   `pmsdk_decoder_set_property` (exposure lock); shared-canvas multi-projector align in
   the package instead of the game repo.
 
+## Canvas-space reference pattern (2026-07-17) ✅
+
+- [x] `PMSDKCanvasReferencePattern` — end-to-end plus + level/vertical reference lines rasterized in SHARED canvas space, fed through `PMSDKExternalContent` so every projector shows its warped slice: lines land straight and seam-continuous on the physical wall even with tilted projectors (addresses the on-wall "horizontal line isn't horizontal" problem from the hardware run). `C` toggles in calibration mode. Deterministic rasterizer test (28/28 suite). Verified in play: skewed pin → pattern pre-warps in raster (i.e. straight on wall); centre plus falls in the overlap of both slices.
+- Note: level is relative to the canvas; if the auto-align camera was tilted, verify once against a laser level / chalk line.
+
+## Milestone — camera-measured luminance compensation (2026-07-21) ✅ IMPLEMENTED
+
+Built (Unity binding; no native change — apply is a shader multiply). See D-027.
+- [x] Retain the sweep's all-white capture on `PMSDKAutoAlign.Result.White`.
+- [x] `PMSDKLuminanceCompensation.Compute` — pure core: raster luminance from correspondence,
+      hole-fill + box-blur, global robust-min target, `gain = clamp(target/measured, gainMin, 1)`.
+- [x] `PMSDKLuminanceGain` component drives `_GainTex` / `_UseGainTex`.
+- [x] `PMSDK/UnlitWarp`: gain multiply after the blend ramp, sampled by raster UV1.
+- [x] `PMSDKMeshWarp` writes UV1 (warped raster position) only while a gain map is active.
+- [x] Persist per-surface, quantized + base64 (`PMSDKGainCodec`), in the calibration JSON.
+- [x] Manager: `AutoLuminanceAfterAlignAll` (opt-in) runs it after Shift+A; save/restore.
+- [x] EditMode tests: flatten-to-target, cross-projector equalize, floor clamp, hole-fill, codec.
+
+Original plan (retained for context):
+
+Why: projectors are brightest at centre and dimmer at the edges (vignetting); a blend
+overlap is built from both projectors' dimmest edges, so even a perfect alpha ramp leaves
+a visible band (observed on the real wall 2026-07-17). Hand-tuning gamma cannot fix a
+spatial brightness difference — it must be measured.
+
+Plan:
+1. During the F4/auto-align sweep, keep each projector's all-WHITE capture (already
+   taken for the shadow mask — measurement data is free) as a per-projector wall
+   luminance map, warped into that projector's raster space via the fitted homography.
+2. Normalize: target luminance = min envelope across the canvas (compensation can only
+   dim, never add light); derive a per-projector gain map = target / measured.
+3. Apply as a small gain texture sampled in `PMSDK/UnlitWarp` (multiply after the blend
+   ramp, before colour correct) — reuse the vertex-colour or a dedicated `_GainTex`.
+4. Smooth/lowpass the map (webcam noise), clamp gain range (e.g. 0.6..1.0), persist it
+   in the calibration JSON per surface.
+5. Scope: fixes bright-content banding/unevenness. Explicitly does NOT fix the doubled
+   projector-black glow on dark content — that is the separate per-region black-level
+   item below.
+
+Pairs naturally with the same branch: RANSAC upstreaming into `PMSDKAutoAlign`,
+time-based settle, C-API exposure lock (D-025 upstream list), and N-projector
+generalization of the wall-canvas align.
+
 ## Blended stereo (SBS 3D) + content-UI canvas (2026-07-17) — nested `SBS` branch
 
 Built and editor-verified; on-wall glasses test pending. DLP-Link cross-projector sync
@@ -301,6 +344,7 @@ confirmed stable in the overlap beforehand (the go/no-go gate). Architecture: D-
 - [ ] Upstream candidate: move the stereo composer/rig into the package (currently game-side).
 
 ## Next Items / Backlog
+- [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)
 - [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
 - [ ] True per-region black-level compensation (current `_BlackLevel` is a uniform floor)

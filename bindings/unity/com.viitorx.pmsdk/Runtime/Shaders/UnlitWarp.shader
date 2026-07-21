@@ -7,7 +7,9 @@
 //                        stage bakes into COLOR (PMSDKMeshWarp/pmsdk_blendconfig_apply_to_mesh)
 //   4. luminance gain  — multiply by a camera-measured per-projector vignette gain map
 //                        sampled in raster space (UV1)              (PMSDKLuminanceGain)
-//   5. black level     — uniform black-floor lift                 (PMSDKEdgeBlend, #6)
+//   5. black level     — uniform floor lift + per-region uplift map that raises
+//                        single-projector black to the doubled overlap black
+//                        (PMSDKEdgeBlend #6 / PMSDKBlackLevelLift)
 //   6. color correct   — per-channel gain/offset + output gamma   (PMSDKColorCorrection, #6/#7)
 //
 // Cull Off: the warped mesh lives in normalized projector-raster space and may be
@@ -26,6 +28,9 @@ Shader "PMSDK/UnlitWarp"
         _UseGainTex ("Use Gain Map", Float) = 0
         // Black level (#6)
         _BlackLevel ("Black Level", Range(0,1)) = 0
+        // Per-region black-level uplift (camera-measured, raster-space)
+        _BlackLiftTex ("Black Lift Map (R)", 2D) = "black" {}
+        _UseBlackLift ("Use Black Lift Map", Float) = 0
         // Color correction (#6 per-channel gamma, #7)
         _ColorGain ("Color Gain", Color) = (1,1,1,1)
         _ColorOffset ("Color Offset", Color) = (0,0,0,0)
@@ -49,6 +54,8 @@ Shader "PMSDK/UnlitWarp"
             float4 _MainTex_ST;
             sampler2D _GainTex;
             float _UseGainTex;
+            sampler2D _BlackLiftTex;
+            float _UseBlackLift;
             float _UVRotation;
             float _MirrorX;
             float _MirrorY;
@@ -117,6 +124,16 @@ Shader "PMSDK/UnlitWarp"
                 // Black level: lift the floor uniformly so single-projector regions
                 // can be raised toward the doubled black of overlap regions.
                 c.rgb = c.rgb * (1.0 - _BlackLevel) + _BlackLevel;
+
+                // Per-region black-level uplift: a camera-measured map raises each
+                // projector's non-overlap black up to the overlap's doubled black, so a
+                // blended wall reads as one uniform floor instead of a bright centre band.
+                // Sampled in raster space (UV1), same as the gain map.
+                if (_UseBlackLift > 0.5)
+                {
+                    float bl = tex2D(_BlackLiftTex, i.rasterUV).r;
+                    c.rgb = c.rgb * (1.0 - bl) + bl;
+                }
 
                 // Per-projector color match: gain/offset then per-channel output gamma.
                 c.rgb = saturate(c.rgb * _ColorGain.rgb + _ColorOffset.rgb);

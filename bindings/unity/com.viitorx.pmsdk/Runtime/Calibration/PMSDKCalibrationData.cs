@@ -39,6 +39,13 @@ namespace vxpmsdk.Components
         public int lumGainWidth;
         public int lumGainHeight;
         public string lumGainData;
+
+        // Camera-measured per-region black-level uplift map (same encoding as the gain
+        // map). Row-major, y-up, each cell a signal lift in [0,1].
+        public bool blackLiftEnabled;
+        public int blackLiftWidth;
+        public int blackLiftHeight;
+        public string blackLiftData;
     }
 
     /// <summary>

@@ -34,6 +34,7 @@ namespace vxpmsdk.Components
             public PMSDKTestPattern TestPattern;
             public PMSDKGridWarp Grid;
             public PMSDKLuminanceGain LuminanceGain;
+            public PMSDKBlackLevelLift BlackLift;
             public Camera ProjectorCamera;
             public PMSDKCalibrationOverlay Overlay;
             public RenderTexture Thumbnail;
@@ -76,6 +77,12 @@ namespace vxpmsdk.Components
         public int LuminanceMapResolution = 96;
         [Tooltip("Lower clamp on luminance gain: how far a bright region may be dimmed (0.5 = at most halved). Guards against over-dimming from a noisy-dark measurement.")]
         [Range(0f, 1f)] public float LuminanceGainMin = 0.5f;
+        [Tooltip("After aligning ALL projectors, also compute a per-region black-level uplift map that raises single-projector black to match the overlap's doubled black (removes the bright centre band on dark content). Off by default — opt in; each surface's PMSDKBlackLevelLift can be disabled to revert.")]
+        public bool AutoBlackLevelAfterAlignAll = false;
+        [Tooltip("Resolution of each per-projector black-level uplift map (square).")]
+        public int BlackLevelMapResolution = 96;
+        [Tooltip("Upper clamp on the black-level signal lift (guards against a dark/odd measurement over-lifting the floor).")]
+        [Range(0f, 1f)] public float MaxBlackLift = 0.15f;
         [Tooltip("If >= 2, auto-align fits an NxN grid warp from the camera (dense auto-warp) instead of only the 4 corners — for curved/irregular surfaces. 0 = corner pin only.")]
         public int DenseAutoWarpN = 0;
         [Tooltip("Observer camera for simulated auto-align. If null, a scene object named 'PMSDK Calibration Observer' with a Camera is used.")]
@@ -732,6 +739,15 @@ namespace vxpmsdk.Components
                     entry.lumGainHeight = s.LuminanceGain.Height;
                     entry.lumGainData = PMSDKGainCodec.Encode(s.LuminanceGain.GetGainMap());
                 }
+
+                if (s.BlackLift != null && s.BlackLift.HasMap)
+                {
+                    var entry = file.surfaces[i];
+                    entry.blackLiftEnabled = s.BlackLift.enabled;
+                    entry.blackLiftWidth = s.BlackLift.Width;
+                    entry.blackLiftHeight = s.BlackLift.Height;
+                    entry.blackLiftData = PMSDKGainCodec.Encode(s.BlackLift.GetLiftMap());
+                }
             }
             return file;
         }
@@ -1049,6 +1065,7 @@ namespace vxpmsdk.Components
                     TestPattern = warp.GetComponent<PMSDKTestPattern>(),
                     Grid = warp.GetComponent<PMSDKGridWarp>(),
                     LuminanceGain = warp.GetComponent<PMSDKLuminanceGain>(),
+                    BlackLift = warp.GetComponent<PMSDKBlackLevelLift>(),
                     ProjectorCamera = warp.Projector != null ? warp.Projector.GetComponent<Camera>() : null
                 };
                 if (s.CornerPin == null)
@@ -1167,6 +1184,10 @@ namespace vxpmsdk.Components
             {
                 blendMsg += ApplyAutoLuminance(toAlign, results);
             }
+            if (all && AutoBlackLevelAfterAlignAll && ok >= 2)
+            {
+                blendMsg += ApplyAutoBlackLevel(toAlign, results);
+            }
 
             Dirty = true;
             AutoAlignStatus = $"Auto-align done: {ok}/{toAlign.Count} surfaces.{blendMsg} Fine-tune by hand, Ctrl+S to save.";
@@ -1263,6 +1284,61 @@ namespace vxpmsdk.Components
                 if (s.LuminanceGain == null) s.LuminanceGain = s.Warp.gameObject.AddComponent<PMSDKLuminanceGain>();
             }
             return s.LuminanceGain;
+        }
+
+        /// <summary>
+        /// Compute per-projector black-level uplift maps from the all-black + all-white
+        /// captures the align sweep already took, and install them on each surface's
+        /// PMSDKBlackLevelLift. Same single-camera requirement as auto-blend. Returns a
+        /// status fragment.
+        /// </summary>
+        private string ApplyAutoBlackLevel(List<Surface> aligned, List<PMSDKAutoAlign.Result> results)
+        {
+            var white = new List<byte[]>();
+            var black = new List<byte[]>();
+            var corr = new List<PMSDKGrayCodeDecode.Correspondence[]>();
+            var blSurfaces = new List<Surface>();
+            int camW = -1, camH = -1, projW = 0, projH = 0;
+            for (int i = 0; i < results.Count; i++)
+            {
+                var r = results[i];
+                if (!r.Success || r.Correspondence == null || r.White == null || r.Black == null) continue;
+                if (camW < 0) { camW = r.CamW; camH = r.CamH; projW = r.ProjW; projH = r.ProjH; }
+                if (r.CamW != camW || r.CamH != camH) continue;
+                white.Add(r.White);
+                black.Add(r.Black);
+                corr.Add(r.Correspondence);
+                blSurfaces.Add(aligned[i]);
+            }
+            if (corr.Count < 2) return " (black-level comp skipped: need 2+ projectors in one camera view).";
+
+            int res = Mathf.Clamp(BlackLevelMapResolution, 8, 512);
+            var maps = PMSDKBlackLevelCompensation.Compute(
+                white, black, corr, camW, camH, projW, projH, res, res, Mathf.Clamp01(MaxBlackLift));
+
+            int applied = 0;
+            for (int i = 0; i < blSurfaces.Count; i++)
+            {
+                if (!maps[i].Valid) continue;
+                var bl = EnsureBlackLevelLift(blSurfaces[i]);
+                if (bl == null) continue;
+                bl.SetLiftMap(maps[i].Lift, maps[i].Width, maps[i].Height);
+                bl.enabled = true;
+                applied++;
+            }
+            return $" Black-level comp set on {applied} projectors.";
+        }
+
+        /// <summary>Get or add the surface's PMSDKBlackLevelLift component.</summary>
+        private static PMSDKBlackLevelLift EnsureBlackLevelLift(Surface s)
+        {
+            if (s == null || s.Warp == null) return null;
+            if (s.BlackLift == null)
+            {
+                s.BlackLift = s.Warp.GetComponent<PMSDKBlackLevelLift>();
+                if (s.BlackLift == null) s.BlackLift = s.Warp.gameObject.AddComponent<PMSDKBlackLevelLift>();
+            }
+            return s.BlackLift;
         }
 
         /// <summary>
@@ -1456,6 +1532,23 @@ namespace vxpmsdk.Components
                 {
                     match.LuminanceGain.ClearGainMap();
                     match.LuminanceGain.enabled = false;
+                }
+
+                // Restore a saved per-region black-level uplift map.
+                var lift = PMSDKGainCodec.Decode(saved.blackLiftData, saved.blackLiftWidth * saved.blackLiftHeight);
+                if (lift != null && saved.blackLiftWidth > 0 && saved.blackLiftHeight > 0)
+                {
+                    var bl = EnsureBlackLevelLift(match);
+                    if (bl != null)
+                    {
+                        bl.SetLiftMap(lift, saved.blackLiftWidth, saved.blackLiftHeight);
+                        bl.enabled = saved.blackLiftEnabled;
+                    }
+                }
+                else if (match.BlackLift != null)
+                {
+                    match.BlackLift.ClearLiftMap();
+                    match.BlackLift.enabled = false;
                 }
             }
         }

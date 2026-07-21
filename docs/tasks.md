@@ -282,6 +282,24 @@ displays, `ProBuilderMappingDemo` content.
 - [x] `PMSDKCanvasReferencePattern` — end-to-end plus + level/vertical reference lines rasterized in SHARED canvas space, fed through `PMSDKExternalContent` so every projector shows its warped slice: lines land straight and seam-continuous on the physical wall even with tilted projectors (addresses the on-wall "horizontal line isn't horizontal" problem from the hardware run). `C` toggles in calibration mode. Deterministic rasterizer test (28/28 suite). Verified in play: skewed pin → pattern pre-warps in raster (i.e. straight on wall); centre plus falls in the overlap of both slices.
 - Note: level is relative to the canvas; if the auto-align camera was tilted, verify once against a laser level / chalk line.
 
+## Milestone — per-region black-level compensation (2026-07-21) ✅ IMPLEMENTED
+
+Built (Unity binding; additive twin of the luminance milestone below). See D-028.
+Fixes the bright, slightly-yellow band over the projector overlap on DARK content
+(doubled projector-black; a multiply cannot touch an additive floor).
+- [x] Retain the sweep's all-black capture on `PMSDKAutoAlign.Result.Black`.
+- [x] `PMSDKBlackLevelCompensation.Compute` — pure core: camera-space litCount + summed
+      floor, high-percentile uplift target, per-projector `deficit/litCount` → signal lift
+      via each projector's black→white span, scatter to raster, hole-fill + box-blur + clamp.
+- [x] `PMSDKBlackLevelLift` component drives `_BlackLiftTex` / `_UseBlackLift`.
+- [x] `PMSDK/UnlitWarp`: uplift `c = c·(1−lift)+lift` at the black-level stage, raster UV1.
+- [x] `PMSDKMeshWarp` writes UV1 when a gain OR a black-lift map is active.
+- [x] Persist per-surface, quantized + base64 (`PMSDKGainCodec`), in the calibration JSON.
+- [x] Manager: `AutoBlackLevelAfterAlignAll` (opt-in) runs it after Shift+A; save/restore.
+- [x] EditMode tests: single-region lift-to-overlap, no-lift on uniform full overlap,
+      clamp, empty/missing-safe. Core also validated by a standalone compile-and-run harness.
+- Residual floor tint left to a per-projector `PMSDKColorCorrection` offset (RGB capture future).
+
 ## Milestone — camera-measured luminance compensation (2026-07-21) ✅ IMPLEMENTED
 
 Built (Unity binding; no native change — apply is a shader multiply). See D-027.
@@ -347,7 +365,7 @@ confirmed stable in the overlap beforehand (the go/no-go gate). Architecture: D-
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)
 - [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
-- [ ] True per-region black-level compensation (current `_BlackLevel` is a uniform floor)
+- [x] True per-region black-level compensation (implemented 2026-07-21 — see milestone above, D-028; `_BlackLevel` uniform floor retained as a manual override)
 - [ ] GPU warp path for extreme projector counts / grid density
 - [ ] Milestone 19: Plugin SDK
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)

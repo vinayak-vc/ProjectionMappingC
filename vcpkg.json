@@ -13,6 +13,12 @@
       "dependencies": [
         "gtest"
       ]
+    },
+    "depthai": {
+      "description": "Build the HoloTrack OAK-D device source (Luxonis DepthAI)",
+      "dependencies": [
+        "depthai"
+      ]
     }
   }
 }

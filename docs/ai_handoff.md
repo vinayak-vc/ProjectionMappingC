@@ -44,9 +44,23 @@ Gotchas: MCP drops on domain reload (reconnects); play mode started PAUSED (clea
 `EditorApplication.isPaused`); MCP screenshot renders white for this scene (built-in-pipeline
 capture quirk, reproduces with the default camera — unrelated to HoloTrack; verify numerically).
 
-**Next: H4** — OAK device source behind a vcpkg `depthai` feature (spatial MobileNet-SSD,
-background thread implementing `IDetectionSource`) + a recorded source; live test needs an
-OAK-D-PRO-W-97 attached. Everything above H4 is complete and independently usable now.
+**H4 CODE done — live test deferred (no camera here).** `holotrack::OakDevice` (PImpl
+`IDetectionSource`, DepthAI ColorCamera+MonoL/R→StereoDepth→`MobileNetSpatialDetectionNetwork`
+on a bg thread, spatial→metres +Y up) compiled only under `HOLOTRACK_HAVE_DEPTHAI`, else an inert
+stub → default DLL stays camera-free. Device C-API `HoloTrack/C_API/DeviceAPI.*` (8 `ht_oak_*`
+exports) + Unity `PMHTOakSource` (`IHeadTrackingSource` over the same push path; warns + no-ops
+without DepthAI). vcpkg feature `depthai`, CMake `HOLOTRACK_WITH_DEPTHAI` (OFF default). Verified:
+feature-OFF DLL builds, harness 171/171, Unity C# compiles clean.
+
+To go live: ensure a resolvable `depthai` vcpkg port, `cmake --preset vs2022
+-DHOLOTRACK_WITH_DEPTHAI=ON`, build, **close Unity** (plugin lock) and redeploy the new DLL to
+`Plugins/HoloTrack/`, drop a MobileNet-SSD 300² blob in StreamingAssets, swap the demo's
+`PMHTSimulatedSource` for a `PMHTOakSource`, attach the OAK-D-PRO-W-97, smoke-test. Targets
+depthai-core v2.x — verify node API (`MobileNetSpatialDetectionNetwork`, board sockets) against
+the installed version.
+
+**All of H1–H6 + H4 code are complete; the head-tracked holographic SDK is functionally done
+and independently usable. Only the physical-camera smoke test remains, gated on hardware.**
 
 Build/verify: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then `build/vs2022/bin/Release/holotrack_harness.exe`.

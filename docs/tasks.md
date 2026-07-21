@@ -391,7 +391,22 @@ hardware on this machine → hardware-free first (D-032). See `docs/holotrack-ar
       gotcha). MCP screenshot returns white for this scene (built-in pipeline capture quirk —
       reproduces with the default camera too, unrelated to HoloTrack); verification was done
       numerically via NDC projection, which is stronger than eyeballing.
-- [ ] H4 remains: OAK/DepthAI device source (vcpkg `depthai` feature) for real-camera input.
+- [x] H4 OAK/DepthAI device source CODE done (live test deferred — no camera here):
+      `holotrack::OakDevice` (`include/HoloTrack/Tracking/Device/OakDevice.h`,
+      `holotrack/src/Tracking/Device/OakDevice.cpp`) — PImpl `IDetectionSource`; DepthAI pipeline
+      (ColorCamera 300² preview + MonoL/R → StereoDepth → `MobileNetSpatialDetectionNetwork`,
+      depth-aligned) on a background thread, spatial detections → metres with +Y up. Compiled
+      only under `HOLOTRACK_HAVE_DEPTHAI`; otherwise an inert stub (Start fails cleanly), so the
+      default DLL is camera-free. Device C-API `HoloTrack/C_API/DeviceAPI.{h,cpp}` (opaque
+      `ht_oak_source_t`, is_supported/create/destroy/start/stop/is_running/poll/last_error — 8
+      exports, dumpbin-confirmed). Unity `PMHTOakSource` (`IHeadTrackingSource` over `ht_oak_*`,
+      same push path as the sim source; warns + no-ops when the DLL lacks DepthAI). vcpkg feature
+      `depthai`, CMake option `HOLOTRACK_WITH_DEPTHAI` (OFF default).
+      Verified: default (feature-OFF) DLL builds; harness 171/171 incl. device C-API stub checks;
+      Unity C# compiles clean (0 errors). Targets depthai-core v2.x.
+- [ ] H4 live: enable `HOLOTRACK_WITH_DEPTHAI` (needs a resolvable `depthai` vcpkg port), supply
+      a MobileNet-SSD 300² blob, rebuild + redeploy the DLL (Unity closed — plugin lock), attach
+      the OAK-D-PRO-W-97, add a `PMHTOakSource` to the scene (replacing the sim source), smoke-test.
 
 Build/run: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then run `build/vs2022/bin/Release/holotrack_harness.exe`.

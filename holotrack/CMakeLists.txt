@@ -8,7 +8,18 @@ add_library(HoloTrack::holotrack ALIAS holotrack)
 
 target_sources(holotrack PRIVATE
     src/Tracking/Tracker.cpp
-    src/C_API/TrackingAPI.cpp)
+    src/Tracking/Device/OakDevice.cpp
+    src/C_API/TrackingAPI.cpp
+    src/C_API/DeviceAPI.cpp)
+
+# OAK-D device path. Off by default (D-032): OakDevice.cpp compiles as an inert stub with no
+# DepthAI dependency, so the DLL builds camera-free. When enabled, link DepthAI and define
+# HOLOTRACK_HAVE_DEPTHAI to compile the real pipeline.
+if(HOLOTRACK_WITH_DEPTHAI)
+    find_package(depthai CONFIG REQUIRED)
+    target_link_libraries(holotrack PRIVATE depthai::core)
+    target_compile_definitions(holotrack PRIVATE HOLOTRACK_HAVE_DEPTHAI)
+endif()
 
 # Public headers live in the shared include/ root (include/HoloTrack, plus header-only
 # pmsdk::Math from include/PMSDK reused at build time only).
@@ -42,10 +53,14 @@ set_target_properties(holotrack PROPERTIES
 # GoogleTest suite is retained for CI and gated behind HOLOTRACK_BUILD_GTESTS (default OFF);
 # turn it on once the build and gtest toolsets are aligned.
 if(PMSDK_BUILD_TESTS)
+    # Harness always compiles the DepthAI-free stub of the device path (no HOLOTRACK_HAVE_DEPTHAI),
+    # so it links with no camera dependency regardless of the DLL's feature setting.
     add_executable(holotrack_harness
         tests/harness/HoloTrackHarness.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/Tracking/Tracker.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/C_API/TrackingAPI.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/Tracking/Device/OakDevice.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/C_API/TrackingAPI.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/C_API/DeviceAPI.cpp)
     target_include_directories(holotrack_harness PRIVATE ${PROJECT_SOURCE_DIR}/include)
     target_compile_definitions(holotrack_harness PRIVATE HOLOTRACK_STATIC)
     pmsdk_apply_compiler_options(holotrack_harness)

@@ -18,6 +18,7 @@
 #include "HoloTrack/Tracking/TrackingStateMachine.h"
 #include "HoloTrack/Tracking/Tracker.h"
 #include "HoloTrack/C_API/TrackingAPI.h"
+#include "HoloTrack/C_API/DeviceAPI.h"
 
 using namespace holotrack;
 using pmsdk::Math::Vector3;
@@ -437,6 +438,34 @@ static void TestCApi() {
     ht_tracker_destroy(nullptr); // no-op, must not crash
 }
 
+// ------------------------------------------------------------------- OAK device C-API
+static void TestDeviceApi() {
+    // Harness is built without DepthAI, so the device is inert but the ABI must behave.
+    CHECK(ht_oak_is_supported() == 0);
+
+    ht_oak_source_t* dev = ht_oak_create(nullptr);
+    CHECK(dev != nullptr);
+    CHECK(ht_oak_is_running(dev) == 0);
+
+    // Start fails cleanly (no DepthAI) with a non-empty message; no crash.
+    CHECK(ht_oak_start(dev) != HT_SUCCESS);
+    CHECK(ht_oak_last_error(dev)[0] != '\0');
+    CHECK(ht_oak_is_running(dev) == 0);
+
+    // Poll reports no frame, not an error.
+    ht_detection_t buf[8];
+    size_t count = 123;
+    int hasFrame = 9;
+    double ts = -1.0;
+    CHECK(ht_oak_poll(dev, buf, 8, &count, &hasFrame, &ts) == HT_SUCCESS);
+    CHECK(hasFrame == 0);
+    CHECK(count == 0);
+
+    CHECK(ht_oak_stop(dev) == HT_SUCCESS);
+    ht_oak_destroy(dev);
+    ht_oak_destroy(nullptr); // no-op
+}
+
 int main() {
     TestFilters();
     TestOffAxis();
@@ -446,6 +475,7 @@ int main() {
     TestStateMachine();
     TestTracker();
     TestCApi();
+    TestDeviceApi();
 
     std::printf("\nHoloTrack harness: %d checks, %d failure(s)\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;

@@ -5,9 +5,15 @@ cmake_minimum_required(VERSION 3.25)
 option(PMSDK_BUILD_TESTS "Build PMSDK unit tests" ON)
 option(PMSDK_BUILD_EXAMPLES "Build PMSDK example applications" ON)
 option(PMSDK_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+# HoloTrack OAK-D device source (DepthAI). OFF by default: the DLL and its tests build with no
+# camera and no DepthAI dependency; the device path is compiled only when this is ON (D-032).
+option(HOLOTRACK_WITH_DEPTHAI "Build the HoloTrack OAK-D device source (requires DepthAI)" OFF)
 
 if(PMSDK_BUILD_TESTS)
     list(APPEND VCPKG_MANIFEST_FEATURES "tests")
+endif()
+if(HOLOTRACK_WITH_DEPTHAI)
+    list(APPEND VCPKG_MANIFEST_FEATURES "depthai")
 endif()
 
 project(ProjectionMappingSDK

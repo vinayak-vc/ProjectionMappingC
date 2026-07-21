@@ -129,6 +129,17 @@ namespace vxholotrack
         public int valid;
     }
 
+    /// <summary>OAK device options. Matches <c>ht_oak_options_t</c>.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct HtOakOptions
+    {
+        [MarshalAs(UnmanagedType.LPStr)] public string blobPath;
+        public int personLabel;
+        public float confidenceThreshold;
+        public float depthLowerThresholdMm;
+        public float depthUpperThresholdMm;
+    }
+
     /// <summary>
     /// Raw P/Invoke bindings to <c>HoloTrackSDK.dll</c>. Consumers should prefer the managed
     /// wrappers (<see cref="PMHTHeadTracker"/>) rather than calling these directly.
@@ -172,10 +183,45 @@ namespace vxholotrack
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern HtStatus ht_tracker_reset(IntPtr tracker);
 
+        // --- OAK-D device source (inert unless the DLL was built with DepthAI) ---
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int ht_oak_is_supported();
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr ht_oak_create(ref HtOakOptions options);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern void ht_oak_destroy(IntPtr source);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern HtStatus ht_oak_start(IntPtr source);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern HtStatus ht_oak_stop(IntPtr source);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int ht_oak_is_running(IntPtr source);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern HtStatus ht_oak_poll(IntPtr source, [Out] HtDetection[] buffer,
+                                                  UIntPtr capacity, out UIntPtr outCount,
+                                                  out int outHasFrame, out double outTimestampSeconds);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr ht_oak_last_error(IntPtr source);
+
         /// <summary>Managed copy of the most recent native error message for this thread.</summary>
         public static string GetLastError()
         {
             IntPtr ptr = ht_get_last_error();
+            return ptr == IntPtr.Zero ? string.Empty : Marshal.PtrToStringAnsi(ptr);
+        }
+
+        /// <summary>Managed copy of an OAK source's last error message.</summary>
+        public static string GetOakLastError(IntPtr source)
+        {
+            IntPtr ptr = ht_oak_last_error(source);
             return ptr == IntPtr.Zero ? string.Empty : Marshal.PtrToStringAnsi(ptr);
         }
     }

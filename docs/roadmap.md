@@ -48,7 +48,7 @@ Driven by the Unity host work and a gap audit against Resolume / MadMapper / VIO
 
 All 12 pro-feature gaps implemented (see docs/tasks.md for verification caveats).
 
-**Camera-measured luminance compensation (implemented 2026-07-21, D-026)** — the sweep's
+**Camera-measured luminance compensation (implemented 2026-07-21, D-027)** — the sweep's
 all-white captures become per-projector wall luminance maps; `PMSDKLuminanceCompensation`
 derives a per-projector gain map (global robust-min target, dim-only) that `PMSDK/UnlitWarp`
 multiplies in raster space via `_GainTex`, so the blended wall reads as one even light

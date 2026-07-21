@@ -16,6 +16,10 @@ correction, output rotation/mirror, dense auto-warp) + mark-target UI.
 **HARDWARE-VERIFIED (2026-07-17)**: the real projector+webcam loop — two UST projectors
 blended on one wall, RMS 0.55/0.57 px, editor-driven, calibration persisted. See
 "Real-hardware run" section below for the workflow and the four real-world gotchas.
+**BUILT, EDITOR-VERIFIED, glasses-test pending (2026-07-17)**: blended stereo (SBS 3D) on
+the two-projector wall + a `ContentUI` screen-space canvas that reaches the wall. Both are
+game-side on the nested repo's `SBS` branch (unmerged). See "Stereo (SBS 3D)" and
+"Content UI on the wall" sections below.
 **Current Task**: Milestone 19 (Plugin SDK = UE5 bindings) is the main open track (user:
 "UE will do later"). Latest batch (2026-07-17): fixed the long-red triangulation test
 (real SDK bug — CV_32F read as double), Unity Test Framework suite 21/21 green, named
@@ -28,7 +32,7 @@ compile-gated via versionDefines but NOT tested against the real packages here).
 Remaining elsewhere: Klak adapter loopback once a host installs KlakSpout, GPU warp path
 for extreme scale, per-region black-level, and upstreaming the D-025 hardware findings
 (RANSAC consensus fit into `PMSDKAutoAlign`, time-based settle, C-API exposure lock).
-**Camera-measured luminance compensation — IMPLEMENTED 2026-07-21 (D-026).** Per-projector
+**Camera-measured luminance compensation — IMPLEMENTED 2026-07-21 (D-027).** Per-projector
 wall luminance maps from the sweep's all-white captures (`PMSDKAutoAlign.Result.White`) →
 `PMSDKLuminanceCompensation.Compute` (pure/testable) → per-projector `_GainTex` multiplied
 in `PMSDK/UnlitWarp` in raster space (UV1), so the blend seam disappears on bright content.
@@ -102,6 +106,60 @@ shared canvas; use F4 for the wall workflow. F2 = manual touch-up, Ctrl+S saves.
 Also learned: OpenCV device indices ≠ Unity `WebCamTexture` order (Meta Quest virtual
 cameras don't consume OpenCV indices — the C270 was index 0); `pmsdk_decoder_create`
 runs fine but `open_camera` fails while any other app holds the camera.
+
+## Stereo (SBS 3D) on the blended wall (2026-07-17) — nested repo, `SBS` branch
+
+Blended stereoscopic 3D across the two-projector wall, for glasses + DLP-Link projectors in
+3D SBS mode. DLP-Link sync was verified stable across BOTH projectors in the overlap zone
+before any code (the go/no-go gate — free-running projectors can ghost in the overlap; this
+hardware did not). Architecture + rationale: D-026. Files (nested repo `Scripts/`,
+`Shaders/`):
+
+- `PMSDKStereoContentRig` (on the Content Camera): produces two eye textures. `SceneCameras`
+  mode renders a parallel L/R pair with asymmetric off-axis frusta, zero-parallax at the
+  wall plane (`ZeroParallaxDistance`, default 6 m; nearer = pops out, farther = recedes);
+  `SbsTexture` mode uses the two halves of a side-by-side texture (e.g. a VideoPlayer RT) as
+  the eyes. `EyeSeparation` (default 0.06) tunes depth strength. **F6** toggles stereo,
+  **F7** flips source. When stereo turns on it also re-parks screen-space content canvases
+  to the zero-parallax plane (world space) so flat UI renders correctly in both eyes at wall
+  depth, and restores them on toggle-off.
+- `PMSDKStereoComposer` (on each projector camera): renders the projector's EXISTING warp
+  surface once per eye (swaps only `_MainTex` via a MaterialPropertyBlock, with the eye's
+  slice scale/offset composed in), then packs both warped images into an SBS frame via
+  `PMSDK/StereoPack`. Calibration mode → full mono passthrough; a material takeover
+  (test pattern / Gray-code sweep) → the pattern packed identically into both halves, so F4
+  works with the projectors left in 3D SBS mode.
+- `PMSDK/StereoPack` shader: samples `_LeftTex`/`_RightTex` into the left/right output
+  halves; `_Mono=1` packs left into both (calibration/2D passthrough).
+
+**Demo scene**: `Scenes/StereoMappingDemo.unity` — a clone of the calibrated
+ProBuilderMappingDemo (reads the SAME calibration JSON, so the wall alignment carries over),
+plus a VideoPlayer → `PMSDKDemo/SBS_Video_RT` (assign your SBS clip to the VideoPlayer's
+Video Clip; slot intentionally empty in git) and three depth showcase objects at ~3 m
+(pops out), ~4.5 m, ~9 m (recedes). Title bar retitled.
+
+**On-wall procedure**: projectors → 3D SBS mode; play the scene; open fullscreen previews;
+**F6** (stereo); glasses on; **F7** flips scene-objects ↔ video. Tuning knobs on the rig:
+`EyeSeparation` (depth strength), `ZeroParallaxDistance` (what sits at wall depth). If depth
+reads INVERTED (some projectors swap eye order), swap `_LeftTex`/`_RightTex` in the composer
+— one-line fix. **Editor-verified** (0.00 px disparity at zero-parallax, −18.7 px crossed at
+2 m, both eyes warped+blended+packed, clean mono round-trip); **NOT yet verified on the wall
+with glasses** — that is the remaining gate before this merges to main / upstreams.
+
+## Content UI on the wall (2026-07-17) — nested repo, `SBS` branch
+
+Screen-Space **Overlay** canvases never reach the projectors (Unity composites Overlay onto
+the display backbuffer after all cameras; the wall only shows what lands in `Projection_RT`).
+To put audience UI on the wall: a **Screen Space – Camera** canvas rendered by the Content
+Camera, on a dedicated `ContentUI` layer added to the Content Camera's culling mask ONLY.
+The projector cameras must NOT see that layer or they draw the UI a second time, unwarped —
+they cull `UI | TransparentFX` (calibration overlays), so keep audience UI off `UI`.
+Implemented in ProBuilderMappingDemo (a spanning title bar) + StereoMappingDemo. Operator UI
+(calibration HUD/loupe) deliberately stays Overlay on Display 1 — never projected. Caveat:
+the `ContentUI` layer NAME lives in the template project's `ProjectSettings/TagManager.asset`
+(not committed); scene/camera store the layer by index (bit 8), so it works on a fresh
+machine but shows unnamed until re-added. A straight-edged UI element is also a great
+residual-warp detector — the title bar is what exposed a stale grid warp on Left_Screen.
 
 ## Current State
 - The Core, Math, Geometry, Warp, Blend, Serialization, and Calibration modules are implemented.

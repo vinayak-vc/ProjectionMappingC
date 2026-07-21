@@ -41,6 +41,10 @@ namespace vxpmsdk.Components
             // camW*camH) — the shadow-mask reference, reused as a per-projector wall
             // luminance map for camera-measured luminance compensation.
             public byte[] White;
+            // All-black camera capture (same layout) — each projector's residual black
+            // floor (leak) per pixel, reused for per-region black-level compensation
+            // (the overlap sums two floors -> a brighter central band on dark content).
+            public byte[] Black;
             public int CamW, CamH, ProjW, ProjH;
         }
 
@@ -161,6 +165,7 @@ namespace vxpmsdk.Components
             var corr = PMSDKGrayCodeDecode.Decode(captures, inverseCaptures, white, black, camW, camH, projW, projH, MinContrast);
             result.Correspondence = corr;
             result.White = white;
+            result.Black = black;
             result.CamW = camW; result.CamH = camH; result.ProjW = projW; result.ProjH = projH;
 
             var camPts = new List<Vector2>();

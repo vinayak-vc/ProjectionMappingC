@@ -96,6 +96,42 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
+## D-028 2026-07-21 — Per-region black-level uplift is the additive twin of luminance comp
+
+The residual seam that luminance compensation (D-027) explicitly could NOT fix: on dark
+content a bright, slightly-yellow band sits over the projector overlap. Cause — projectors
+cannot emit true black; each leaks a floor at signal 0, and in the overlap BOTH floors add,
+so overlap black ≈ 2× a single projector's black. It is an ADDITIVE offset, so it dominates
+near-black content and vanishes on bright content (observed on the real wall). A multiply
+(the luminance gain) can't touch it: gain × 0 = 0.
+
+Fix — "black-level uplift": you can't remove the overlap's extra light, so raise every
+other region's black UP to match it; the whole wall then sits at one uniform, slightly-grey
+floor (the eye accepts a uniform grey far more readily than a bright band). Same architecture
+as D-027, additive instead of multiplicative:
+
+- **Measurement is (again) free.** The sweep already captures an all-BLACK frame per
+  projector for the shadow-mask gate; that frame IS each projector's per-pixel floor. Now
+  retained on `PMSDKAutoAlign.Result.Black` alongside `.White`.
+- **Pure core.** `PMSDKBlackLevelCompensation.Compute`: in camera space, count how many
+  projectors cover each pixel (`litCount`) and the summed floor there; the uplift target is
+  the high percentile of that summed floor (the overlap). Per projector, the deficit to the
+  target — `max(0, target − Σ floor) / litCount` — is converted to a signal lift by dividing
+  by that projector's own black→white span, then scattered into raster space. In the overlap
+  the summed floor already ≈ target so the lift is ~0; single-projector regions carry the
+  full lift. Correct even with unequal projector blacks (the deficit form, not an equal
+  share, avoids overshoot).
+- **Apply.** `_BlackLiftTex` in `PMSDK/UnlitWarp`, sampled by the same raster UV1 as the
+  gain map, applied at the black-level stage as `c = c·(1−lift) + lift`. `PMSDKMeshWarp`
+  writes UV1 when either map is active.
+- **Persistence / opt-in / revert:** identical to D-027 (`PMSDKGainCodec`,
+  `AutoBlackLevelAfterAlignAll` default OFF, disable the surface's `PMSDKBlackLevelLift`).
+
+Scope: the captures are single-channel luminance, so this flattens the band's BRIGHTNESS
+(the dominant artifact). A residual colour tint of the lifted floor is left to a
+per-projector `PMSDKColorCorrection` offset; measured per-channel tint would need an RGB
+capture (future).
+
 ## D-027 2026-07-21 — Camera-measured luminance compensation reuses the white sweep capture
 
 Projector vignetting (bright centre, dim edges) means a soft-edge blend overlap is the sum

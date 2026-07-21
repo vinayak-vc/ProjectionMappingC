@@ -54,8 +54,15 @@ derives a per-projector gain map (global robust-min target, dim-only) that `PMSD
 multiplies in raster space via `_GainTex`, so the blended wall reads as one even light
 source (fixes the residual seam band gamma tuning cannot). Opt-in via
 `AutoLuminanceAfterAlignAll`; persisted quantized in the calibration JSON. Related
-follow-ups: per-region black-level (doubled projector-black on dark content is still open),
-D-025 upstreaming (RANSAC/settle/exposure), N-projector wall-canvas align.
+follow-ups: D-025 upstreaming (RANSAC/settle/exposure), N-projector wall-canvas align.
+
+**Per-region black-level compensation (implemented 2026-07-21, D-028)** — the additive twin
+of luminance comp: the sweep's all-black captures become per-projector floor maps;
+`PMSDKBlackLevelCompensation` raises each projector's non-overlap black up to the overlap's
+doubled black (`_BlackLiftTex` in `PMSDK/UnlitWarp`, raster UV1), removing the bright
+centre band on dark content. Opt-in (`AutoBlackLevelAfterAlignAll`), persisted in the
+calibration JSON. Residual floor tint left to a per-projector colour offset (measured
+per-channel tint would need an RGB capture).
 
 Pro-feature gap list: **8 of 12 done** (all 3 High + auto-blend, blend-gamma, color,
 rotation, dense-warp).

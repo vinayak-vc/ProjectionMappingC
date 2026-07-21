@@ -129,10 +129,12 @@ namespace vxpmsdk.Components
                 // Pull data back and apply to Unity mesh
                 NativeBindings.pmsdk_mesh_get_vertices(nativeOutputMesh, vertexBuffer, (UIntPtr)vertexBuffer.Length);
 
-                // A luminance-gain map is sampled in raster space; only then do we pay
-                // to compute + upload the per-vertex raster UV (UV1).
+                // Luminance-gain and black-lift maps are both sampled in raster space;
+                // only then do we pay to compute + upload the per-vertex raster UV (UV1).
                 PMSDKLuminanceGain gain = GetComponent<PMSDKLuminanceGain>();
-                bool writeRasterUV = gain != null && gain.enabled && gain.HasMap;
+                PMSDKBlackLevelLift blackLift = GetComponent<PMSDKBlackLevelLift>();
+                bool writeRasterUV = (gain != null && gain.enabled && gain.HasMap)
+                                  || (blackLift != null && blackLift.enabled && blackLift.HasMap);
 
                 // Reuse cached arrays — allocating fresh each frame is a GC-hitch
                 // source at high grid density / many projectors.

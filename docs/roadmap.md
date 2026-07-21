@@ -48,11 +48,13 @@ Driven by the Unity host work and a gap audit against Resolume / MadMapper / VIO
 
 All 12 pro-feature gaps implemented (see docs/tasks.md for verification caveats).
 
-**Next development (planned): camera-measured luminance compensation** — use the
-all-white captures from the calibration sweep as per-projector wall luminance maps and
-apply a per-projector gain texture so the blended wall reads as one even light source
-(fixes the residual seam band that gamma tuning cannot, observed on real hardware).
-Plan in docs/tasks.md §NEXT DEVELOPMENT. Related follow-ups: per-region black-level,
+**Camera-measured luminance compensation (implemented 2026-07-21, D-026)** — the sweep's
+all-white captures become per-projector wall luminance maps; `PMSDKLuminanceCompensation`
+derives a per-projector gain map (global robust-min target, dim-only) that `PMSDK/UnlitWarp`
+multiplies in raster space via `_GainTex`, so the blended wall reads as one even light
+source (fixes the residual seam band gamma tuning cannot). Opt-in via
+`AutoLuminanceAfterAlignAll`; persisted quantized in the calibration JSON. Related
+follow-ups: per-region black-level (doubled projector-black on dark content is still open),
 D-025 upstreaming (RANSAC/settle/exposure), N-projector wall-canvas align.
 
 Pro-feature gap list: **8 of 12 done** (all 3 High + auto-blend, blend-gamma, color,

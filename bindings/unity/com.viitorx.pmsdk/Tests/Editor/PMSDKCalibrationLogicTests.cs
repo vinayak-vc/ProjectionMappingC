@@ -269,5 +269,140 @@ namespace vxpmsdk.Tests
                 Directory.Delete(dir, true);
             }
         }
+
+        // ---------- luminance compensation ----------
+
+        // A 1:1 camera==raster identity correspondence, so a white capture indexed by
+        // camera pixel lands one-to-one in the raster gain map.
+        private static PMSDKGrayCodeDecode.Correspondence[] IdentityCorr(int size, System.Func<int, int, bool> valid = null)
+        {
+            return MakeCorrespondence(size, size, (x, y) => (valid == null || valid(x, y), x, y));
+        }
+
+        private static byte[] WhiteCapture(int size, System.Func<int, int, int> lumAt)
+        {
+            var w = new byte[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    w[y * size + x] = (byte)Mathf.Clamp(lumAt(x, y), 0, 255);
+            return w;
+        }
+
+        [Test]
+        public void Luminance_VignetteFlattenedToTarget()
+        {
+            int size = 64;
+            // Centre-bright gradient (min 130 at (0,0)); every cell distinct.
+            var white = WhiteCapture(size, (x, y) => 130 + (x + y) / 2);
+            var maps = PMSDKLuminanceCompensation.Compute(
+                new List<byte[]> { white }, new List<PMSDKGrayCodeDecode.Correspondence[]> { IdentityCorr(size) },
+                size, size, size, size, size, size,
+                gainMin: 0.3f, smoothRadius: 0, targetPercentile: 0f);
+
+            Assert.AreEqual(1, maps.Length);
+            Assert.IsTrue(maps[0].Valid);
+            var g = maps[0].Gain;
+            const float target = 130f; // the darkest measured cell
+
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float gain = g[y * size + x];
+                    Assert.LessOrEqual(gain, 1f + 1e-4f);
+                    Assert.GreaterOrEqual(gain, 0.3f - 1e-4f);
+                    // measured * gain collapses to the shared target (dim-only flatten).
+                    float measured = white[y * size + x];
+                    Assert.AreEqual(target, measured * gain, 0.6f);
+                }
+
+            // Brighter centre is dimmed more than the darker corner.
+            Assert.Less(g[(size - 1) * size + (size - 1)], g[0]);
+            Assert.AreEqual(1f, g[0], 1e-3f); // darkest cell is untouched
+        }
+
+        [Test]
+        public void Luminance_EqualizesAcrossProjectors()
+        {
+            int size = 32;
+            var bright = WhiteCapture(size, (x, y) => 200);
+            var dim = WhiteCapture(size, (x, y) => 140);
+            var maps = PMSDKLuminanceCompensation.Compute(
+                new List<byte[]> { bright, dim },
+                new List<PMSDKGrayCodeDecode.Correspondence[]> { IdentityCorr(size), IdentityCorr(size) },
+                size, size, size, size, size, size,
+                gainMin: 0.3f, smoothRadius: 0, targetPercentile: 0f);
+
+            // Shared target = dimmest projector (140): bright dims to 0.7, dim stays 1.
+            Assert.AreEqual(0.7f, maps[0].Gain[0], 1e-3f);
+            Assert.AreEqual(1.0f, maps[1].Gain[0], 1e-3f);
+        }
+
+        [Test]
+        public void Luminance_GainClampedAtFloor()
+        {
+            int size = 16;
+            var bright = WhiteCapture(size, (x, y) => 250);
+            var dim = WhiteCapture(size, (x, y) => 50); // target -> 50, ratio 0.2 < floor
+            var maps = PMSDKLuminanceCompensation.Compute(
+                new List<byte[]> { bright, dim },
+                new List<PMSDKGrayCodeDecode.Correspondence[]> { IdentityCorr(size), IdentityCorr(size) },
+                size, size, size, size, size, size,
+                gainMin: 0.5f, smoothRadius: 0, targetPercentile: 0f);
+
+            Assert.AreEqual(0.5f, maps[0].Gain[0], 1e-3f); // clamped, not 0.2
+        }
+
+        [Test]
+        public void Luminance_FillsHolesAndStaysFinite()
+        {
+            int size = 32;
+            var white = WhiteCapture(size, (x, y) => 150 + x);
+            // Only every other cell is lit — the rest are holes to be filled.
+            var corr = IdentityCorr(size, (x, y) => ((x + y) & 1) == 0);
+            var maps = PMSDKLuminanceCompensation.Compute(
+                new List<byte[]> { white }, new List<PMSDKGrayCodeDecode.Correspondence[]> { corr },
+                size, size, size, size, size, size,
+                gainMin: 0.4f, smoothRadius: 1, targetPercentile: 0f);
+
+            Assert.IsTrue(maps[0].Valid);
+            foreach (var gain in maps[0].Gain)
+            {
+                Assert.IsFalse(float.IsNaN(gain));
+                Assert.GreaterOrEqual(gain, 0.4f - 1e-4f);
+                Assert.LessOrEqual(gain, 1f + 1e-4f);
+            }
+        }
+
+        [Test]
+        public void Luminance_EmptyAndMissingInputsAreSafe()
+        {
+            var none = PMSDKLuminanceCompensation.Compute(
+                new List<byte[]>(), new List<PMSDKGrayCodeDecode.Correspondence[]>(),
+                0, 0, 64, 64, 64, 64);
+            Assert.AreEqual(0, none.Length);
+
+            // Correspondence present but no white capture -> pass-through (gain 1), invalid.
+            int size = 8;
+            var maps = PMSDKLuminanceCompensation.Compute(
+                new List<byte[]> { null }, new List<PMSDKGrayCodeDecode.Correspondence[]> { IdentityCorr(size) },
+                size, size, size, size, size, size);
+            Assert.IsFalse(maps[0].Valid);
+            foreach (var gain in maps[0].Gain) Assert.AreEqual(1f, gain, 1e-6f);
+        }
+
+        [Test]
+        public void GainCodec_Roundtrips()
+        {
+            var gain = new float[] { 0f, 0.5f, 0.6f, 0.75f, 1f };
+            string encoded = PMSDKGainCodec.Encode(gain);
+            var decoded = PMSDKGainCodec.Decode(encoded, gain.Length);
+            Assert.IsNotNull(decoded);
+            for (int i = 0; i < gain.Length; i++)
+                Assert.AreEqual(gain[i], decoded[i], 1f / 255f); // 8-bit quantization
+
+            Assert.IsNull(PMSDKGainCodec.Decode(encoded, gain.Length + 1)); // count mismatch
+            Assert.IsNull(PMSDKGainCodec.Decode(null, 4));
+            Assert.IsNull(PMSDKGainCodec.Encode(null));
+        }
     }
 }

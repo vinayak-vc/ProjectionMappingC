@@ -28,12 +28,16 @@ compile-gated via versionDefines but NOT tested against the real packages here).
 Remaining elsewhere: Klak adapter loopback once a host installs KlakSpout, GPU warp path
 for extreme scale, per-region black-level, and upstreaming the D-025 hardware findings
 (RANSAC consensus fit into `PMSDKAutoAlign`, time-based settle, C-API exposure lock).
-**NEXT DEVELOPMENT (planned, user-approved, not implemented): camera-measured luminance
-compensation** — per-projector wall luminance maps from the sweep's all-white captures →
-per-projector gain texture in `PMSDK/UnlitWarp`, so the blend seam disappears on bright
-content (gamma alone cannot fix spatial vignetting; seen on the real wall). Full plan:
-docs/tasks.md §NEXT DEVELOPMENT. Suggested branch: bundle with D-025 upstreaming +
-N-projector wall-canvas generalization.
+**Camera-measured luminance compensation — IMPLEMENTED 2026-07-21 (D-026).** Per-projector
+wall luminance maps from the sweep's all-white captures (`PMSDKAutoAlign.Result.White`) →
+`PMSDKLuminanceCompensation.Compute` (pure/testable) → per-projector `_GainTex` multiplied
+in `PMSDK/UnlitWarp` in raster space (UV1), so the blend seam disappears on bright content.
+Opt-in: `PMSDKCalibrationManager.AutoLuminanceAfterAlignAll` (default OFF) runs it after
+Shift+A; persisted quantized+base64 in the calibration JSON (`PMSDKGainCodec`); revert by
+disabling a surface's `PMSDKLuminanceGain`. EditMode tests in PMSDKCalibrationLogicTests.
+Verify on real hardware next (was validated only in code + unit tests). Still open:
+per-region black-level (doubled projector-black on dark content), D-025 upstreaming, and
+N-projector wall-canvas generalization — all natural for the same branch.
 
 ## Machine note (2026-07-17) — current layout on this machine
 

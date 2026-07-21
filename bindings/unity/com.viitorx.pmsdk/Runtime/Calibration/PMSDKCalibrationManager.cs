@@ -33,6 +33,7 @@ namespace vxpmsdk.Components
             public PMSDKEdgeBlend Blend;
             public PMSDKTestPattern TestPattern;
             public PMSDKGridWarp Grid;
+            public PMSDKLuminanceGain LuminanceGain;
             public Camera ProjectorCamera;
             public PMSDKCalibrationOverlay Overlay;
             public RenderTexture Thumbnail;
@@ -69,6 +70,12 @@ namespace vxpmsdk.Components
         public int WebcamFlushFrames = 2;
         [Tooltip("After aligning ALL projectors (Shift+A), auto-compute edge-blend widths from the camera-detected overlap between them.")]
         public bool AutoBlendAfterAlignAll = true;
+        [Tooltip("After aligning ALL projectors, also compute a camera-measured luminance (vignette) gain map per projector to flatten brightness banding across the blend. Off by default — enable to opt in; it can only DIM, and each surface's PMSDKLuminanceGain can be disabled to revert.")]
+        public bool AutoLuminanceAfterAlignAll = false;
+        [Tooltip("Resolution of each per-projector luminance gain map (square). The map is smooth, so a coarse map is plenty; higher costs more JSON.")]
+        public int LuminanceMapResolution = 96;
+        [Tooltip("Lower clamp on luminance gain: how far a bright region may be dimmed (0.5 = at most halved). Guards against over-dimming from a noisy-dark measurement.")]
+        [Range(0f, 1f)] public float LuminanceGainMin = 0.5f;
         [Tooltip("If >= 2, auto-align fits an NxN grid warp from the camera (dense auto-warp) instead of only the 4 corners — for curved/irregular surfaces. 0 = corner pin only.")]
         public int DenseAutoWarpN = 0;
         [Tooltip("Observer camera for simulated auto-align. If null, a scene object named 'PMSDK Calibration Observer' with a Camera is used.")]
@@ -716,6 +723,15 @@ namespace vxpmsdk.Components
                     file.surfaces[i].hasTarget = true;
                     file.surfaces[i].targetCorners = (Vector2[])s.TargetCorners.Clone();
                 }
+
+                if (s.LuminanceGain != null && s.LuminanceGain.HasMap)
+                {
+                    var entry = file.surfaces[i];
+                    entry.lumCompEnabled = s.LuminanceGain.enabled;
+                    entry.lumGainWidth = s.LuminanceGain.Width;
+                    entry.lumGainHeight = s.LuminanceGain.Height;
+                    entry.lumGainData = PMSDKGainCodec.Encode(s.LuminanceGain.GetGainMap());
+                }
             }
             return file;
         }
@@ -1032,6 +1048,7 @@ namespace vxpmsdk.Components
                     Blend = warp.GetComponent<PMSDKEdgeBlend>(),
                     TestPattern = warp.GetComponent<PMSDKTestPattern>(),
                     Grid = warp.GetComponent<PMSDKGridWarp>(),
+                    LuminanceGain = warp.GetComponent<PMSDKLuminanceGain>(),
                     ProjectorCamera = warp.Projector != null ? warp.Projector.GetComponent<Camera>() : null
                 };
                 if (s.CornerPin == null)
@@ -1146,6 +1163,10 @@ namespace vxpmsdk.Components
             {
                 blendMsg = ApplyAutoBlend(toAlign, results);
             }
+            if (all && AutoLuminanceAfterAlignAll && ok >= 2)
+            {
+                blendMsg += ApplyAutoLuminance(toAlign, results);
+            }
 
             Dirty = true;
             AutoAlignStatus = $"Auto-align done: {ok}/{toAlign.Count} surfaces.{blendMsg} Fine-tune by hand, Ctrl+S to save.";
@@ -1189,6 +1210,59 @@ namespace vxpmsdk.Components
                 applied++;
             }
             return $" Auto-blend set on {applied} projectors.";
+        }
+
+        /// <summary>
+        /// Compute per-projector luminance (vignette) gain maps from the all-white
+        /// captures the align sweep already took, and install them on each surface's
+        /// PMSDKLuminanceGain. Same single-camera requirement as auto-blend so luminance
+        /// is comparable across projectors. Returns a status fragment.
+        /// </summary>
+        private string ApplyAutoLuminance(List<Surface> aligned, List<PMSDKAutoAlign.Result> results)
+        {
+            var white = new List<byte[]>();
+            var corr = new List<PMSDKGrayCodeDecode.Correspondence[]>();
+            var lumSurfaces = new List<Surface>();
+            int camW = -1, camH = -1, projW = 0, projH = 0;
+            for (int i = 0; i < results.Count; i++)
+            {
+                var r = results[i];
+                if (!r.Success || r.Correspondence == null || r.White == null) continue;
+                if (camW < 0) { camW = r.CamW; camH = r.CamH; projW = r.ProjW; projH = r.ProjH; }
+                if (r.CamW != camW || r.CamH != camH) continue;
+                white.Add(r.White);
+                corr.Add(r.Correspondence);
+                lumSurfaces.Add(aligned[i]);
+            }
+            if (corr.Count < 2) return " (luminance comp skipped: need 2+ projectors in one camera view).";
+
+            int res = Mathf.Clamp(LuminanceMapResolution, 8, 512);
+            var maps = PMSDKLuminanceCompensation.Compute(
+                white, corr, camW, camH, projW, projH, res, res, Mathf.Clamp01(LuminanceGainMin));
+
+            int applied = 0;
+            for (int i = 0; i < lumSurfaces.Count; i++)
+            {
+                if (!maps[i].Valid) continue;
+                var lg = EnsureLuminanceGain(lumSurfaces[i]);
+                if (lg == null) continue;
+                lg.SetGainMap(maps[i].Gain, maps[i].Width, maps[i].Height);
+                lg.enabled = true;
+                applied++;
+            }
+            return $" Luminance comp set on {applied} projectors.";
+        }
+
+        /// <summary>Get or add the surface's PMSDKLuminanceGain component (mirrors the grid-warp pattern).</summary>
+        private static PMSDKLuminanceGain EnsureLuminanceGain(Surface s)
+        {
+            if (s == null || s.Warp == null) return null;
+            if (s.LuminanceGain == null)
+            {
+                s.LuminanceGain = s.Warp.GetComponent<PMSDKLuminanceGain>();
+                if (s.LuminanceGain == null) s.LuminanceGain = s.Warp.gameObject.AddComponent<PMSDKLuminanceGain>();
+            }
+            return s.LuminanceGain;
         }
 
         /// <summary>
@@ -1365,6 +1439,23 @@ namespace vxpmsdk.Components
                 {
                     match.TargetCorners = (Vector2[])saved.targetCorners.Clone();
                     match.HasTarget = true;
+                }
+
+                // Restore a saved luminance gain map (vignette compensation).
+                var lumGain = PMSDKGainCodec.Decode(saved.lumGainData, saved.lumGainWidth * saved.lumGainHeight);
+                if (lumGain != null && saved.lumGainWidth > 0 && saved.lumGainHeight > 0)
+                {
+                    var lg = EnsureLuminanceGain(match);
+                    if (lg != null)
+                    {
+                        lg.SetGainMap(lumGain, saved.lumGainWidth, saved.lumGainHeight);
+                        lg.enabled = saved.lumCompEnabled;
+                    }
+                }
+                else if (match.LuminanceGain != null)
+                {
+                    match.LuminanceGain.ClearGainMap();
+                    match.LuminanceGain.enabled = false;
                 }
             }
         }

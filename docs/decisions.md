@@ -96,6 +96,42 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
+## D-026 2026-07-21 — Camera-measured luminance compensation reuses the white sweep capture
+
+Projector vignetting (bright centre, dim edges) means a soft-edge blend overlap is the sum
+of both projectors' DIMMEST edges, so even a perfect 1/γ alpha ramp leaves a visible band
+on the real wall (observed 2026-07-17, D-025 run). Gamma tuning cannot fix a *spatial*
+brightness difference — it must be measured.
+
+Design (Unity-side, no native change — the apply path is a shader multiply):
+
+- **Measurement is free.** The auto-align sweep already captures an all-white frame per
+  projector for the shadow-mask contrast gate (`PMSDKAutoAlign`). That frame IS a picture
+  of each projector's wall luminance; it is now retained on `PMSDKAutoAlign.Result.White`.
+- **Pure core.** `PMSDKLuminanceCompensation.Compute` (same testable contract as
+  `PMSDKAutoBlend`) scatters each lit camera pixel's luminance into its projector-raster
+  bin via the Gray-code correspondence, fills unmeasured bins by dilation, box-blurs out
+  webcam noise, then derives `gain = target / measured` where `target` is a robust-min
+  (percentile) of pooled luminance across ALL projectors. A *global* target flattens every
+  projector to the same absolute level, so both single-projector regions and blend overlaps
+  (α_A·T + α_B·T = T under the partition-of-unity ramp) land at one uniform brightness.
+- **Dim only.** target ≤ every measured value ⇒ gain ≤ 1; a `gainMin` floor caps how far a
+  bright region may be dimmed, guarding against a noisy-dark target over-dimming everything.
+- **Raster-space apply.** A per-projector `_GainTex` is multiplied in `PMSDK/UnlitWarp`
+  after the blend ramp, before colour-correct. It is sampled by UV1 = the warped vertex
+  raster position (D-020: `position = gridwarp(uv)` on the [0,1]² quad), so the vignette
+  stays locked to the physical projector as the warp changes. `PMSDKMeshWarp` only writes
+  UV1 while a `PMSDKLuminanceGain` map is active, so the common path pays nothing.
+- **Persistence.** The map is quantized to 1 byte/cell + base64 in the calibration JSON
+  (`PMSDKGainCodec`) — 8 bits over the 0.5..1 usable range is sub-visible, and a 96² map
+  stays ~12 KB instead of a giant float array.
+- **Opt-in.** `AutoLuminanceAfterAlignAll` defaults OFF (unlike auto-blend): it is a new,
+  more aggressive correction on a hardware-verified pipeline, and each surface's
+  `PMSDKLuminanceGain` can be disabled to revert instantly.
+
+Explicitly out of scope: the doubled projector-black glow on dark content (a separate
+per-region black-level item; `_BlackLevel` is still only a uniform floor).
+
 ## D-025 2026-07-17 — Real-room auto-align needs consensus fitting and shared-canvas targets
 
 First run on physical hardware (2× UST projectors, one wall, Logitech C270) exposed two

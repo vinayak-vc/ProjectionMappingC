@@ -282,7 +282,20 @@ displays, `ProBuilderMappingDemo` content.
 - [x] `PMSDKCanvasReferencePattern` — end-to-end plus + level/vertical reference lines rasterized in SHARED canvas space, fed through `PMSDKExternalContent` so every projector shows its warped slice: lines land straight and seam-continuous on the physical wall even with tilted projectors (addresses the on-wall "horizontal line isn't horizontal" problem from the hardware run). `C` toggles in calibration mode. Deterministic rasterizer test (28/28 suite). Verified in play: skewed pin → pattern pre-warps in raster (i.e. straight on wall); centre plus falls in the overlap of both slices.
 - Note: level is relative to the canvas; if the auto-align camera was tilted, verify once against a laser level / chalk line.
 
-## NEXT DEVELOPMENT (planned, not implemented) — camera-measured luminance compensation
+## Milestone — camera-measured luminance compensation (2026-07-21) ✅ IMPLEMENTED
+
+Built (Unity binding; no native change — apply is a shader multiply). See D-026.
+- [x] Retain the sweep's all-white capture on `PMSDKAutoAlign.Result.White`.
+- [x] `PMSDKLuminanceCompensation.Compute` — pure core: raster luminance from correspondence,
+      hole-fill + box-blur, global robust-min target, `gain = clamp(target/measured, gainMin, 1)`.
+- [x] `PMSDKLuminanceGain` component drives `_GainTex` / `_UseGainTex`.
+- [x] `PMSDK/UnlitWarp`: gain multiply after the blend ramp, sampled by raster UV1.
+- [x] `PMSDKMeshWarp` writes UV1 (warped raster position) only while a gain map is active.
+- [x] Persist per-surface, quantized + base64 (`PMSDKGainCodec`), in the calibration JSON.
+- [x] Manager: `AutoLuminanceAfterAlignAll` (opt-in) runs it after Shift+A; save/restore.
+- [x] EditMode tests: flatten-to-target, cross-projector equalize, floor clamp, hole-fill, codec.
+
+Original plan (retained for context):
 
 Why: projectors are brightest at centre and dimmer at the edges (vignetting); a blend
 overlap is built from both projectors' dimmest edges, so even a perfect alpha ramp leaves
@@ -308,7 +321,7 @@ time-based settle, C-API exposure lock (D-025 upstream list), and N-projector
 generalization of the wall-canvas align.
 
 ## Next Items / Backlog
-- [ ] Camera-measured luminance compensation (see NEXT DEVELOPMENT above)
+- [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-026)
 - [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
 - [ ] True per-region black-level compensation (current `_BlackLevel` is a uniform floor)

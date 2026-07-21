@@ -26,6 +26,9 @@ namespace vxpmsdk.Components
         // and 60 fps and it becomes a GC-hitch source).
         private Vector3[] unityVertsCache;
         private Color[] unityColorsCache;
+        // Raster position per vertex (UV1), uploaded only while a luminance-gain map is
+        // active so its vignette texture can be sampled in raster space.
+        private Vector2[] unityRasterUVCache;
 
         private void OnEnable()
         {
@@ -126,6 +129,11 @@ namespace vxpmsdk.Components
                 // Pull data back and apply to Unity mesh
                 NativeBindings.pmsdk_mesh_get_vertices(nativeOutputMesh, vertexBuffer, (UIntPtr)vertexBuffer.Length);
 
+                // A luminance-gain map is sampled in raster space; only then do we pay
+                // to compute + upload the per-vertex raster UV (UV1).
+                PMSDKLuminanceGain gain = GetComponent<PMSDKLuminanceGain>();
+                bool writeRasterUV = gain != null && gain.enabled && gain.HasMap;
+
                 // Reuse cached arrays — allocating fresh each frame is a GC-hitch
                 // source at high grid density / many projectors.
                 if (unityVertsCache == null || unityVertsCache.Length != vertexBuffer.Length)
@@ -133,14 +141,23 @@ namespace vxpmsdk.Components
                     unityVertsCache = new Vector3[vertexBuffer.Length];
                     unityColorsCache = new Color[vertexBuffer.Length];
                 }
+                if (writeRasterUV && (unityRasterUVCache == null || unityRasterUVCache.Length != vertexBuffer.Length))
+                {
+                    unityRasterUVCache = new Vector2[vertexBuffer.Length];
+                }
 
                 for (int i = 0; i < vertexBuffer.Length; i++)
                 {
                     unityVertsCache[i] = new Vector3(vertexBuffer[i].position.x, vertexBuffer[i].position.y, vertexBuffer[i].position.z);
                     unityColorsCache[i] = new Color(vertexBuffer[i].color.x, vertexBuffer[i].color.y, vertexBuffer[i].color.z, vertexBuffer[i].color.w);
+                    // The warped position IS the normalized projector-raster coordinate,
+                    // which is exactly where the vignette gain map is indexed.
+                    if (writeRasterUV)
+                        unityRasterUVCache[i] = new Vector2(vertexBuffer[i].position.x, vertexBuffer[i].position.y);
                 }
                 warpedMesh.SetVertices(unityVertsCache);
                 warpedMesh.SetColors(unityColorsCache);
+                if (writeRasterUV) warpedMesh.SetUVs(1, unityRasterUVCache);
                 warpedMesh.RecalculateBounds();
             }
         }

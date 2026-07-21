@@ -32,6 +32,49 @@ namespace vxpmsdk.Components
         // camera doesn't require re-marking.
         public bool hasTarget;
         public Vector2[] targetCorners;
+
+        // Camera-measured luminance (vignette) gain map. Stored quantized + base64 so a
+        // fine map stays compact in the JSON. Row-major, y-up, each cell in [0,1].
+        public bool lumCompEnabled;
+        public int lumGainWidth;
+        public int lumGainHeight;
+        public string lumGainData;
+    }
+
+    /// <summary>
+    /// Compact, lossless-enough encoding for a luminance gain map: each [0,1] cell
+    /// quantized to one byte and base64-encoded. 8 bits over the usable 0.5..1 gain
+    /// range is ~0.2% brightness steps — below the visible threshold — while keeping a
+    /// 96x96 map at ~12 KB in the calibration JSON instead of a giant float array.
+    /// </summary>
+    public static class PMSDKGainCodec
+    {
+        public static string Encode(float[] gain)
+        {
+            if (gain == null || gain.Length == 0) return null;
+            var bytes = new byte[gain.Length];
+            for (int i = 0; i < gain.Length; i++)
+            {
+                int q = Mathf.RoundToInt(Mathf.Clamp01(gain[i]) * 255f);
+                bytes[i] = (byte)Mathf.Clamp(q, 0, 255);
+            }
+            return Convert.ToBase64String(bytes);
+        }
+
+        /// <summary>Decode to a float[] of exactly expectedCount cells; null if malformed.</summary>
+        public static float[] Decode(string data, int expectedCount)
+        {
+            if (string.IsNullOrEmpty(data) || expectedCount <= 0) return null;
+            try
+            {
+                var bytes = Convert.FromBase64String(data);
+                if (bytes.Length != expectedCount) return null;
+                var gain = new float[expectedCount];
+                for (int i = 0; i < expectedCount; i++) gain[i] = bytes[i] / 255f;
+                return gain;
+            }
+            catch { return null; }
+        }
     }
 
     [Serializable]

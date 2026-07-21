@@ -96,6 +96,48 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
+## D-026 2026-07-17 — Blended stereo (SBS 3D) splits eyes at the content RT and re-packs AFTER the warp
+
+Client has a side-by-side stereoscopic video and DLP-Link projectors that support 3D SBS;
+they want depth on the blended two-projector wall (glasses, DLP-Link sync verified stable
+across both projectors in the overlap before any code). The pipeline question: where do the
+two eye views split, and where do they re-merge relative to the warp/blend stage?
+
+Decision: split the eyes at the CONTENT source (two RenderTextures — either a parallel L/R
+camera pair, or the two halves of an SBS texture), run the EXISTING warp surface once per
+eye (swap only the source texture via a MaterialPropertyBlock), and re-pack the two fully
+warped+blended images into a single side-by-side display frame as the very LAST step (a
+`PMSDK/StereoPack` blit). The projector's 3D SBS mode stretches each half ×2, so
+squeeze-then-stretch round-trips and the calibration geometry inside each eye is preserved
+bit-for-bit.
+
+Why this ordering:
+- **Calibration applies to both eyes for free.** One surface, one corner pin, one edge
+  blend renders both eyes; there is nothing to keep in sync between eyes and no second
+  calibration. Splitting eyes AFTER the warp (e.g. two warp surfaces per projector) would
+  double the calibration surface count and let the eyes drift.
+- **Blend and stereo are orthogonal.** Each projector's composer samples its own content
+  slice of each eye texture, so the split-slice blend logic is unchanged; edge-blend ramps
+  still sum across the overlap, per eye.
+- **Calibration stays runnable with 3D mode left ON.** In calibration mode the composer
+  does full mono passthrough; when a test pattern or Gray-code sweep takes over the surface
+  material, the composer packs that pattern IDENTICALLY into both halves — so the projector
+  decodes the sweep correctly without toggling out of 3D SBS mode. This matters on site:
+  the operator never has to touch the projector OSD between calibrating and showing content.
+- **Parallel eyes, not toe-in.** Eye cameras are offset laterally with an asymmetric
+  frustum shift (off-axis projection) so both eyes agree at the zero-parallax plane (the
+  wall). Toe-in (rotating the cameras inward) would introduce vertical parallax at frame
+  edges — uncomfortable and wrong for a flat wall.
+
+Cost owned: SBS halves each eye's horizontal resolution (960 native columns) — inherent to
+the format, not the pipeline. The per-eye double render is one extra quad blit per projector
+per frame — negligible.
+
+Lives game-side for now (`PMSDKStereoContentRig`, `PMSDKStereoComposer`,
+`PMSDK/StereoPack` in the nested repo, `SBS` branch). Candidate to upstream into the package
+once hardware-proven with glasses. Editor-verified (0.00 px disparity at zero-parallax,
+crossed disparity with correct sign at 2 m); NOT yet verified on the wall with glasses.
+
 ## D-025 2026-07-17 — Real-room auto-align needs consensus fitting and shared-canvas targets
 
 First run on physical hardware (2× UST projectors, one wall, Logitech C270) exposed two

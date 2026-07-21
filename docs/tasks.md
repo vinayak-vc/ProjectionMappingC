@@ -277,6 +277,29 @@ displays, `ProBuilderMappingDemo` content.
   `pmsdk_decoder_set_property` (exposure lock); shared-canvas multi-projector align in
   the package instead of the game repo.
 
+## Blended stereo (SBS 3D) + content-UI canvas (2026-07-17) — nested `SBS` branch
+
+Built and editor-verified; on-wall glasses test pending. DLP-Link cross-projector sync
+confirmed stable in the overlap beforehand (the go/no-go gate). Architecture: D-026.
+
+- [x] `PMSDKStereoContentRig` (Content Camera) — two eye textures: `SceneCameras` (parallel
+  L/R pair, asymmetric off-axis frusta, zero-parallax at the wall) or `SbsTexture` (halves
+  of an SBS video RT). `EyeSeparation`/`ZeroParallaxDistance` tuning; F6 stereo toggle, F7
+  source toggle; re-parks screen-space content canvases to the zero-parallax plane in stereo.
+- [x] `PMSDKStereoComposer` (per projector) — renders the existing warp surface once per eye
+  (MaterialPropertyBlock texture swap, slice scale/offset composed in) and packs into an SBS
+  frame via `PMSDK/StereoPack`. Calibration → mono passthrough; sweep/test-pattern packed
+  into both halves so F4 runs with 3D SBS mode left on.
+- [x] `StereoMappingDemo` scene — calibrated ProBuilderMappingDemo clone (shares the
+  calibration JSON) + VideoPlayer→`SBS_Video_RT` (clip slot left empty) + depth objects at
+  3/4.5/9 m. Content-UI canvas (`ContentUI` layer, Content-Camera-only) added to both demo
+  scenes; fixed a stale grid warp on Left_Screen that the straight title bar exposed.
+- [x] Editor-verified: 0.00 px disparity at zero-parallax, −18.7 px crossed at 2 m; both
+  eyes warped+blended+packed; clean mono round-trip; console clean.
+- [ ] On-wall glasses test (projectors in 3D SBS mode) — the gate before merge to main.
+  If depth inverts, swap `_LeftTex`/`_RightTex` in the composer.
+- [ ] Upstream candidate: move the stereo composer/rig into the package (currently game-side).
+
 ## Next Items / Backlog
 - [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter
 - [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)

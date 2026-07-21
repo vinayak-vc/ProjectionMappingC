@@ -96,6 +96,38 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
+## D-029 2026-07-21 — A depth camera (OAK-D) is a 3D-mapping enabler, not a flat-wall quality upgrade
+
+Prompted by "will adding OAK-D-PRO-W support enhance our current results?" Verified answer:
+for the current flat-wall, 2D-homography blend — **no.**
+
+The current auto-align recovers a planar camera→projector homography from Gray-code
+correspondence; on a plane that fit is exact and already sub-pixel (0.55 px on real
+hardware, over ~1,500 RANSAC inliers). The visible seam is bounded by projector focus,
+lens quality, and light spill — physical factors a better *camera* does not change. A
+higher-res / global-shutter / depth sensor would shrink the reported reprojection number
+without changing what lands on the wall. The OAK's differentiators are unused by this
+pipeline: depth (2D homography ignores it), active IR (we decode *visible* projected
+light), global shutter (the sweep is static).
+
+The one real flat-wall pain point — webcam auto-exposure equalizing the white/black
+references (forcing lights-off) — is a property of exposure *control*, not depth, and is
+addressed by the D-025 follow-up (C-API exposure lock) on any controllable camera far more
+cheaply than by adopting a DepthAI device.
+
+Where a depth camera IS the right tool: **non-planar** targets — curved/irregular walls
+and twin-free object mapping — where the homography assumption breaks and a metric 3D
+reconstruction is genuinely required. That is a feature project (DepthAI capture source +
+metric calibration + structured-light triangulation + 3D→warp), scoped in
+docs/tasks.md ("Depth-camera 3D / curved-surface mapping"), with the OAK-D-PRO-W as the
+reference sensor. Decision: do not adopt the OAK to chase flat-wall numbers; adopt it only
+when curved-surface / 3D-scan mapping is greenlit, and treat it as that milestone's sensor.
+
+Verified on the machine (2026-07-21): the OAK-D enumerates as `Movidius MyriadX`
+(DepthAI/XLink), not UVC; OpenCV `pmsdk_decoder` cannot open it (indices 0–6 all fail),
+confirming it needs either Luxonis UVC mode (plain 2D, no depth benefit) or a native
+DepthAI source (to use depth).
+
 ## D-028 2026-07-21 — Per-region black-level uplift is the additive twin of luminance comp
 
 The residual seam that luminance compensation (D-027) explicitly could NOT fix: on dark

@@ -369,10 +369,19 @@ hardware on this machine → hardware-free first (D-032). See `docs/holotrack-ar
 - [ ] H4 OAK device source behind a vcpkg `depthai` feature (spatial MobileNet-SSD, bg thread,
       `IDetectionSource`) + a `SimulatedSource`/recorded source. Live smoke test deferred to
       when an OAK-D-PRO-W-97 is attached.
-- [ ] H5 Unity package `com.viitorx.holotrack` — P/Invoke bindings, `PMHTHeadTracker`,
-      `HeadTrackedCameraController` (off-axis; applies movementScale/deadZone/clamp), config
-      ScriptableObject, diagnostics overlay, scene-view gizmos, CSV recorder; EditMode tests.
-- [ ] H6 Consumer sample in the nested game repo — scene, prefab, wiring, operator docs.
+- [x] H5 Unity package `com.viitorx.holotrack` AUTHORED (`bindings/unity/com.viitorx.holotrack`):
+      `HoloTrackNative` (P/Invoke + blittable structs/enums, lib `HoloTrackSDK`), `PMHTHeadTracker`
+      (owns native handle, pumps `IHeadTrackingSource`, zero per-frame alloc), `PMHTSimulatedSource`
+      (proxy-transform head, no hardware), `HeadTrackingConfig` ScriptableObject (+`ToNative`),
+      `HeadTrackingDisplaySurface`, `HeadTrackedCameraController` (off-axis matrices +
+      movementScale/deadZone/max-travel), `HeadTrackingDiagnostics` (overlay + gizmos),
+      `HeadTrackingRecorder` (CSV), asmdef `vxholotrack`, package.json, README.
+      NOT yet compiled in Unity (no editor session here) — that happens in H6. Known follow-up:
+      `HtOffAxis` marshals two float[16]/call (per-frame GC); make blittable/unsafe if it matters.
+- [ ] H6 Consumer sample in the nested game repo — deploy `HoloTrackSDK.dll` to the project's
+      Plugins, build a sample scene (surface + camera + sim source + diagnostics), compile the
+      package in Unity, and verify the off-axis parallax in play mode (watch for a view-handedness
+      flip — see the package README). Add EditMode tests once compiling.
 
 Build/run: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then run `build/vs2022/bin/Release/holotrack_harness.exe`.

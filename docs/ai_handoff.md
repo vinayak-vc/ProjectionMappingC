@@ -26,11 +26,18 @@ the two DLLs. Design: `docs/holotrack-architecture.md`; decisions D-029..D-032; 
   the pure test target must not depend on that, hence the harness is the primary verifier.
   Enable the gtest suite once the build/gtest toolsets are aligned.
 
-**Next (H4–H6):** H4 OAK device source behind a vcpkg `depthai` feature (spatial MobileNet-SSD,
-background thread, `IDetectionSource`) + a simulated/recorded source — live test needs the
-camera. H5 Unity package `com.viitorx.holotrack` (P/Invoke + `PMHTHeadTracker` +
-`HeadTrackedCameraController` off-axis + config SO + diagnostics + gizmos + CSV recorder;
-authorable now, compiles only in Unity). H6 consumer sample scene in the nested game repo.
+**H5 Unity package AUTHORED** (`bindings/unity/com.viitorx.holotrack`, asmdef `vxholotrack`):
+`HoloTrackNative` (P/Invoke, lib `HoloTrackSDK`), `PMHTHeadTracker` (owns handle, pumps
+`IHeadTrackingSource`, zero per-frame alloc), `PMHTSimulatedSource` (proxy transform — no
+hardware), `HeadTrackingConfig` SO, `HeadTrackingDisplaySurface`, `HeadTrackedCameraController`
+(off-axis + safety layer), `HeadTrackingDiagnostics`, `HeadTrackingRecorder`, README. NOT
+compiled in Unity yet (no editor here) — that is H6.
+
+**Next (H4, H6):** H4 OAK device source behind a vcpkg `depthai` feature (spatial MobileNet-SSD,
+background thread, `IDetectionSource`) + a recorded source — live test needs the camera. H6
+deploy `HoloTrackSDK.dll` into the nested game repo's Plugins, build a sample scene, compile the
+package in Unity, and verify the off-axis parallax in play mode (watch a possible
+view-handedness flip — package README). `.meta` files generate on first Unity import.
 
 Build/verify: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then `build/vs2022/bin/Release/holotrack_harness.exe`.

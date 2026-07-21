@@ -39,6 +39,13 @@ if(PMSDK_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
+# HoloTrackSDK — independent head-tracking product/DLL (docs/decisions.md D-029).
+# Placed after enable_testing() so its gtest_discover_tests registers cleanly.
+option(HOLOTRACK_BUILD "Build the HoloTrack head-tracking SDK" ON)
+if(HOLOTRACK_BUILD)
+    add_subdirectory(holotrack)
+endif()
+
 find_package(Python COMPONENTS Interpreter REQUIRED)
 add_custom_target(package_sdk
     COMMAND ${Python_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/package_release.py

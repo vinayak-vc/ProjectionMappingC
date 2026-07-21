@@ -343,6 +343,40 @@ confirmed stable in the overlap beforehand (the go/no-go gate). Architecture: D-
   If depth inverts, swap `_LeftTex`/`_RightTex` in the composer.
 - [ ] Upstream candidate: move the stereo composer/rig into the package (currently game-side).
 
+## HoloTrackSDK — Head-Tracked Holographic Projection (independent DLL, 2026-07-21)
+
+Separate product/DLL (D-029). Branch `Head-Tracked-Holographic-Projection-System`. No OAK
+hardware on this machine → hardware-free first (D-032). See `docs/holotrack-architecture.md`.
+
+- [x] H1 Docs — D-029..D-032, roadmap entry, architecture doc.
+- [x] H2 Core pure logic (all header-only except the Tracker): `Detection`/`PoseKeypoints`,
+      `TrackedViewer`/`TrackingState`, `TrackerConfig` (+`CalibrationTransform`), `IHeadFilter`
+      + `PassThrough`/`Exponential`/`OneEuro`/`Kalman` + `MakeFilter`, `TrackingStateMachine`,
+      `ViewerSelector` (nearest/largest-box, depth gate, hysteresis, stable id, no viewer-hop),
+      `HeadEstimator` (pose eyes→nose→neck, else bbox+depth+height), `CoordinateTransform`
+      (OAK→world T/R/S + inverse), `OffAxisProjection` (Kooima generalized perspective),
+      `Tracker` orchestrator (select→estimate→filter→state→transform→off-axis, velocity +
+      prediction extrapolation). `IDetectionSource` interface defined.
+- [x] H2 verification — standalone `holotrack_harness` (no gtest dependency): **161/161 checks,
+      exit 0**. GoogleTest suite authored too, gated behind `HOLOTRACK_BUILD_GTESTS` (OFF)
+      pending a gtest-matching MSVC toolset (prebuilt vcpkg gtest pulls unresolved `__std_rotate`
+      under the local link toolset; the pure test target must not drag OpenCV to mask it).
+- [x] H3 C-API (`HoloTrack/C_API/Types.h` + `TrackingAPI.h/.cpp`) — opaque `ht_tracker_t`,
+      create/destroy/set-config/get-config/push-frame/get-viewer/compute-offaxis/reset +
+      version + thread-local last-error; flat POD structs. Build target `holotrack` →
+      `HoloTrackSDK.dll` (10 `ht_*` exports confirmed via dumpbin). C boundary smoke-tested in
+      the harness.
+- [ ] H4 OAK device source behind a vcpkg `depthai` feature (spatial MobileNet-SSD, bg thread,
+      `IDetectionSource`) + a `SimulatedSource`/recorded source. Live smoke test deferred to
+      when an OAK-D-PRO-W-97 is attached.
+- [ ] H5 Unity package `com.viitorx.holotrack` — P/Invoke bindings, `PMHTHeadTracker`,
+      `HeadTrackedCameraController` (off-axis; applies movementScale/deadZone/clamp), config
+      ScriptableObject, diagnostics overlay, scene-view gizmos, CSV recorder; EditMode tests.
+- [ ] H6 Consumer sample in the nested game repo — scene, prefab, wiring, operator docs.
+
+Build/run: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
+holotrack holotrack_harness`, then run `build/vs2022/bin/Release/holotrack_harness.exe`.
+
 ## Next Items / Backlog
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)
 - [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter

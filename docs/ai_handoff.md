@@ -1,5 +1,40 @@
 # AI Agent Handoff Document
 
+## HoloTrackSDK — NEW independent product (2026-07-21)
+
+Branch `Head-Tracked-Holographic-Projection-System` (off `main`). Building the **Head-Tracked
+Holographic Projection System** as a **separate DLL** — `HoloTrackSDK.dll`, namespace
+`holotrack`, no runtime dependency on `ProjectionMappingSDK` (D-029). OAK-D-PRO-W-97 →
+single-viewer head tracking → off-axis generalized-perspective render (D-030) that feeds a
+content camera; projection mapping is composed downstream in the consumer scene, not by linking
+the two DLLs. Design: `docs/holotrack-architecture.md`; decisions D-029..D-032; plan/status in
+`docs/roadmap.md` + `docs/tasks.md` (HoloTrack sections).
+
+**Done (H1–H3), verified with no camera:**
+- C++ core in `include/HoloTrack/**` + `holotrack/src/**`: filters (Exp/OneEuro/Kalman),
+  Searching→Tracking→Prediction→Lost state machine, viewer selector (nearest/largest-box +
+  depth gate + switch hysteresis + stable id + no viewer-hop on transient loss), head estimator
+  (pose keypoints → bbox+depth+body-height fallback), OAK→world transform, Kooima off-axis
+  projection, and the `Tracker` orchestrator (velocity + prediction extrapolation).
+- C-API `include/HoloTrack/C_API/**` → `HoloTrackSDK.dll` with 10 `ht_*` exports (dumpbin-
+  confirmed). Independent CMake target wired via top-level `add_subdirectory(holotrack)`
+  (`HOLOTRACK_BUILD`, default ON).
+- Verification: `holotrack_harness` (dependency-free assertion exe) **161/161, exit 0**. A
+  GoogleTest suite is also authored but gated behind `HOLOTRACK_BUILD_GTESTS` (default OFF):
+  the prebuilt vcpkg gtest was built against a newer MSVC STL than the local link toolset, so
+  it needs `__std_rotate` which only resolves when a heavy lib (OpenCV) drags in the newer CRT —
+  the pure test target must not depend on that, hence the harness is the primary verifier.
+  Enable the gtest suite once the build/gtest toolsets are aligned.
+
+**Next (H4–H6):** H4 OAK device source behind a vcpkg `depthai` feature (spatial MobileNet-SSD,
+background thread, `IDetectionSource`) + a simulated/recorded source — live test needs the
+camera. H5 Unity package `com.viitorx.holotrack` (P/Invoke + `PMHTHeadTracker` +
+`HeadTrackedCameraController` off-axis + config SO + diagnostics + gizmos + CSV recorder;
+authorable now, compiles only in Unity). H6 consumer sample scene in the nested game repo.
+
+Build/verify: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
+holotrack holotrack_harness`, then `build/vs2022/bin/Release/holotrack_harness.exe`.
+
 ## Current State (2026-07-16)
 
 New machine / new agent: see `docs/dev-setup.md` for environment setup; repo layout and

@@ -60,6 +60,27 @@ D-025 upstreaming (RANSAC/settle/exposure), N-projector wall-canvas align.
 Pro-feature gap list: **8 of 12 done** (all 3 High + auto-blend, blend-gamma, color,
 rotation, dense-warp).
 
+## HoloTrackSDK — Head-Tracked Holographic Projection (independent product, started 2026-07-21)
+
+Separate DLL (`HoloTrackSDK.dll`, `com.viitorx.holotrack`), zero runtime dependency on the
+projection-mapping SDK (D-029). OAK-D-PRO-W-97 → single-viewer head tracking → off-axis
+perspective (D-030). Development is hardware-free first (no OAK on this machine): all
+decision logic is pure and unit-tested; the DepthAI device path is feature-gated (D-032).
+
+| Phase | Scope | Status |
+|---|---|---|
+| H1 | Docs — decisions D-029..D-032, this roadmap entry, `holotrack-architecture.md` | ✅ done |
+| H2 | Core pure logic — Detection/Viewer types, filters (Exp/OneEuro/Kalman), tracking state machine, viewer selector + hysteresis, head estimator, OAK→world transform, off-axis projection | ✅ done (harness 161/161) |
+| H3 | C-API (`HoloTrack/C_API`) — opaque tracker handle, config, push-detections, poll, get-head-pose, get-off-axis matrices; build target `holotrack` → `HoloTrackSDK.dll` (10 exports) | ✅ done |
+| H4 | OAK device source behind vcpkg `depthai` feature (spatial MobileNet-SSD) + `SimulatedSource`; live smoke test deferred to hardware | pending |
+| H5 | Unity package `com.viitorx.holotrack` — P/Invoke, `PMHTHeadTracker`, `HeadTrackedCameraController` (off-axis), config SO, diagnostics overlay, gizmos, CSV recorder; EditMode tests | pending |
+| H6 | Consumer sample in the nested game repo — scene, prefab, wiring, operator docs (needs Unity/MCP) | pending |
+
+Extensibility carried through the design (not built in v1): multi-user tracking (the selector
+already tracks a list, v1 exposes one), multiple projectors / edge-blended output (downstream
+in the PM package), stereo rendering (off-axis already produces per-eye frusta), networked
+tracking + multi-OAK sync (the `IDetectionSource` abstraction).
+
 ## Dependency plan (vcpkg manifest features)
 
 | Milestone | Dependency added |

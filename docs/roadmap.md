@@ -74,7 +74,7 @@ decision logic is pure and unit-tested; the DepthAI device path is feature-gated
 | H3 | C-API (`HoloTrack/C_API`) — opaque tracker handle, config, push-detections, poll, get-head-pose, get-off-axis matrices; build target `holotrack` → `HoloTrackSDK.dll` (10 exports) | ✅ done |
 | H4 | OAK device source behind vcpkg `depthai` feature (spatial MobileNet-SSD) + `SimulatedSource`; live smoke test deferred to hardware | pending |
 | H5 | Unity package `com.viitorx.holotrack` — P/Invoke, `PMHTHeadTracker`, `HeadTrackedCameraController` (off-axis), config SO, display surface, diagnostics overlay, gizmos, CSV recorder, sim source | ✅ authored (Unity compile/verify pending in H6) |
-| H6 | Consumer sample in the nested game repo — scene, prefab, wiring, operator docs (needs Unity/MCP) | pending |
+| H6 | Consumer sample in the nested game repo — `HoloTrackDemo` scene, DLL deployed to Plugins, off-axis parallax play-mode verified | ✅ done (parallax verified live) |
 
 Extensibility carried through the design (not built in v1): multi-user tracking (the selector
 already tracks a list, v1 exposes one), multiple projectors / edge-blended output (downstream

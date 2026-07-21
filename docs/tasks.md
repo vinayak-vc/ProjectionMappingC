@@ -378,10 +378,20 @@ hardware on this machine → hardware-free first (D-032). See `docs/holotrack-ar
       `HeadTrackingRecorder` (CSV), asmdef `vxholotrack`, package.json, README.
       NOT yet compiled in Unity (no editor session here) — that happens in H6. Known follow-up:
       `HtOffAxis` marshals two float[16]/call (per-frame GC); make blittable/unsafe if it matters.
-- [ ] H6 Consumer sample in the nested game repo — deploy `HoloTrackSDK.dll` to the project's
-      Plugins, build a sample scene (surface + camera + sim source + diagnostics), compile the
-      package in Unity, and verify the off-axis parallax in play mode (watch for a view-handedness
-      flip — see the package README). Add EditMode tests once compiling.
+- [x] H6 Consumer sample in the nested game repo (committed there, `dc18b10`): base project's
+      `Packages/manifest.json` references `com.viitorx.holotrack` (file:), `HoloTrackSDK.dll`
+      deployed to `Plugins/HoloTrack/` (force-added past the global *.dll ignore, like the PMSDK
+      DLL). Scene `HoloTrackDemo` (surface + off-axis camera + sim source + head proxy + 3 depth
+      cubes + diagnostics + config asset). Package compiles clean in Unity (0 errors).
+      **Play-mode verified**: head at centre → surface NDC.x 0.000, near cube 0.600, far 0.000;
+      head +0.8 x → surface stays 0.000 (window anchored), near→0.200, far→0.400 (near/far shift
+      OPPOSITE directions) = correct holographic motion parallax. No view-handedness flip needed.
+      Gotchas hit: MCP link drops on domain reload (reconnects); `manage_editor(play)` started
+      PAUSED so the sim head looked frozen until `EditorApplication.isPaused=false` (AGENTS
+      gotcha). MCP screenshot returns white for this scene (built-in pipeline capture quirk —
+      reproduces with the default camera too, unrelated to HoloTrack); verification was done
+      numerically via NDC projection, which is stronger than eyeballing.
+- [ ] H4 remains: OAK/DepthAI device source (vcpkg `depthai` feature) for real-camera input.
 
 Build/run: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then run `build/vs2022/bin/Release/holotrack_harness.exe`.

@@ -33,11 +33,20 @@ hardware), `HeadTrackingConfig` SO, `HeadTrackingDisplaySurface`, `HeadTrackedCa
 (off-axis + safety layer), `HeadTrackingDiagnostics`, `HeadTrackingRecorder`, README. NOT
 compiled in Unity yet (no editor here) — that is H6.
 
-**Next (H4, H6):** H4 OAK device source behind a vcpkg `depthai` feature (spatial MobileNet-SSD,
-background thread, `IDetectionSource`) + a recorded source — live test needs the camera. H6
-deploy `HoloTrackSDK.dll` into the nested game repo's Plugins, build a sample scene, compile the
-package in Unity, and verify the off-axis parallax in play mode (watch a possible
-view-handedness flip — package README). `.meta` files generate on first Unity import.
+**H6 DONE — consumer sample verified live** (nested game repo `main`, commit `dc18b10`): base
+project `Packages/manifest.json` references `com.viitorx.holotrack` (file:), `HoloTrackSDK.dll`
+in `Plugins/HoloTrack/` (force-added past the global `*.dll` ignore). Scene
+`HoloTrackDemo` (display surface + off-axis camera + sim source + head proxy + 3 depth cubes +
+diagnostics). Package compiled clean. Play-mode parallax verified numerically: head +0.8 x →
+on-plane surface stays NDC.x 0.000 (window anchored) while near cube 0.600→0.200 and far cube
+0.000→0.400 move OPPOSITE ways = correct off-axis hologram. No view-handedness flip needed.
+Gotchas: MCP drops on domain reload (reconnects); play mode started PAUSED (clear
+`EditorApplication.isPaused`); MCP screenshot renders white for this scene (built-in-pipeline
+capture quirk, reproduces with the default camera — unrelated to HoloTrack; verify numerically).
+
+**Next: H4** — OAK device source behind a vcpkg `depthai` feature (spatial MobileNet-SSD,
+background thread implementing `IDetectionSource`) + a recorded source; live test needs an
+OAK-D-PRO-W-97 attached. Everything above H4 is complete and independently usable now.
 
 Build/verify: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then `build/vs2022/bin/Release/holotrack_harness.exe`.

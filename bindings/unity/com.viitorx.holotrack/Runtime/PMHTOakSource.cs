@@ -34,6 +34,9 @@ namespace vxholotrack
         [SerializeField] private float depthLowerThresholdMm = 300f;
         [SerializeField] private float depthUpperThresholdMm = 8000f;
 
+        [Tooltip("Mirror detections horizontally (negate X). Enable when the camera faces the viewer (selfie view) so the tracked head moves the correct way.")]
+        [SerializeField] private bool mirrorX = false;
+
         private IntPtr source = IntPtr.Zero;
         private bool started;
 
@@ -95,6 +98,20 @@ namespace vxholotrack
                 return false;
             }
             count = (int)nativeCount;
+
+            if (mirrorX)
+            {
+                // Camera-facing-viewer selfie mirror: negate X on the spatial position and every
+                // pose keypoint so the tracked head moves the same direction the viewer does.
+                for (int i = 0; i < count && i < buffer.Length; i++)
+                {
+                    buffer[i].spatial.x = -buffer[i].spatial.x;
+                    buffer[i].nose.x = -buffer[i].nose.x;
+                    buffer[i].leftEye.x = -buffer[i].leftEye.x;
+                    buffer[i].rightEye.x = -buffer[i].rightEye.x;
+                    buffer[i].neck.x = -buffer[i].neck.x;
+                }
+            }
             return true; // a new frame (possibly zero detections) — let the tracker advance
         }
 

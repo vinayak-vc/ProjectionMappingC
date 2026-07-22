@@ -81,6 +81,17 @@ namespace vxholotrack
             }
         }
 
+        /// <summary>
+        /// Assign the two eye cameras at runtime. A stereo rig that creates its eye pair on demand
+        /// (e.g. PMSDKStereoContentRig via EnsureEyeCameras) binds them here so this controller can
+        /// drive their off-axis matrices each LateUpdate.
+        /// </summary>
+        public void SetEyeCameras(Camera left, Camera right)
+        {
+            leftCamera = left;
+            rightCamera = right;
+        }
+
         /// <summary>Restore both eye cameras to Unity's automatic view/projection.</summary>
         public void RestoreDefaultProjection()
         {

@@ -69,17 +69,32 @@ directly; person fallback after N faceless frames; feature-gated, untested witho
 game-side `PMSDKStereoContentRig.ExternalEyeMatrices` + eye-camera getters + `EnsureEyeCameras()`.
 Build feature-OFF green, **harness 180/180**. Nested rig change committed to the game repo.
 
-**DEFERRED (needs Unity — MCP was disconnected during this pass):** build the **ProBuilder
-holographic diorama scene** (recipe in the brief §C: recessed stage box + bezel + depth props +
-a pop-out hero kept inside the frame), wire `HeadTrackedStereoController` to the rig's runtime
-eye cameras (call `EnsureEyeCameras()`, grab `LeftEyeCamera`/`RightEyeCamera`, set
-`ExternalEyeMatrices=true`, order the controller after the rig), redeploy the rebuilt
-`HoloTrackSDK.dll` into the nested `Plugins/HoloTrack/` (Unity closed — plugin lock), then
-verify parallax + stereo in play mode (flip `swapEyes` if depth inverts). H4 face/person DepthAI
-path also still needs a hardware pass.
+**H7 diorama scene DONE + play-mode verified (2026-07-22).** Built `HoloStereoDioramaDemo`
+(nested repo `Scenes/`) per brief §C: display surface (2.0×1.2 @ z=0) + rest eye (0,0,+2),
+recessed box as 5 inward walls (robust fallback vs ProBuilder face-flipping), 4-bar bezel,
+3 depth props (z −1.05/−0.55/−0.15), pop-out hero (z +0.25). Wiring added: clean
+`HeadTrackedStereoController.SetEyeCameras(l,r)` (SDK) + game-side `PMSDKStereoHeadTrackBinder`
+(sets rig `SceneCameras`+`ExternalEyeMatrices`+`EnsureEyeCameras`, binds the rig's on-demand eye
+pair into the controller; `[DefaultExecutionOrder(50)]`, after the rig). Verified numerically:
+window disparity 0 (anchored), far>near positive behind, hero negative/crossed in front (no
+`swapEyes` flip); head→(0.8,0,2) leaves the window anchored (Δ0) while behind props shift right
+(far ≫ near) and the pop-out shifts opposite; eye offset exactly the 0.06 IPD. Console clean.
 
-**All of H1–H7 SDK/rig code is complete; the head-tracked holographic SBS-3D SDK is functionally
-done and independently usable. Remaining work is Unity-scene assembly + on-hardware verification.**
+**Root cause fixed along the way:** the deployed `Plugins/HoloTrack/HoloTrackSDK.dll` was the
+PRE-H7 build (10 `ht_` exports, missing `ht_compute_offaxis_eye`) → the controller threw
+`EntryPointNotFound` and never moved the eyes. Rebuilt the DLL **feature-OFF standalone** (a
+throwaway minimal CMake over the 4 holotrack sources + header-only `PMSDK/Math` — NO vcpkg/OpenCV,
+~1 min at a short path to dodge MAX_PATH) → 19 `ht_` exports incl. the H7 arbitrary-eye + H4
+`ht_oak_*`; redeployed (Unity closed for the plugin lock). Feature-OFF is enough for head-tracked
+stereo with the sim source; the real OAK path is still blocked on the missing `depthai` vcpkg port.
+
+**Manifest note:** `com.viitorx.holotrack` was added to `Multi Projector/Packages/manifest.json`
+(file:) so the package loads — but that manifest is in the TEMPLATE project (never committed), so
+on a fresh machine it must be re-added (same as the pmsdk reference).
+
+**All of H1–H7 SDK/rig code + the stereo diorama scene are complete and play-mode verified. The
+only remaining HoloTrack work is the H4 real-OAK path (blocked on a resolvable `depthai` vcpkg
+port).**
 
 Build/verify: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then `build/vs2022/bin/Release/holotrack_harness.exe`.

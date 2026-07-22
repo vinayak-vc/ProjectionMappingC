@@ -430,11 +430,21 @@ ProBuilder scene and live stereo verification are DEFERRED (Unity MCP was discon
 - [x] Game-side rig hook (nested repo): `PMSDKStereoContentRig.ExternalEyeMatrices` flag +
       `LeftEyeCamera`/`RightEyeCamera` getters + `EnsureEyeCameras()`; `UpdateEye` skips its own
       shear when driven externally.
-- [ ] DEFERRED (needs Unity, could not run — MCP disconnected): the **ProBuilder holographic
-      diorama scene** (recipe in the brief §C), wiring `HeadTrackedStereoController` to the rig's
-      runtime eye cameras, DLL redeploy (Unity closed), and **live parallax+stereo play-mode
-      verify** (watch the `swapEyes` flip). Also the H4 face/person DepthAI path is unverified
-      (no hardware).
+- [x] **DONE + play-mode verified (2026-07-22)**: `HoloStereoDioramaDemo` scene (nested repo
+      `Scenes/`) built per brief §C — display surface (2.0×1.2, z=0) + rest eye (0,0,+2),
+      recessed box as 5 inward walls (robust fallback vs ProBuilder face-flipping), 4-bar bezel,
+      3 depth props (z −1.05/−0.55/−0.15), pop-out hero (z +0.25). Wiring: added clean
+      `HeadTrackedStereoController.SetEyeCameras(l,r)` API + game-side `PMSDKStereoHeadTrackBinder`
+      (rig `SceneCameras`+`ExternalEyeMatrices`+`EnsureEyeCameras`, then binds the rig's eye pair
+      to the controller). **Root cause found**: the deployed `HoloTrackSDK.dll` was the pre-H7
+      build (missing `ht_compute_offaxis_eye` → EntryPointNotFound); rebuilt feature-OFF
+      standalone (no vcpkg/OpenCV needed — 4 files) with all 19 `ht_` exports and redeployed.
+      Verified numerically: stereo disparity 0 at window, +far > +near behind, −hero in front
+      (crossed) — correct sign, no `swapEyes` flip; motion parallax window-anchored (Δ0), behind
+      props shift right (far ≫ near), pop-out shifts opposite; IPD offset exactly 0.06. Console
+      clean.
+- [ ] H4 face/person DepthAI path still unverified (blocked on the missing `depthai` vcpkg port;
+      the feature-OFF stereo path above needs no camera).
 
 Build/run: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then run `build/vs2022/bin/Release/holotrack_harness.exe`.

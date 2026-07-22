@@ -23,15 +23,44 @@
 
 namespace holotrack {
 
+/**
+ * @brief Which on-device detector produces the head position.
+ *
+ * A face NN localizes the head directly (best for a forward-facing viewer); person detection is
+ * robust when the viewer turns away but only estimates the head from the body box. FaceThenPerson
+ * runs both and prefers the face, falling back to the person box after a run of faceless frames.
+ */
+enum class DetectionMode {
+    Person = 0,        /**< Person spatial detection only (@ref blobPath). */
+    Face = 1,          /**< Face spatial detection only (@ref faceBlobPath); head = face centre. */
+    FaceThenPerson = 2 /**< Face preferred, person fallback after @ref faceFallbackFrames faceless frames. */
+};
+
 /** @brief OAK device configuration. */
 struct OakOptions {
+    /** @brief Active detector (default FaceThenPerson). */
+    DetectionMode detectionMode{DetectionMode::FaceThenPerson};
+
     /**
-     * @brief Path to the compiled spatial-detection network blob (e.g. MobileNet-SSD).
+     * @brief Path to the compiled PERSON spatial-detection blob (e.g. MobileNet-SSD, 300x300).
      *
-     * Required — the SDK does not bundle a model. Produce one with the Luxonis model zoo /
-     * blobconverter (mobilenet-ssd, 300x300). @ref Start fails if empty or unreadable.
+     * Required for @ref DetectionMode::Person and @ref DetectionMode::FaceThenPerson. The SDK does
+     * not bundle a model — produce one with the Luxonis model zoo / blobconverter. @ref Start fails
+     * if the blob(s) required by the active mode are empty/unreadable.
      */
     std::string blobPath;
+
+    /**
+     * @brief Path to the compiled FACE spatial-detection blob (e.g. face-detection-retail-0004).
+     *
+     * Required for @ref DetectionMode::Face and @ref DetectionMode::FaceThenPerson. A face
+     * detection is emitted with its centre as a nose keypoint so the head estimator uses it
+     * directly (no body-height lift).
+     */
+    std::string faceBlobPath;
+
+    /** @brief FaceThenPerson: frames with no face before falling back to the person box. */
+    int faceFallbackFrames{15};
 
     /** @brief VOC class id treated as "person" (MobileNet-SSD: 15). */
     int personLabel{15};

@@ -13,8 +13,17 @@ namespace vxholotrack
     [AddComponentMenu("ViitorX/HoloTrack/OAK-D Source")]
     public sealed class PMHTOakSource : MonoBehaviour, IHeadTrackingSource
     {
-        [Tooltip("Path to the spatial-detection network blob (absolute, or under StreamingAssets).")]
+        [Tooltip("Which detector produces the head position. FaceThenPerson prefers the face and falls back to the person box.")]
+        [SerializeField] private HtDetectionMode detectionMode = HtDetectionMode.FaceThenPerson;
+
+        [Tooltip("Path to the PERSON spatial-detection blob (absolute, or under StreamingAssets). Used by Person/FaceThenPerson.")]
         [SerializeField] private string blobPath = string.Empty;
+
+        [Tooltip("Path to the FACE spatial-detection blob (absolute, or under StreamingAssets). Used by Face/FaceThenPerson.")]
+        [SerializeField] private string faceBlobPath = string.Empty;
+
+        [Tooltip("FaceThenPerson: consecutive faceless frames before falling back to the person box.")]
+        [SerializeField] private int faceFallbackFrames = 15;
 
         [Tooltip("Detector class id treated as 'person' (MobileNet-SSD VOC: 15).")]
         [SerializeField] private int personLabel = 15;
@@ -43,10 +52,12 @@ namespace vxholotrack
                 return;
             }
 
-            string resolvedBlob = ResolveBlobPath(blobPath);
             HtOakOptions opts = new HtOakOptions
             {
-                blobPath = resolvedBlob,
+                detectionMode = (int)detectionMode,
+                blobPath = ResolveBlobPath(blobPath),
+                faceBlobPath = ResolveBlobPath(faceBlobPath),
+                faceFallbackFrames = faceFallbackFrames,
                 personLabel = personLabel,
                 confidenceThreshold = confidenceThreshold,
                 depthLowerThresholdMm = depthLowerThresholdMm,

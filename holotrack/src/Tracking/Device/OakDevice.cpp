@@ -4,9 +4,15 @@
  *        HOLOTRACK_HAVE_DEPTHAI is defined (the vcpkg `depthai` feature); otherwise this is an
  *        inert stub so the DLL builds and links with no camera dependency (D-032).
  *
- * Targets depthai-core v2.x. Coordinate note: DepthAI spatial coordinates are millimetres with
- * +X right, +Y down, +Z forward; converted here to metres with +Y up to match the tracker's
- * assumed convention (any residual axis difference is absorbed by the OAK->world calibration).
+ * Detection modes (OakOptions::detectionMode):
+ *   - Person: one MobileNet-SSD spatial net; head is estimated downstream from the body box.
+ *   - Face:   one face spatial net; each face is emitted with its centre as a nose keypoint so the
+ *             head estimator uses it directly (no body-height lift).
+ *   - FaceThenPerson: both nets run; the face is preferred, falling back to the person box after
+ *             `faceFallbackFrames` consecutive faceless frames.
+ *
+ * Targets depthai-core v2.x. DepthAI spatial coordinates are mm, +X right, +Y down, +Z forward;
+ * converted here to metres with +Y up (residual axis differences are absorbed by OAK->world calib).
  */
 #include "HoloTrack/Tracking/Device/OakDevice.h"
 
@@ -30,47 +36,118 @@ struct OakDevice::Impl {
 
 #ifdef HOLOTRACK_HAVE_DEPTHAI
     std::unique_ptr<dai::Device> device;
-    std::shared_ptr<dai::DataOutputQueue> queue;
+    std::shared_ptr<dai::DataOutputQueue> faceQueue;   // null unless Face/FaceThenPerson
+    std::shared_ptr<dai::DataOutputQueue> personQueue; // null unless Person/FaceThenPerson
     std::thread worker;
     std::mutex mutex;
     std::vector<Detection> latest;
     double latestTimestamp{0.0};
     std::atomic<bool> running{false};
     std::atomic<bool> hasNew{false};
+    int facelessFrames{0};
+
+    static bool NeedsPerson(DetectionMode m) { return m == DetectionMode::Person || m == DetectionMode::FaceThenPerson; }
+    static bool NeedsFace(DetectionMode m) { return m == DetectionMode::Face || m == DetectionMode::FaceThenPerson; }
+
+    Detection ToDetection(const dai::SpatialImgDetection& d, bool asFace) const {
+        Detection out;
+        out.bboxX = d.xmin;
+        out.bboxY = d.ymin;
+        out.bboxW = d.xmax - d.xmin;
+        out.bboxH = d.ymax - d.ymin;
+        out.confidence = d.confidence;
+        out.spatial = Vector3(d.spatialCoordinates.x / 1000.0f,
+                              -d.spatialCoordinates.y / 1000.0f, // +Y up
+                              d.spatialCoordinates.z / 1000.0f);
+        if (asFace) {
+            // A face box already localizes the head: hand its centre to the estimator as a nose
+            // keypoint so it is used directly instead of the bbox+body-height fallback.
+            out.pose.valid = true;
+            out.pose.hasNose = true;
+            out.pose.nose = out.spatial;
+        }
+        return out;
+    }
+
+    void Publish(std::vector<Detection>&& frame, double ts) {
+        std::lock_guard<std::mutex> lock(mutex);
+        latest = std::move(frame);
+        latestTimestamp = ts;
+        hasNew.store(true, std::memory_order_release);
+    }
 
     void WorkerLoop() {
         const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        const DetectionMode mode = options.detectionMode;
         while (running.load(std::memory_order_relaxed)) {
-            std::shared_ptr<dai::SpatialImgDetections> packet = queue->tryGet<dai::SpatialImgDetections>();
-            if (packet == nullptr) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                continue;
-            }
-            std::vector<Detection> frame;
-            frame.reserve(packet->detections.size());
-            for (const dai::SpatialImgDetection& d : packet->detections) {
-                if (static_cast<int>(d.label) != options.personLabel || d.confidence < options.confidenceThreshold) {
-                    continue;
-                }
-                Detection out;
-                out.bboxX = d.xmin;
-                out.bboxY = d.ymin;
-                out.bboxW = d.xmax - d.xmin;
-                out.bboxH = d.ymax - d.ymin;
-                out.confidence = d.confidence;
-                out.spatial = Vector3(d.spatialCoordinates.x / 1000.0f,
-                                      -d.spatialCoordinates.y / 1000.0f, // +Y up
-                                      d.spatialCoordinates.z / 1000.0f);
-                frame.push_back(out);
-            }
+            bool published = false;
             const double ts = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-            {
-                std::lock_guard<std::mutex> lock(mutex);
-                latest = std::move(frame);
-                latestTimestamp = ts;
-                hasNew.store(true, std::memory_order_release);
+
+            // --- Face path (preferred when present) ---
+            if (faceQueue != nullptr) {
+                std::shared_ptr<dai::SpatialImgDetections> packet = faceQueue->tryGet<dai::SpatialImgDetections>();
+                if (packet != nullptr) {
+                    std::vector<Detection> frame;
+                    frame.reserve(packet->detections.size());
+                    for (const dai::SpatialImgDetection& d : packet->detections) {
+                        if (d.confidence < options.confidenceThreshold) {
+                            continue;
+                        }
+                        frame.push_back(ToDetection(d, /*asFace=*/true));
+                    }
+                    if (!frame.empty()) {
+                        facelessFrames = 0;
+                        Publish(std::move(frame), ts);
+                        published = true;
+                    } else if (facelessFrames < 1000000) {
+                        ++facelessFrames;
+                    }
+                }
+            }
+
+            // --- Person path (Person mode, or FaceThenPerson past the fallback threshold) ---
+            if (!published && personQueue != nullptr) {
+                std::shared_ptr<dai::SpatialImgDetections> packet = personQueue->tryGet<dai::SpatialImgDetections>();
+                if (packet != nullptr) {
+                    const bool usePerson = (mode == DetectionMode::Person) ||
+                                           (mode == DetectionMode::FaceThenPerson && facelessFrames >= options.faceFallbackFrames);
+                    if (usePerson) {
+                        std::vector<Detection> frame;
+                        frame.reserve(packet->detections.size());
+                        for (const dai::SpatialImgDetection& d : packet->detections) {
+                            if (static_cast<int>(d.label) != options.personLabel || d.confidence < options.confidenceThreshold) {
+                                continue;
+                            }
+                            frame.push_back(ToDetection(d, /*asFace=*/false));
+                        }
+                        Publish(std::move(frame), ts);
+                        published = true;
+                    }
+                }
+            }
+
+            if (!published) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
         }
+    }
+
+    // Build a spatial-detection net (MobileNet-SSD family: person or face) on a shared preview+depth.
+    static void AddSpatialNet(dai::Pipeline& pipeline, std::shared_ptr<dai::node::ColorCamera> cam,
+                              std::shared_ptr<dai::node::StereoDepth> stereo, const std::string& blob,
+                              float confidence, float lowerMm, float upperMm, const std::string& streamName) {
+        auto nn = pipeline.create<dai::node::MobileNetSpatialDetectionNetwork>();
+        auto xout = pipeline.create<dai::node::XLinkOut>();
+        xout->setStreamName(streamName);
+        nn->setBlobPath(blob);
+        nn->setConfidenceThreshold(confidence);
+        nn->input.setBlocking(false);
+        nn->setBoundingBoxScaleFactor(0.5f);
+        nn->setDepthLowerThreshold(static_cast<uint32_t>(lowerMm));
+        nn->setDepthUpperThreshold(static_cast<uint32_t>(upperMm));
+        cam->preview.link(nn->input);
+        stereo->depth.link(nn->inputDepth);
+        nn->out.link(xout->input);
     }
 #endif
 };
@@ -99,8 +176,13 @@ bool OakDevice::Start() {
     if (impl_->running.load()) {
         return true;
     }
-    if (impl_->options.blobPath.empty()) {
-        impl_->lastError = "OakDevice::Start: OakOptions.blobPath is empty (spatial-detection blob required)";
+    const DetectionMode mode = impl_->options.detectionMode;
+    if (Impl::NeedsPerson(mode) && impl_->options.blobPath.empty()) {
+        impl_->lastError = "OakDevice::Start: person blobPath is empty (required for Person/FaceThenPerson)";
+        return false;
+    }
+    if (Impl::NeedsFace(mode) && impl_->options.faceBlobPath.empty()) {
+        impl_->lastError = "OakDevice::Start: faceBlobPath is empty (required for Face/FaceThenPerson)";
         return false;
     }
     try {
@@ -109,9 +191,6 @@ bool OakDevice::Start() {
         auto monoLeft = pipeline.create<dai::node::MonoCamera>();
         auto monoRight = pipeline.create<dai::node::MonoCamera>();
         auto stereo = pipeline.create<dai::node::StereoDepth>();
-        auto spatialNN = pipeline.create<dai::node::MobileNetSpatialDetectionNetwork>();
-        auto xoutNN = pipeline.create<dai::node::XLinkOut>();
-        xoutNN->setStreamName("detections");
 
         camRgb->setPreviewSize(300, 300);
         camRgb->setResolution(dai::ColorCameraProperties::SensorResolution::THE_1080_P);
@@ -129,25 +208,33 @@ bool OakDevice::Start() {
         monoLeft->out.link(stereo->left);
         monoRight->out.link(stereo->right);
 
-        spatialNN->setBlobPath(impl_->options.blobPath);
-        spatialNN->setConfidenceThreshold(impl_->options.confidenceThreshold);
-        spatialNN->input.setBlocking(false);
-        spatialNN->setBoundingBoxScaleFactor(0.5f);
-        spatialNN->setDepthLowerThreshold(static_cast<uint32_t>(impl_->options.depthLowerThresholdMm));
-        spatialNN->setDepthUpperThreshold(static_cast<uint32_t>(impl_->options.depthUpperThresholdMm));
-
-        camRgb->preview.link(spatialNN->input);
-        stereo->depth.link(spatialNN->inputDepth);
-        spatialNN->out.link(xoutNN->input);
+        if (Impl::NeedsFace(mode)) {
+            Impl::AddSpatialNet(pipeline, camRgb, stereo, impl_->options.faceBlobPath,
+                                impl_->options.confidenceThreshold, impl_->options.depthLowerThresholdMm,
+                                impl_->options.depthUpperThresholdMm, "det_face");
+        }
+        if (Impl::NeedsPerson(mode)) {
+            Impl::AddSpatialNet(pipeline, camRgb, stereo, impl_->options.blobPath,
+                                impl_->options.confidenceThreshold, impl_->options.depthLowerThresholdMm,
+                                impl_->options.depthUpperThresholdMm, "det_person");
+        }
 
         impl_->device = std::make_unique<dai::Device>(pipeline);
-        impl_->queue = impl_->device->getOutputQueue("detections", 4, false);
+        if (Impl::NeedsFace(mode)) {
+            impl_->faceQueue = impl_->device->getOutputQueue("det_face", 4, false);
+        }
+        if (Impl::NeedsPerson(mode)) {
+            impl_->personQueue = impl_->device->getOutputQueue("det_person", 4, false);
+        }
+        impl_->facelessFrames = 0;
         impl_->running.store(true);
         impl_->worker = std::thread([this]() { impl_->WorkerLoop(); });
         return true;
     } catch (const std::exception& e) {
         impl_->lastError = std::string("OakDevice::Start: ") + e.what();
         impl_->device.reset();
+        impl_->faceQueue.reset();
+        impl_->personQueue.reset();
         impl_->running.store(false);
         return false;
     }
@@ -159,7 +246,8 @@ void OakDevice::Stop() {
             impl_->worker.join();
         }
     }
-    impl_->queue.reset();
+    impl_->faceQueue.reset();
+    impl_->personQueue.reset();
     impl_->device.reset();
 }
 

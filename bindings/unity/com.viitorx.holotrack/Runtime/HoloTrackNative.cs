@@ -129,11 +129,22 @@ namespace vxholotrack
         public int valid;
     }
 
-    /// <summary>OAK device options. Matches <c>ht_oak_options_t</c>.</summary>
+    /// <summary>OAK detector selection. Matches <c>ht_detection_mode_t</c>.</summary>
+    public enum HtDetectionMode : int
+    {
+        Person = 0,
+        Face = 1,
+        FaceThenPerson = 2
+    }
+
+    /// <summary>OAK device options. Field order MUST match <c>ht_oak_options_t</c>.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct HtOakOptions
     {
+        public int detectionMode;
         [MarshalAs(UnmanagedType.LPStr)] public string blobPath;
+        [MarshalAs(UnmanagedType.LPStr)] public string faceBlobPath;
+        public int faceFallbackFrames;
         public int personLabel;
         public float confidenceThreshold;
         public float depthLowerThresholdMm;
@@ -179,6 +190,11 @@ namespace vxholotrack
                                                                 ref HtVec3 pa, ref HtVec3 pb, ref HtVec3 pc,
                                                                 float nearPlane, float farPlane,
                                                                 out HtOffAxis result);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern HtStatus ht_compute_offaxis_eye(ref HtVec3 pa, ref HtVec3 pb, ref HtVec3 pc,
+                                                             ref HtVec3 eye, float nearPlane, float farPlane,
+                                                             out HtOffAxis result);
 
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         public static extern HtStatus ht_tracker_reset(IntPtr tracker);

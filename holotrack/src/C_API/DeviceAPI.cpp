@@ -47,7 +47,10 @@ HOLOTRACK_API ht_oak_source_t* ht_oak_create(const ht_oak_options_t* options) {
         OakDevice* dev;
         if (options != nullptr) {
             OakOptions opt;
+            opt.detectionMode = static_cast<DetectionMode>(options->detectionMode);
             opt.blobPath = (options->blobPath != nullptr) ? options->blobPath : "";
+            opt.faceBlobPath = (options->faceBlobPath != nullptr) ? options->faceBlobPath : "";
+            opt.faceFallbackFrames = options->faceFallbackFrames;
             opt.personLabel = options->personLabel;
             opt.confidenceThreshold = options->confidenceThreshold;
             opt.depthLowerThresholdMm = options->depthLowerThresholdMm;

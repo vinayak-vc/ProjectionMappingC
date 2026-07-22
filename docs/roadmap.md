@@ -75,6 +75,7 @@ decision logic is pure and unit-tested; the DepthAI device path is feature-gated
 | H4 | OAK device source behind vcpkg `depthai` feature (spatial MobileNet-SSD, bg thread) + device C-API + Unity `PMHTOakSource` | ✅ code done (feature OFF build + C# verified; live test needs the camera) |
 | H5 | Unity package `com.viitorx.holotrack` — P/Invoke, `PMHTHeadTracker`, `HeadTrackedCameraController` (off-axis), config SO, display surface, diagnostics overlay, gizmos, CSV recorder, sim source | ✅ authored (Unity compile/verify pending in H6) |
 | H6 | Consumer sample in the nested game repo — `HoloTrackDemo` scene, DLL deployed to Plugins, off-axis parallax play-mode verified | ✅ done (parallax verified live) |
+| H7 | Head-tracked **SBS-3D** integration — stateless arbitrary-eye off-axis C-API + `PMHTHeadTracker` eye overload, generic `HeadTrackedStereoController`, OAK detection modes (Person/Face/FaceThenPerson), game-side rig `ExternalEyeMatrices` hook | ✅ SDK+rig code done (harness 180/180); ProBuilder scene + live stereo verify DEFERRED (needs Unity + DLL redeploy) |
 
 Extensibility carried through the design (not built in v1): multi-user tracking (the selector
 already tracks a list, v1 exposes one), multiple projectors / edge-blended output (downstream

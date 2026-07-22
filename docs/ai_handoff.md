@@ -59,8 +59,27 @@ To go live: ensure a resolvable `depthai` vcpkg port, `cmake --preset vs2022
 depthai-core v2.x — verify node API (`MobileNetSpatialDetectionNetwork`, board sockets) against
 the installed version.
 
-**All of H1–H6 + H4 code are complete; the head-tracked holographic SDK is functionally done
-and independently usable. Only the physical-camera smoke test remains, gated on hardware.**
+**H7 head-tracked SBS-3D integration — SDK + rig code DONE (2026-07-22).** Design:
+`docs/holotrack-stereo-integration.md`. Added: stateless `ht_compute_offaxis_eye` C-API (arbitrary
+eye) + `PMHTHeadTracker.TryComputeOffAxis(...,eye,...)` overload; generic
+`HeadTrackedStereoController` (head ± IPD/2 → two off-axis frusta on two eye cameras; `swapEyes`,
+safety layer); OAK detection modes `Person/Face/FaceThenPerson` (`OakDevice`/`OakOptions`/
+`ht_oak_options_t`/`PMHTOakSource` — face box emitted as a nose keypoint so the estimator uses it
+directly; person fallback after N faceless frames; feature-gated, untested without hardware);
+game-side `PMSDKStereoContentRig.ExternalEyeMatrices` + eye-camera getters + `EnsureEyeCameras()`.
+Build feature-OFF green, **harness 180/180**. Nested rig change committed to the game repo.
+
+**DEFERRED (needs Unity — MCP was disconnected during this pass):** build the **ProBuilder
+holographic diorama scene** (recipe in the brief §C: recessed stage box + bezel + depth props +
+a pop-out hero kept inside the frame), wire `HeadTrackedStereoController` to the rig's runtime
+eye cameras (call `EnsureEyeCameras()`, grab `LeftEyeCamera`/`RightEyeCamera`, set
+`ExternalEyeMatrices=true`, order the controller after the rig), redeploy the rebuilt
+`HoloTrackSDK.dll` into the nested `Plugins/HoloTrack/` (Unity closed — plugin lock), then
+verify parallax + stereo in play mode (flip `swapEyes` if depth inverts). H4 face/person DepthAI
+path also still needs a hardware pass.
+
+**All of H1–H7 SDK/rig code is complete; the head-tracked holographic SBS-3D SDK is functionally
+done and independently usable. Remaining work is Unity-scene assembly + on-hardware verification.**
 
 Build/verify: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then `build/vs2022/bin/Release/holotrack_harness.exe`.

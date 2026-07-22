@@ -18,9 +18,19 @@ extern "C" {
 /** @brief Opaque OAK detection-source handle. */
 typedef struct ht_oak_source_t ht_oak_source_t;
 
-/** @brief OAK device options. Mirrors holotrack::OakOptions. */
+/** @brief Detector selection; matches holotrack::DetectionMode. */
+typedef enum {
+    HT_DETECT_PERSON = 0,
+    HT_DETECT_FACE = 1,
+    HT_DETECT_FACE_THEN_PERSON = 2
+} ht_detection_mode_t;
+
+/** @brief OAK device options. Mirrors holotrack::OakOptions (field order must match the C# struct). */
 typedef struct {
-    const char* blobPath;          /**< Spatial-detection network blob path (required to start). */
+    int detectionMode;             /**< @ref ht_detection_mode_t (default FaceThenPerson). */
+    const char* blobPath;          /**< Person spatial-detection blob (Person/FaceThenPerson). */
+    const char* faceBlobPath;      /**< Face spatial-detection blob (Face/FaceThenPerson). */
+    int faceFallbackFrames;        /**< FaceThenPerson: faceless frames before person fallback. */
     int personLabel;               /**< VOC class id for "person" (MobileNet-SSD: 15). */
     float confidenceThreshold;     /**< Minimum detection confidence [0,1]. */
     float depthLowerThresholdMm;   /**< Stereo depth lower clamp (mm). */

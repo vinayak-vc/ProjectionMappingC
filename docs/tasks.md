@@ -408,6 +408,34 @@ hardware on this machine → hardware-free first (D-032). See `docs/holotrack-ar
       a MobileNet-SSD 300² blob, rebuild + redeploy the DLL (Unity closed — plugin lock), attach
       the OAK-D-PRO-W-97, add a `PMHTOakSource` to the scene (replacing the sim source), smoke-test.
 
+## HoloTrack H7 — head-tracked SBS-3D integration (2026-07-22)
+
+Design/brief: `docs/holotrack-stereo-integration.md`. SDK-side + game-side rig code DONE; the
+ProBuilder scene and live stereo verification are DEFERRED (Unity MCP was disconnected).
+
+- [x] Native stateless `ht_compute_offaxis_eye(pa,pb,pc,eye,near,far,out)` (arbitrary eye, no
+      tracker handle) in `TrackingAPI.{h,cpp}`; harness checks it (lateral eye shift skews the
+      frustum; eye-on-plane degenerate; null guard). Build feature-OFF green, **harness 180/180**.
+- [x] P/Invoke `ht_compute_offaxis_eye` in `HoloTrackNative.cs` + `PMHTHeadTracker.TryComputeOffAxis(
+      bl,br,tl,eye,near,far,...)` eye overload.
+- [x] Generic package component `HeadTrackedStereoController` — head ± IPD/2 along the display
+      right axis → two off-axis frusta on two assigned eye cameras; `ApplySafety`, `swapEyes`,
+      rest-eye, `RestoreDefaultProjection`.
+- [x] Detection modes: `holotrack::DetectionMode {Person,Face,FaceThenPerson}` (+ `faceBlobPath`,
+      `faceFallbackFrames`) in `OakOptions`/`ht_oak_options_t`; `OakDevice` builds face and/or
+      person spatial nets on a shared preview+depth and, in FaceThenPerson, prefers the face
+      (emitted with its centre as a nose keypoint so `HeadEstimator` uses it directly), falling
+      back to the person box after N faceless frames. Stub path intact; feature-gated (untested —
+      no DepthAI/hardware). Exposed on `PMHTOakSource`.
+- [x] Game-side rig hook (nested repo): `PMSDKStereoContentRig.ExternalEyeMatrices` flag +
+      `LeftEyeCamera`/`RightEyeCamera` getters + `EnsureEyeCameras()`; `UpdateEye` skips its own
+      shear when driven externally.
+- [ ] DEFERRED (needs Unity, could not run — MCP disconnected): the **ProBuilder holographic
+      diorama scene** (recipe in the brief §C), wiring `HeadTrackedStereoController` to the rig's
+      runtime eye cameras, DLL redeploy (Unity closed), and **live parallax+stereo play-mode
+      verify** (watch the `swapEyes` flip). Also the H4 face/person DepthAI path is unverified
+      (no hardware).
+
 Build/run: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then run `build/vs2022/bin/Release/holotrack_harness.exe`.
 

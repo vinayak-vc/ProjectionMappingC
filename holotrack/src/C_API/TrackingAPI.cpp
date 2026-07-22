@@ -216,6 +216,24 @@ HOLOTRACK_API ht_status_t ht_tracker_compute_offaxis(ht_tracker_t* tracker, cons
     return HT_SUCCESS;
 }
 
+HOLOTRACK_API ht_status_t ht_compute_offaxis_eye(const ht_vec3_t* pa, const ht_vec3_t* pb,
+                                                 const ht_vec3_t* pc, const ht_vec3_t* eye,
+                                                 float nearPlane, float farPlane, ht_offaxis_t* out) {
+    if (pa == nullptr || pb == nullptr || pc == nullptr || eye == nullptr || out == nullptr) {
+        SetError("ht_compute_offaxis_eye: null argument");
+        return HT_ERROR_INVALID_ARGUMENT;
+    }
+    const OffAxisResult r = holotrack::ComputeOffAxis(ToVec3(*pa), ToVec3(*pb), ToVec3(*pc),
+                                                      ToVec3(*eye), nearPlane, farPlane);
+    for (int i = 0; i < 16; ++i) {
+        out->view[i] = r.view[i];
+        out->projection[i] = r.projection[i];
+    }
+    out->eyeToScreen = r.eyeToScreen;
+    out->valid = r.valid ? 1 : 0;
+    return HT_SUCCESS;
+}
+
 HOLOTRACK_API ht_status_t ht_tracker_reset(ht_tracker_t* tracker) {
     Tracker* t = AsTracker(tracker);
     if (t == nullptr) { SetError("ht_tracker_reset: null handle"); return HT_ERROR_INVALID_HANDLE; }

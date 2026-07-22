@@ -428,6 +428,19 @@ static void TestCApi() {
     CHECK(off.valid == 1);
     NEAR(off.eyeToScreen, 2.0f, 1e-4);
 
+    // Stateless arbitrary-eye off-axis (drives the stereo pair, ± IPD/2).
+    const ht_vec3_t eyeC{0, 0, 2}, eyeRt{0.5f, 0, 2}, eyeOn{0, 0, 0};
+    ht_offaxis_t oc{}, ort{}, obad{};
+    CHECK(ht_compute_offaxis_eye(&pa, &pb, &pc, &eyeC, 0.1f, 100.0f, &oc) == HT_SUCCESS);
+    CHECK(oc.valid == 1);
+    NEAR(oc.eyeToScreen, 2.0f, 1e-4);
+    CHECK(ht_compute_offaxis_eye(&pa, &pb, &pc, &eyeRt, 0.1f, 100.0f, &ort) == HT_SUCCESS);
+    CHECK(ort.valid == 1);
+    CHECK(oc.projection[8] != ort.projection[8]);           // lateral eye shift skews the frustum
+    CHECK(ht_compute_offaxis_eye(&pa, &pb, &pc, &eyeOn, 0.1f, 100.0f, &obad) == HT_SUCCESS);
+    CHECK(obad.valid == 0);                                 // eye on the screen plane is degenerate
+    CHECK(ht_compute_offaxis_eye(nullptr, &pb, &pc, &eyeC, 0.1f, 100.0f, &oc) == HT_ERROR_INVALID_ARGUMENT);
+
     // Config round-trip preserves the filter type.
     ht_tracker_config_t got{};
     CHECK(ht_tracker_get_config(t, &got) == HT_SUCCESS);

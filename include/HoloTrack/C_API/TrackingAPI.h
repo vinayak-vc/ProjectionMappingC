@@ -60,6 +60,22 @@ HOLOTRACK_API ht_status_t ht_tracker_compute_offaxis(ht_tracker_t* tracker,
                                                      const ht_vec3_t* pc, float nearPlane,
                                                      float farPlane, ht_offaxis_t* out);
 
+/**
+ * @brief Stateless off-axis view+projection for an ARBITRARY eye and display surface.
+ *
+ * Unlike @ref ht_tracker_compute_offaxis (which uses the tracker's internal head), this takes
+ * an explicit @p eye, so a caller can drive a stereo pair by solving twice — one eye at
+ * head - right*(IPD/2), one at head + right*(IPD/2) — against the same display quad. No tracker
+ * handle required.
+ * @param pa Screen bottom-left (world). @param pb bottom-right. @param pc top-left.
+ * @param eye Eye position (world).
+ * @param nearPlane Near clip (>0). @param farPlane Far clip (> near).
+ * @param out Receives the matrices; @c out->valid is 0 for a degenerate configuration.
+ */
+HOLOTRACK_API ht_status_t ht_compute_offaxis_eye(const ht_vec3_t* pa, const ht_vec3_t* pb,
+                                                 const ht_vec3_t* pc, const ht_vec3_t* eye,
+                                                 float nearPlane, float farPlane, ht_offaxis_t* out);
+
 /** @brief Reset tracking (drop the viewer, clear filter/selector state). */
 HOLOTRACK_API ht_status_t ht_tracker_reset(ht_tracker_t* tracker);
 

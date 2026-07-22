@@ -153,6 +153,33 @@ namespace vxholotrack
             return true;
         }
 
+        /// <summary>
+        /// Off-axis view + projection for an EXPLICIT eye position (stateless native solve). Used to
+        /// drive a stereo pair — left/right eye at head ± IPD/2 — against the same display surface.
+        /// </summary>
+        /// <returns>True on a valid (non-degenerate) result.</returns>
+        public bool TryComputeOffAxis(Vector3 bottomLeft, Vector3 bottomRight, Vector3 topLeft, Vector3 eye,
+                                      float nearPlane, float farPlane,
+                                      out Matrix4x4 view, out Matrix4x4 projection)
+        {
+            view = Matrix4x4.identity;
+            projection = Matrix4x4.identity;
+
+            HtVec3 pa = new HtVec3(bottomLeft.x, bottomLeft.y, bottomLeft.z);
+            HtVec3 pb = new HtVec3(bottomRight.x, bottomRight.y, bottomRight.z);
+            HtVec3 pc = new HtVec3(topLeft.x, topLeft.y, topLeft.z);
+            HtVec3 e = new HtVec3(eye.x, eye.y, eye.z);
+            HtStatus status = HoloTrackNative.ht_compute_offaxis_eye(ref pa, ref pb, ref pc, ref e,
+                                                                     nearPlane, farPlane, out HtOffAxis result);
+            if (status != HtStatus.Success || result.valid == 0 || result.view == null || result.projection == null)
+            {
+                return false;
+            }
+            view = ToMatrix(result.view);
+            projection = ToMatrix(result.projection);
+            return true;
+        }
+
         private void OnDestroy()
         {
             if (tracker != IntPtr.Zero)

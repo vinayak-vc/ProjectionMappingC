@@ -94,6 +94,11 @@ if(PMSDK_BUILD_TESTS)
     endif()
 endif()
 
+add_executable(holotrack_oak_smoke tools/OakSmoke.cpp)
+target_link_libraries(holotrack_oak_smoke PRIVATE holotrack)
+target_include_directories(holotrack_oak_smoke PRIVATE ${PROJECT_SOURCE_DIR}/include)
+pmsdk_apply_compiler_options(holotrack_oak_smoke)
+
 # --- Install (independent package export) ---
 include(GNUInstallDirs)
 install(TARGETS holotrack

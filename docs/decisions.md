@@ -157,6 +157,27 @@ abstraction, so a `SimulatedSource` / recorded source drives development and CI 
 hardware (the same no-hardware strategy used for calibration auto-align, D-021). The DLL and
 its entire test suite build green with DepthAI absent.
 
+## D-033 2026-07-22 — HoloTrack DepthAI resolves as an external CMake package by default
+
+Live H4 work on the OAK-D-PRO-W-97 showed the camera is connected and calibrated
+(OAK Viewer reports MXID `14442C10F143D3D200`, product `OAK-D-PRO-W-97`), but this repo's
+pinned vcpkg baseline has no `depthai` port. Enabling `HOLOTRACK_WITH_DEPTHAI` previously
+forced `VCPKG_MANIFEST_FEATURES=depthai`, so configure failed before CMake could find any
+external Luxonis SDK install.
+
+Decision: `HOLOTRACK_WITH_DEPTHAI=ON` means "compile the real OAK source", and
+`find_package(depthai CONFIG REQUIRED)` resolves DepthAI from `CMAKE_PREFIX_PATH` or a normal
+CMake package location. The vcpkg manifest feature is only appended when
+`HOLOTRACK_DEPTHAI_USE_VCPKG=ON`, for machines that provide a custom/updated vcpkg registry or
+overlay port. This matches Luxonis' C++ integration model (install `depthai-core`, then consume
+`depthai::core` through `find_package`) and avoids making all developers depend on an absent
+port.
+
+Added `holotrack_oak_smoke`: a native executable that starts `ht_oak_*`, polls the device for a
+short window, and prints frame/detection counts. It is intentionally not a CTest because it
+requires hardware, valid model blobs, and exclusive device access. Close OAK Viewer before using
+it; its logs show it owns/runs a DepthAI pipeline while open.
+
 ## D-027 2026-07-21 — Camera-measured luminance compensation reuses the white sweep capture
 
 Projector vignetting (bright centre, dim edges) means a soft-edge blend overlap is the sum

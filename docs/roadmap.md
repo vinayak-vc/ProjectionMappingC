@@ -72,7 +72,7 @@ decision logic is pure and unit-tested; the DepthAI device path is feature-gated
 | H1 | Docs — decisions D-029..D-032, this roadmap entry, `holotrack-architecture.md` | ✅ done |
 | H2 | Core pure logic — Detection/Viewer types, filters (Exp/OneEuro/Kalman), tracking state machine, viewer selector + hysteresis, head estimator, OAK→world transform, off-axis projection | ✅ done (harness 161/161) |
 | H3 | C-API (`HoloTrack/C_API`) — opaque tracker handle, config, push-detections, poll, get-head-pose, get-off-axis matrices; build target `holotrack` → `HoloTrackSDK.dll` (10 exports) | ✅ done |
-| H4 | OAK device source behind vcpkg `depthai` feature (spatial MobileNet-SSD, bg thread) + device C-API + Unity `PMHTOakSource` | ✅ code done (feature OFF build + C# verified; live test needs the camera) |
+| H4 | OAK device source behind DepthAI support (spatial MobileNet-SSD, bg thread) + device C-API + Unity `PMHTOakSource` | ✅ code done; live camera detected; dependency path fixed to external `depthai` CMake package; live test still needs DepthAI C++ install + blobs |
 | H5 | Unity package `com.viitorx.holotrack` — P/Invoke, `PMHTHeadTracker`, `HeadTrackedCameraController` (off-axis), config SO, display surface, diagnostics overlay, gizmos, CSV recorder, sim source | ✅ authored (Unity compile/verify pending in H6) |
 | H6 | Consumer sample in the nested game repo — `HoloTrackDemo` scene, DLL deployed to Plugins, off-axis parallax play-mode verified | ✅ done (parallax verified live) |
 | H7 | Head-tracked **SBS-3D** integration — stateless arbitrary-eye off-axis C-API + `PMHTHeadTracker` eye overload, generic `HeadTrackedStereoController`, OAK detection modes (Person/Face/FaceThenPerson), game-side rig `ExternalEyeMatrices` hook | ✅ SDK+rig code done (harness 180/180); ProBuilder scene + live stereo verify DEFERRED (needs Unity + DLL redeploy) |
@@ -91,3 +91,8 @@ tracking + multi-OAK sync (the `IDetectionSource` abstraction).
 | 8 | `nlohmann-json` |
 | 9 | `opencv4` (feature `calibration`) |
 | later | `spdlog` — deferred; M2 logging is a zero-dependency callback facade (see D-008) |
+
+DepthAI note (2026-07-22, D-033): the pinned vcpkg baseline does not contain a `depthai` port.
+`HOLOTRACK_WITH_DEPTHAI=ON` now resolves Luxonis DepthAI through `find_package(depthai CONFIG)`
+from an external install by default; vcpkg resolution is opt-in with
+`HOLOTRACK_DEPTHAI_USE_VCPKG=ON` for machines that provide a custom/updated port.

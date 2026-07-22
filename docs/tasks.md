@@ -366,9 +366,9 @@ hardware on this machine → hardware-free first (D-032). See `docs/holotrack-ar
       version + thread-local last-error; flat POD structs. Build target `holotrack` →
       `HoloTrackSDK.dll` (10 `ht_*` exports confirmed via dumpbin). C boundary smoke-tested in
       the harness.
-- [ ] H4 OAK device source behind a vcpkg `depthai` feature (spatial MobileNet-SSD, bg thread,
-      `IDetectionSource`) + a `SimulatedSource`/recorded source. Live smoke test deferred to
-      when an OAK-D-PRO-W-97 is attached.
+- [ ] H4 OAK device source behind DepthAI support (spatial MobileNet-SSD, bg thread,
+      `IDetectionSource`) + a `SimulatedSource`/recorded source. Live camera is now present;
+      smoke test still needs a C++ DepthAI package and model blobs.
 - [x] H5 Unity package `com.viitorx.holotrack` AUTHORED (`bindings/unity/com.viitorx.holotrack`):
       `HoloTrackNative` (P/Invoke + blittable structs/enums, lib `HoloTrackSDK`), `PMHTHeadTracker`
       (owns native handle, pumps `IHeadTrackingSource`, zero per-frame alloc), `PMHTSimulatedSource`
@@ -400,13 +400,20 @@ hardware on this machine → hardware-free first (D-032). See `docs/holotrack-ar
       default DLL is camera-free. Device C-API `HoloTrack/C_API/DeviceAPI.{h,cpp}` (opaque
       `ht_oak_source_t`, is_supported/create/destroy/start/stop/is_running/poll/last_error — 8
       exports, dumpbin-confirmed). Unity `PMHTOakSource` (`IHeadTrackingSource` over `ht_oak_*`,
-      same push path as the sim source; warns + no-ops when the DLL lacks DepthAI). vcpkg feature
-      `depthai`, CMake option `HOLOTRACK_WITH_DEPTHAI` (OFF default).
-      Verified: default (feature-OFF) DLL builds; harness 171/171 incl. device C-API stub checks;
+      same push path as the sim source; warns + no-ops when the DLL lacks DepthAI). CMake option
+      `HOLOTRACK_WITH_DEPTHAI` (OFF default) consumes an external `depthai` CMake package by
+      default; vcpkg resolution is opt-in via `HOLOTRACK_DEPTHAI_USE_VCPKG` (D-033).
+      Verified: default (feature-OFF) DLL builds; harness 180/180 incl. device C-API stub checks;
       Unity C# compiles clean (0 errors). Targets depthai-core v2.x.
-- [ ] H4 live: enable `HOLOTRACK_WITH_DEPTHAI` (needs a resolvable `depthai` vcpkg port), supply
-      a MobileNet-SSD 300² blob, rebuild + redeploy the DLL (Unity closed — plugin lock), attach
-      the OAK-D-PRO-W-97, add a `PMHTOakSource` to the scene (replacing the sim source), smoke-test.
+- [ ] H4 live: install Luxonis DepthAI C++ (`depthaiConfig.cmake` / `depthai::core`), configure
+      with `HOLOTRACK_WITH_DEPTHAI=ON` and `CMAKE_PREFIX_PATH` pointing at that install, supply
+      person/face `.blob` files, rebuild + redeploy the DLL (Unity closed — plugin lock), close
+      OAK Viewer for exclusive device access, add a `PMHTOakSource` to the scene (replacing the
+      sim source), smoke-test with `holotrack_oak_smoke` first and Unity second.
+- [ ] H4 first live hologram pass: use **Person** detection mode first, with only a MobileNet-SSD
+      300x300 person `.blob`. Do not start with `FaceThenPerson`; add the face blob/mode only
+      after person-only proves the DepthAI build, native smoke executable, Unity P/Invoke,
+      `PMHTOakSource`, and `PMHTHeadTracker` path.
 
 ## HoloTrack H7 — head-tracked SBS-3D integration (2026-07-22)
 
@@ -443,8 +450,14 @@ ProBuilder scene and live stereo verification are DEFERRED (Unity MCP was discon
       (crossed) — correct sign, no `swapEyes` flip; motion parallax window-anchored (Δ0), behind
       props shift right (far ≫ near), pop-out shifts opposite; IPD offset exactly 0.06. Console
       clean.
-- [ ] H4 face/person DepthAI path still unverified (blocked on the missing `depthai` vcpkg port;
-      the feature-OFF stereo path above needs no camera).
+- [ ] H4 face/person DepthAI live path still unverified, but the missing-vcpkg-port blocker is
+      removed (2026-07-22, D-033): `HOLOTRACK_WITH_DEPTHAI=ON` now consumes an externally
+      installed Luxonis `depthai` CMake package by default; vcpkg is opt-in via
+      `HOLOTRACK_DEPTHAI_USE_VCPKG=ON` only for machines with a working custom/updated port.
+      Added `holotrack_oak_smoke` for hardware polling. Current machine evidence:
+      OAK Viewer sees `OAK-D-PRO-W-97` / MXID `14442C10F143D3D200`; feature-OFF build +
+      harness green; live test still needs a C++ DepthAI install (`depthaiConfig.cmake`),
+      person/face `.blob` files, and exclusive camera access (close OAK Viewer).
 
 Build/run: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then run `build/vs2022/bin/Release/holotrack_harness.exe`.

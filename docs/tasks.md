@@ -468,6 +468,17 @@ ProBuilder scene and live stereo verification are DEFERRED (Unity MCP was discon
       (crossed) — correct sign, no `swapEyes` flip; motion parallax window-anchored (Δ0), behind
       props shift right (far ≫ near), pop-out shifts opposite; IPD offset exactly 0.06. Console
       clean.
+- [x] **Unified full-stack scene DONE + play-mode verified (2026-07-23)**: `HoloProjectionStereoDemo`
+      (nested repo) — the first scene combining **projection mapping + SBS 3D + head-tracking**.
+      Head-tracked off-axis stereo (HoloTrack drives the rig's eye cameras) flows through the
+      two-projector `PMSDKStereoComposer` warp/blend and is packed SBS for 3D projectors — HoloTrack =
+      *what* each eye sees, PM = *where* it lands. Built from `StereoMappingDemo`'s projection+SBS
+      rig + `HoloStereoDioramaDemo`'s head-track layer (framed diorama, sim head source; OAK a
+      one-flag swap). Enabler: `PMSDKStereoHeadTrackBinder.DirectScreenSbs` is now serialized
+      (true=direct-to-display, default; false=through the composer — mutually exclusive paths).
+      Verified: IsStereoReady + both composers active, 0.06 IPD; projector captures show
+      split-sliced/warped/blended/SBS-packed head-tracked content; window-anchored parallax,
+      depth-ordered + crossed disparity. Nested commit `c09b4a0`.
 - [ ] H4 face/person DepthAI live path still unverified, but the missing-vcpkg-port blocker is
       removed (2026-07-22, D-033): `HOLOTRACK_WITH_DEPTHAI=ON` now consumes an externally
       installed Luxonis `depthai` CMake package by default; vcpkg is opt-in via

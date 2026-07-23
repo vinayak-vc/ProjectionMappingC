@@ -491,6 +491,48 @@ ProBuilder scene and live stereo verification are DEFERRED (Unity MCP was discon
 Build/run: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then run `build/vs2022/bin/Release/holotrack_harness.exe`.
 
+## HoloTrack — phone (ARCore 6DoF) head-tracking source (SCOPED — not started, 2026-07-23)
+
+An alternative viewer-tracking input to the OAK camera: the viewer holds or head-mounts an
+**ARCore phone** (Samsung S21 confirmed ARCore-certified) that streams its own 6DoF world pose;
+that pose IS the head/eye position for the off-axis render. Decision + rationale: **D-035**.
+
+**Why / when it's worth it.** The phone route trades the camera's device-free magic for
+precision and simplicity:
+- **Precise, metric, low-drift 6DoF** from ARCore visual-inertial odometry (camera+IMU) —
+  ~cm / ~60 Hz. No detection ambiguity (it's the phone), no ML blob, no DepthAI toolchain.
+- **Unblocks a working head-tracked demo NOW**, independent of the H4 OAK/DepthAI integration.
+- Best fit: **development/testing** (real 6DoF input replacing `PMHTSimulatedSource`),
+  single-user/seated/VIP experiences where wearing a device is acceptable, and **ground-truth**
+  to measure OAK tracking accuracy.
+
+**Explicit non-goal / caveat.** Do NOT replace the OAK for device-free public installs — the
+whole point of the camera path is the viewer wears nothing. The phone tracks the *phone*, so it
+must be **head-mounted** (rigid) to equal eye position; hand-held introduces a wobbling offset.
+Raw IMU alone is not enough (orientation only; position integration drifts) — ARCore VIO is the
+requirement. The S21 has **no ToF** and the base S21 has **no UWB**, so a *fixed* phone
+face-tracker would be worse than the OAK — this item is specifically the WORN/6DoF role.
+
+**Scope (subtasks):**
+- [ ] `PMHTPhoneSource` (Unity): a new `IHeadTrackingSource` that receives phone pose and emits
+  it as the viewer head (bypasses detection/selection; still runs the tracker's smoothing +
+  velocity prediction). Drops into the existing source abstraction alongside
+  `PMHTSimulatedSource`/`PMHTOakSource`.
+- [ ] Transport: reuse the existing `PMSDKOscServer` (or a small dedicated UDP listener) to carry
+  pose PC-side; keep it allocation-free per frame.
+- [ ] Android pose-streamer app (AR Foundation/ARCore): streams 6DoF pose over UDP/OSC (~100
+  lines; well-trodden pattern). The main new artifact.
+- [ ] **ARCore→wall coordinate calibration**: ARCore's world frame is arbitrary (session origin).
+  Align it to the Unity/wall frame with a rigid transform — reuse the same
+  `calibTranslation/Rotation/Scale` mechanism as the OAK→world path (`HeadTrackingConfig`).
+  Establish via a known reference (touch phone to wall centre, or an ARCore image anchor on the
+  wall).
+- [ ] Latency budget: WiFi hop adds ~10–50 ms; head-tracking >50 ms breaks the illusion. Lean on
+  the tracker's existing velocity extrapolation; measure end-to-end.
+
+**Effort:** moderate — the Unity source is small (the pipeline was built for pluggable sources);
+the Android app + coordinate calibration are the real work. No native/DLL change required.
+
 ## Depth-camera 3D / curved-surface mapping (SCOPED — not started, 2026-07-21)
 
 A proper feature project, not a camera swap. Reference device on hand: **Luxonis

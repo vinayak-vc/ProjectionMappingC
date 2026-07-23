@@ -157,6 +157,34 @@ abstraction, so a `SimulatedSource` / recorded source drives development and CI 
 hardware (the same no-hardware strategy used for calibration auto-align, D-021). The DLL and
 its entire test suite build green with DepthAI absent.
 
+## D-035 2026-07-23 — A phone (ARCore 6DoF) is a pluggable head-tracking SOURCE, not a camera replacement
+
+Prompted by "can I use my Samsung S21 as the tracker instead of the OAK face/person detection?"
+
+Decision: support a phone as a **worn/held 6DoF source** via ARCore visual-inertial odometry,
+implemented as a new `IHeadTrackingSource` (`PMHTPhoneSource`) that streams the phone's own world
+pose to the PC — NOT as a fixed camera that face-tracks the viewer. Rationale:
+
+- The head-tracking pipeline was deliberately built around a pluggable `IHeadTrackingSource`
+  (sim / OAK). A phone pose stream is just a third source; it emits the head position directly
+  (no detection/selection/estimation) and reuses the tracker's smoothing + prediction. Zero
+  native/DLL change.
+- ARCore gives metric, low-drift 6DoF *position* (camera+IMU fusion); the phone's raw IMU alone
+  gives only orientation (position integration drifts). So ARCore is the requirement, not "the
+  phone's sensors."
+- **Worn, not fixed.** As a FIXED face-tracker the S21 loses to the OAK: it has no ToF and (base
+  model) no UWB, so head distance would be ML-estimated, not measured. Its advantage is only in
+  the *worn* role, where it reports its own precise pose.
+- **Not a replacement for device-free installs.** The camera path's value is that the viewer
+  wears nothing; the phone must be head-mounted to equal eye position (hand-held wobbles). So the
+  phone is for development/testing, single-user/controlled experiences, and OAK ground-truth —
+  complementary to, not a substitute for, the OAK in public installs.
+- Coordinate alignment reuses the existing OAK→world calibration mechanism
+  (`HeadTrackingConfig.calib*`): ARCore's arbitrary session frame → the wall/world frame via a
+  rigid transform from a known reference.
+
+Scope in docs/tasks.md ("HoloTrack — phone (ARCore 6DoF) head-tracking source").
+
 ## D-033 2026-07-22 — HoloTrack DepthAI resolves as an external CMake package by default
 
 Live H4 work on the OAK-D-PRO-W-97 showed the camera is connected and calibrated

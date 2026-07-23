@@ -1,0 +1,19 @@
+{
+  "name": "com.viitorx.holotrack",
+  "version": "0.1.0",
+  "displayName": "ViitorX HoloTrack SDK",
+  "description": "Head-tracked holographic projection for Unity (OAK-D stereo depth camera). Independent of the projection mapping SDK.",
+  "unity": "2021.3",
+  "keywords": [
+    "head tracking",
+    "holographic",
+    "off-axis",
+    "perspective",
+    "oak-d",
+    "holotrack",
+    "viitorx"
+  ],
+  "author": {
+    "name": "ViitorX"
+  }
+}

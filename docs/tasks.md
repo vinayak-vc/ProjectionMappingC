@@ -361,10 +361,140 @@ confirmed stable in the overlap beforehand (the go/no-go gate). Architecture: D-
   If depth inverts, swap `_LeftTex`/`_RightTex` in the composer.
 - [ ] Upstream candidate: move the stereo composer/rig into the package (currently game-side).
 
+## HoloTrackSDK — Head-Tracked Holographic Projection (independent DLL, 2026-07-21)
+
+Separate product/DLL (D-029). Branch `Head-Tracked-Holographic-Projection-System`. No OAK
+hardware on this machine → hardware-free first (D-032). See `docs/holotrack-architecture.md`.
+
+- [x] H1 Docs — D-029..D-032, roadmap entry, architecture doc.
+- [x] H2 Core pure logic (all header-only except the Tracker): `Detection`/`PoseKeypoints`,
+      `TrackedViewer`/`TrackingState`, `TrackerConfig` (+`CalibrationTransform`), `IHeadFilter`
+      + `PassThrough`/`Exponential`/`OneEuro`/`Kalman` + `MakeFilter`, `TrackingStateMachine`,
+      `ViewerSelector` (nearest/largest-box, depth gate, hysteresis, stable id, no viewer-hop),
+      `HeadEstimator` (pose eyes→nose→neck, else bbox+depth+height), `CoordinateTransform`
+      (OAK→world T/R/S + inverse), `OffAxisProjection` (Kooima generalized perspective),
+      `Tracker` orchestrator (select→estimate→filter→state→transform→off-axis, velocity +
+      prediction extrapolation). `IDetectionSource` interface defined.
+- [x] H2 verification — standalone `holotrack_harness` (no gtest dependency): **161/161 checks,
+      exit 0**. GoogleTest suite authored too, gated behind `HOLOTRACK_BUILD_GTESTS` (OFF)
+      pending a gtest-matching MSVC toolset (prebuilt vcpkg gtest pulls unresolved `__std_rotate`
+      under the local link toolset; the pure test target must not drag OpenCV to mask it).
+- [x] H3 C-API (`HoloTrack/C_API/Types.h` + `TrackingAPI.h/.cpp`) — opaque `ht_tracker_t`,
+      create/destroy/set-config/get-config/push-frame/get-viewer/compute-offaxis/reset +
+      version + thread-local last-error; flat POD structs. Build target `holotrack` →
+      `HoloTrackSDK.dll` (10 `ht_*` exports confirmed via dumpbin). C boundary smoke-tested in
+      the harness.
+- [ ] H4 OAK device source behind DepthAI support (spatial MobileNet-SSD, bg thread,
+      `IDetectionSource`) + a `SimulatedSource`/recorded source. Live camera is now present;
+      smoke test still needs a C++ DepthAI package and model blobs.
+- [x] H5 Unity package `com.viitorx.holotrack` AUTHORED (`bindings/unity/com.viitorx.holotrack`):
+      `HoloTrackNative` (P/Invoke + blittable structs/enums, lib `HoloTrackSDK`), `PMHTHeadTracker`
+      (owns native handle, pumps `IHeadTrackingSource`, zero per-frame alloc), `PMHTSimulatedSource`
+      (proxy-transform head, no hardware), `HeadTrackingConfig` ScriptableObject (+`ToNative`),
+      `HeadTrackingDisplaySurface`, `HeadTrackedCameraController` (off-axis matrices +
+      movementScale/deadZone/max-travel), `HeadTrackingDiagnostics` (overlay + gizmos),
+      `HeadTrackingRecorder` (CSV), asmdef `vxholotrack`, package.json, README.
+      NOT yet compiled in Unity (no editor session here) — that happens in H6. Known follow-up:
+      `HtOffAxis` marshals two float[16]/call (per-frame GC); make blittable/unsafe if it matters.
+- [x] H6 Consumer sample in the nested game repo (committed there, `dc18b10`): base project's
+      `Packages/manifest.json` references `com.viitorx.holotrack` (file:), `HoloTrackSDK.dll`
+      deployed to `Plugins/HoloTrack/` (force-added past the global *.dll ignore, like the PMSDK
+      DLL). Scene `HoloTrackDemo` (surface + off-axis camera + sim source + head proxy + 3 depth
+      cubes + diagnostics + config asset). Package compiles clean in Unity (0 errors).
+      **Play-mode verified**: head at centre → surface NDC.x 0.000, near cube 0.600, far 0.000;
+      head +0.8 x → surface stays 0.000 (window anchored), near→0.200, far→0.400 (near/far shift
+      OPPOSITE directions) = correct holographic motion parallax. No view-handedness flip needed.
+      Gotchas hit: MCP link drops on domain reload (reconnects); `manage_editor(play)` started
+      PAUSED so the sim head looked frozen until `EditorApplication.isPaused=false` (AGENTS
+      gotcha). MCP screenshot returns white for this scene (built-in pipeline capture quirk —
+      reproduces with the default camera too, unrelated to HoloTrack); verification was done
+      numerically via NDC projection, which is stronger than eyeballing.
+- [x] H4 OAK/DepthAI device source CODE done (live test deferred — no camera here):
+      `holotrack::OakDevice` (`include/HoloTrack/Tracking/Device/OakDevice.h`,
+      `holotrack/src/Tracking/Device/OakDevice.cpp`) — PImpl `IDetectionSource`; DepthAI pipeline
+      (ColorCamera 300² preview + MonoL/R → StereoDepth → `MobileNetSpatialDetectionNetwork`,
+      depth-aligned) on a background thread, spatial detections → metres with +Y up. Compiled
+      only under `HOLOTRACK_HAVE_DEPTHAI`; otherwise an inert stub (Start fails cleanly), so the
+      default DLL is camera-free. Device C-API `HoloTrack/C_API/DeviceAPI.{h,cpp}` (opaque
+      `ht_oak_source_t`, is_supported/create/destroy/start/stop/is_running/poll/last_error — 8
+      exports, dumpbin-confirmed). Unity `PMHTOakSource` (`IHeadTrackingSource` over `ht_oak_*`,
+      same push path as the sim source; warns + no-ops when the DLL lacks DepthAI). CMake option
+      `HOLOTRACK_WITH_DEPTHAI` (OFF default) consumes an external `depthai` CMake package by
+      default; vcpkg resolution is opt-in via `HOLOTRACK_DEPTHAI_USE_VCPKG` (D-033).
+      Verified: default (feature-OFF) DLL builds; harness 180/180 incl. device C-API stub checks;
+      Unity C# compiles clean (0 errors). Targets depthai-core v2.x.
+- [ ] H4 live: install Luxonis DepthAI C++ (`depthaiConfig.cmake` / `depthai::core`), configure
+      with `HOLOTRACK_WITH_DEPTHAI=ON` and `CMAKE_PREFIX_PATH` pointing at that install, supply
+      person/face `.blob` files, rebuild + redeploy the DLL (Unity closed — plugin lock), close
+      OAK Viewer for exclusive device access, add a `PMHTOakSource` to the scene (replacing the
+      sim source), smoke-test with `holotrack_oak_smoke` first and Unity second.
+- [ ] H4 first live hologram pass: use **Person** detection mode first, with only a MobileNet-SSD
+      300x300 person `.blob`. Do not start with `FaceThenPerson`; add the face blob/mode only
+      after person-only proves the DepthAI build, native smoke executable, Unity P/Invoke,
+      `PMHTOakSource`, and `PMHTHeadTracker` path.
+
+## HoloTrack H7 — head-tracked SBS-3D integration (2026-07-22)
+
+Design/brief: `docs/holotrack-stereo-integration.md`. SDK-side + game-side rig code DONE; the
+ProBuilder scene and live stereo verification are DEFERRED (Unity MCP was disconnected).
+
+- [x] Native stateless `ht_compute_offaxis_eye(pa,pb,pc,eye,near,far,out)` (arbitrary eye, no
+      tracker handle) in `TrackingAPI.{h,cpp}`; harness checks it (lateral eye shift skews the
+      frustum; eye-on-plane degenerate; null guard). Build feature-OFF green, **harness 180/180**.
+- [x] P/Invoke `ht_compute_offaxis_eye` in `HoloTrackNative.cs` + `PMHTHeadTracker.TryComputeOffAxis(
+      bl,br,tl,eye,near,far,...)` eye overload.
+- [x] Generic package component `HeadTrackedStereoController` — head ± IPD/2 along the display
+      right axis → two off-axis frusta on two assigned eye cameras; `ApplySafety`, `swapEyes`,
+      rest-eye, `RestoreDefaultProjection`.
+- [x] Detection modes: `holotrack::DetectionMode {Person,Face,FaceThenPerson}` (+ `faceBlobPath`,
+      `faceFallbackFrames`) in `OakOptions`/`ht_oak_options_t`; `OakDevice` builds face and/or
+      person spatial nets on a shared preview+depth and, in FaceThenPerson, prefers the face
+      (emitted with its centre as a nose keypoint so `HeadEstimator` uses it directly), falling
+      back to the person box after N faceless frames. Stub path intact; feature-gated (untested —
+      no DepthAI/hardware). Exposed on `PMHTOakSource`.
+- [x] Game-side rig hook (nested repo): `PMSDKStereoContentRig.ExternalEyeMatrices` flag +
+      `LeftEyeCamera`/`RightEyeCamera` getters + `EnsureEyeCameras()`; `UpdateEye` skips its own
+      shear when driven externally.
+- [x] **DONE + play-mode verified (2026-07-22)**: `HoloStereoDioramaDemo` scene (nested repo
+      `Scenes/`) built per brief §C — display surface (2.0×1.2, z=0) + rest eye (0,0,+2),
+      recessed box as 5 inward walls (robust fallback vs ProBuilder face-flipping), 4-bar bezel,
+      3 depth props (z −1.05/−0.55/−0.15), pop-out hero (z +0.25). Wiring: added clean
+      `HeadTrackedStereoController.SetEyeCameras(l,r)` API + game-side `PMSDKStereoHeadTrackBinder`
+      (rig `SceneCameras`+`ExternalEyeMatrices`+`EnsureEyeCameras`, then binds the rig's eye pair
+      to the controller). **Root cause found**: the deployed `HoloTrackSDK.dll` was the pre-H7
+      build (missing `ht_compute_offaxis_eye` → EntryPointNotFound); rebuilt feature-OFF
+      standalone (no vcpkg/OpenCV needed — 4 files) with all 19 `ht_` exports and redeployed.
+      Verified numerically: stereo disparity 0 at window, +far > +near behind, −hero in front
+      (crossed) — correct sign, no `swapEyes` flip; motion parallax window-anchored (Δ0), behind
+      props shift right (far ≫ near), pop-out shifts opposite; IPD offset exactly 0.06. Console
+      clean.
+- [x] **Unified full-stack scene DONE + play-mode verified (2026-07-23)**: `HoloProjectionStereoDemo`
+      (nested repo) — the first scene combining **projection mapping + SBS 3D + head-tracking**.
+      Head-tracked off-axis stereo (HoloTrack drives the rig's eye cameras) flows through the
+      two-projector `PMSDKStereoComposer` warp/blend and is packed SBS for 3D projectors — HoloTrack =
+      *what* each eye sees, PM = *where* it lands. Built from `StereoMappingDemo`'s projection+SBS
+      rig + `HoloStereoDioramaDemo`'s head-track layer (framed diorama, sim head source; OAK a
+      one-flag swap). Enabler: `PMSDKStereoHeadTrackBinder.DirectScreenSbs` is now serialized
+      (true=direct-to-display, default; false=through the composer — mutually exclusive paths).
+      Verified: IsStereoReady + both composers active, 0.06 IPD; projector captures show
+      split-sliced/warped/blended/SBS-packed head-tracked content; window-anchored parallax,
+      depth-ordered + crossed disparity. Nested commit `c09b4a0`.
+- [ ] H4 face/person DepthAI live path still unverified, but the missing-vcpkg-port blocker is
+      removed (2026-07-22, D-033): `HOLOTRACK_WITH_DEPTHAI=ON` now consumes an externally
+      installed Luxonis `depthai` CMake package by default; vcpkg is opt-in via
+      `HOLOTRACK_DEPTHAI_USE_VCPKG=ON` only for machines with a working custom/updated port.
+      Added `holotrack_oak_smoke` for hardware polling. Current machine evidence:
+      OAK Viewer sees `OAK-D-PRO-W-97` / MXID `14442C10F143D3D200`; feature-OFF build +
+      harness green; live test still needs a C++ DepthAI install (`depthaiConfig.cmake`),
+      person/face `.blob` files, and exclusive camera access (close OAK Viewer).
+
+Build/run: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
+holotrack holotrack_harness`, then run `build/vs2022/bin/Release/holotrack_harness.exe`.
+
 ## Depth-camera 3D / curved-surface mapping (SCOPED — not started, 2026-07-21)
 
 A proper feature project, not a camera swap. Reference device on hand: **Luxonis
-OAK-D-PRO-W** (stereo depth + wide FOV). Decision + rationale: **D-029**.
+OAK-D-PRO-W** (stereo depth + wide FOV). Decision + rationale: **D-034**.
 
 **Why / when it's worth it.** The current auto-align is a 2D planar homography: it needs
 only a flat grayscale image of the wall and is already sub-pixel (0.55 px, hardware-run
@@ -412,7 +542,7 @@ scopes it, with the OAK-D as the reference sensor.
 ## Next Items / Backlog
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)
 - [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter
-- [ ] Depth-camera 3D / curved-surface mapping — see the scoped milestone above (OAK-D reference device, D-029)
+- [ ] Depth-camera 3D / curved-surface mapping — see the scoped milestone above (OAK-D reference device, D-034)
 - [x] True per-region black-level compensation (implemented 2026-07-21 — see milestone above, D-028; `_BlackLevel` uniform floor retained as a manual override)
 - [ ] GPU warp path for extreme projector counts / grid density
 - [ ] Milestone 19: Plugin SDK

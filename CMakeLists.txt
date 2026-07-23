@@ -5,9 +5,16 @@ cmake_minimum_required(VERSION 3.25)
 option(PMSDK_BUILD_TESTS "Build PMSDK unit tests" ON)
 option(PMSDK_BUILD_EXAMPLES "Build PMSDK example applications" ON)
 option(PMSDK_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+# HoloTrack OAK-D device source (DepthAI). OFF by default: the DLL and its tests build with no
+# camera and no DepthAI dependency; the device path is compiled only when this is ON (D-032).
+option(HOLOTRACK_WITH_DEPTHAI "Build the HoloTrack OAK-D device source (requires DepthAI)" OFF)
+option(HOLOTRACK_DEPTHAI_USE_VCPKG "Resolve DepthAI through the vcpkg manifest feature instead of an external CMake package" OFF)
 
 if(PMSDK_BUILD_TESTS)
     list(APPEND VCPKG_MANIFEST_FEATURES "tests")
+endif()
+if(HOLOTRACK_WITH_DEPTHAI AND HOLOTRACK_DEPTHAI_USE_VCPKG)
+    list(APPEND VCPKG_MANIFEST_FEATURES "depthai")
 endif()
 
 project(ProjectionMappingSDK
@@ -37,6 +44,13 @@ endif()
 
 if(PMSDK_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+# HoloTrackSDK — independent head-tracking product/DLL (docs/decisions.md D-029).
+# Placed after enable_testing() so its gtest_discover_tests registers cleanly.
+option(HOLOTRACK_BUILD "Build the HoloTrack head-tracking SDK" ON)
+if(HOLOTRACK_BUILD)
+    add_subdirectory(holotrack)
 endif()
 
 find_package(Python COMPONENTS Interpreter REQUIRED)

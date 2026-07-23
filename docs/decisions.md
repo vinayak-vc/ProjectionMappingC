@@ -96,7 +96,90 @@ The projection mapping structure uses a hierarchical Scene Graph for warped surf
 
 To support visual tooling and interactive sample applications (like the Unity setup wizard in Milestone 15), we extended the C-API to allow reading warped geometry back to the host environment (`pmsdk_mesh_get_vertices`). Although the SDK is primarily designed to push rendering output, exposing these getters is necessary for engine-agnostic preview capabilities.
 
-## D-029 2026-07-21 — A depth camera (OAK-D) is a 3D-mapping enabler, not a flat-wall quality upgrade
+## D-029 2026-07-21 — Head-tracked holographic system ships as an independent SDK/DLL (HoloTrackSDK)
+
+The head-tracked holographic projection feature is a **separate product** from the projection
+mapping SDK, delivered as its own DLL (`HoloTrackSDK.dll`, namespace `holotrack`, Unity
+package `com.viitorx.holotrack`) that has **zero runtime dependency** on
+`ProjectionMappingSDK.dll`. Rationale: the two capabilities are orthogonal — a customer can
+run a head-tracked hologram without projection mapping, and vice-versa. Coupling them into
+one DLL would force every projection-mapping consumer to carry the DepthAI/OAK dependency
+and would let one product's ABI churn break the other.
+
+- **Same repo, separate target.** Lives in this repo (`include/HoloTrack`, `holotrack/src`,
+  `holotrack/tests`, top-level `add_subdirectory(holotrack)`), shares CI and the header-only
+  `pmsdk::Math` types (constexpr value types, no link — so reuse costs nothing and adds no
+  runtime dependency). It does **not** link `pmsdk`.
+- **Own C-API** (`include/HoloTrack/C_API`) following the same rules as PMSDK's (D-006):
+  opaque handles, status-code returns, `HT_GetLastError`, no C++/STL/exceptions across the
+  boundary.
+- **Composition happens in the consumer**, not by linking DLLs: the Unity scene feeds the
+  tracked head pose into the content camera, whose output the (separately installed)
+  projection-mapping package then warps/blends. Neither SDK knows about the other.
+
+## D-030 2026-07-21 — Holographic render uses off-axis generalized perspective, not camera translation
+
+The spec (§7/§8) lists "move the virtual camera / movement multiplier / clamp / dead zone",
+which is a naive camera *translation*. That does not produce a geometrically correct
+hologram: the illusion requires the rendered frustum to treat the physical display surface as
+a fixed window and the tracked eye as the projection centre — i.e. an **asymmetric off-axis
+projection** (Kooima 2008, "generalized perspective projection"). The camera's near/far
+planes stay parallel to the wall; only the frustum skews toward the eye. This is the same
+off-axis construction already used game-side by `PMSDKStereoContentRig` for the two-projector
+wall (D-026), reimplemented here as pure math (`holotrack::OffAxisProjection`: 4 world-space
+display corners + eye position → view + projection `Matrix4`). The spec's
+movement-multiplier / clamp / min-max / dead-zone become a **safety + tuning layer** applied
+to the tracked eye position before it feeds the frustum, not the core model.
+
+## D-031 2026-07-21 — Spatial person-detection first; pose estimation is a pluggable refinement
+
+Per the spec's own priority (Person Detection → Pose → Stereo Depth), v1 derives the head
+position from **on-device spatial person detection** (OAK MobileNet-SSD spatial network:
+2D bbox + metric XYZ from stereo depth). The head estimate is the bbox top-centre lifted by a
+fraction of the detected body height, at the detection's spatial Z. This always yields a
+`Vector3 HeadPosition` and needs no fragile face/pose network to be present. Pose estimation
+(nose/eyes/neck) is defined behind the same `Detection` type (optional keypoints) and consumed
+by `HeadEstimator` as a **more accurate refinement when available**, with graceful fallback to
+the bbox+depth+height estimate — matching the spec's "if pose fails, use torso/centroid/height"
+requirement. This keeps the fastest path to a working hologram and defers the heavier pose
+blob integration without changing the tracking/filter/render pipeline above it.
+
+## D-032 2026-07-21 — Pure tracking logic is hardware-free; OAK/DepthAI I/O is feature-gated
+
+Mirrors D-002 (OpenCV confined to Calibration behind the `calibration` vcpkg feature). All of
+HoloTrack's decision logic — filters (exponential / One-Euro / Kalman), the
+Searching→Tracking→Prediction→Lost state machine, active-viewer selection + hysteresis, head
+estimation, OAK→world coordinate transform, off-axis projection — is **pure C++ with no camera
+or DepthAI dependency**, fully unit-tested against synthetic detections. Only the concrete OAK
+device source (`holotrack::OakDevice`, DepthAI pipeline on a background thread) sits behind a
+new vcpkg feature `depthai`; detections reach the tracker through an `IDetectionSource`
+abstraction, so a `SimulatedSource` / recorded source drives development and CI with no
+hardware (the same no-hardware strategy used for calibration auto-align, D-021). The DLL and
+its entire test suite build green with DepthAI absent.
+
+## D-033 2026-07-22 — HoloTrack DepthAI resolves as an external CMake package by default
+
+Live H4 work on the OAK-D-PRO-W-97 showed the camera is connected and calibrated
+(OAK Viewer reports MXID `14442C10F143D3D200`, product `OAK-D-PRO-W-97`), but this repo's
+pinned vcpkg baseline has no `depthai` port. Enabling `HOLOTRACK_WITH_DEPTHAI` previously
+forced `VCPKG_MANIFEST_FEATURES=depthai`, so configure failed before CMake could find any
+external Luxonis SDK install.
+
+Decision: `HOLOTRACK_WITH_DEPTHAI=ON` means "compile the real OAK source", and
+`find_package(depthai CONFIG REQUIRED)` resolves DepthAI from `CMAKE_PREFIX_PATH` or a normal
+CMake package location. The vcpkg manifest feature is only appended when
+`HOLOTRACK_DEPTHAI_USE_VCPKG=ON`, for machines that provide a custom/updated vcpkg registry or
+overlay port. This matches Luxonis' C++ integration model (install `depthai-core`, then consume
+`depthai::core` through `find_package`) and avoids making all developers depend on an absent
+port.
+
+Added `holotrack_oak_smoke`: a native executable that starts `ht_oak_*`, polls the device for a
+short window, and prints frame/detection counts. It is intentionally not a CTest because it
+requires hardware, valid model blobs, and exclusive device access. Close OAK Viewer before using
+it; its logs show it owns/runs a DepthAI pipeline while open.
+## D-034 2026-07-21 — A depth camera (OAK-D) is a 3D-mapping enabler, not a flat-wall quality upgrade
+
+(Renumbered from D-029 on merge into the HoloTrack branch, which had already taken D-029..D-033.)
 
 Prompted by "will adding OAK-D-PRO-W support enhance our current results?" Verified answer:
 for the current flat-wall, 2D-homography blend — **no.**

@@ -172,8 +172,18 @@ focus/convergence/SMPTE-bars/ramp/solids, Y cycles, pixel-tested + bars verified
 output; #11 interop — PMSDKExternalContent verified live, Klak Spout/NDI adapters
 compile-gated via versionDefines but NOT tested against the real packages here).
 Remaining elsewhere: Klak adapter loopback once a host installs KlakSpout, GPU warp path
-for extreme scale, per-region black-level, and upstreaming the D-025 hardware findings
+for extreme scale, and upstreaming the D-025 hardware findings
 (RANSAC consensus fit into `PMSDKAutoAlign`, time-based settle, C-API exposure lock).
+**Per-region black-level compensation — IMPLEMENTED 2026-07-21 (D-028).** The fix for the
+bright yellow band over the overlap on DARK content (doubled projector-black; a multiply
+can't touch it). Additive twin of D-027: sweep's all-black captures
+(`PMSDKAutoAlign.Result.Black`) → `PMSDKBlackLevelCompensation.Compute` (pure/testable,
+harness-validated) → per-projector `_BlackLiftTex` raising non-overlap black to the overlap
+floor, raster UV1, at the black-level stage of `PMSDK/UnlitWarp`. Opt-in
+`AutoBlackLevelAfterAlignAll` (default OFF); persisted (`PMSDKGainCodec`); revert by
+disabling `PMSDKBlackLevelLift`. Residual floor TINT still manual (per-projector
+`PMSDKColorCorrection`) — measured per-channel tint needs an RGB capture. Verify on real
+hardware next (code + unit tests only so far).
 **Camera-measured luminance compensation — IMPLEMENTED 2026-07-21 (D-027).** Per-projector
 wall luminance maps from the sweep's all-white captures (`PMSDKAutoAlign.Result.White`) →
 `PMSDKLuminanceCompensation.Compute` (pure/testable) → per-projector `_GainTex` multiplied
@@ -181,9 +191,9 @@ in `PMSDK/UnlitWarp` in raster space (UV1), so the blend seam disappears on brig
 Opt-in: `PMSDKCalibrationManager.AutoLuminanceAfterAlignAll` (default OFF) runs it after
 Shift+A; persisted quantized+base64 in the calibration JSON (`PMSDKGainCodec`); revert by
 disabling a surface's `PMSDKLuminanceGain`. EditMode tests in PMSDKCalibrationLogicTests.
-Verify on real hardware next (was validated only in code + unit tests). Still open:
-per-region black-level (doubled projector-black on dark content), D-025 upstreaming, and
-N-projector wall-canvas generalization — all natural for the same branch.
+Verify on real hardware next (was validated only in code + unit tests). Companion fix for
+dark content shipped as D-028 (per-region black-level, above). Still open: D-025 upstreaming
+and N-projector wall-canvas generalization — natural for the same branch.
 
 ## Machine note (2026-07-17) — current layout on this machine
 

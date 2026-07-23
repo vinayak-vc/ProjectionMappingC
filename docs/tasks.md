@@ -282,6 +282,24 @@ displays, `ProBuilderMappingDemo` content.
 - [x] `PMSDKCanvasReferencePattern` — end-to-end plus + level/vertical reference lines rasterized in SHARED canvas space, fed through `PMSDKExternalContent` so every projector shows its warped slice: lines land straight and seam-continuous on the physical wall even with tilted projectors (addresses the on-wall "horizontal line isn't horizontal" problem from the hardware run). `C` toggles in calibration mode. Deterministic rasterizer test (28/28 suite). Verified in play: skewed pin → pattern pre-warps in raster (i.e. straight on wall); centre plus falls in the overlap of both slices.
 - Note: level is relative to the canvas; if the auto-align camera was tilted, verify once against a laser level / chalk line.
 
+## Milestone — per-region black-level compensation (2026-07-21) ✅ IMPLEMENTED
+
+Built (Unity binding; additive twin of the luminance milestone below). See D-028.
+Fixes the bright, slightly-yellow band over the projector overlap on DARK content
+(doubled projector-black; a multiply cannot touch an additive floor).
+- [x] Retain the sweep's all-black capture on `PMSDKAutoAlign.Result.Black`.
+- [x] `PMSDKBlackLevelCompensation.Compute` — pure core: camera-space litCount + summed
+      floor, high-percentile uplift target, per-projector `deficit/litCount` → signal lift
+      via each projector's black→white span, scatter to raster, hole-fill + box-blur + clamp.
+- [x] `PMSDKBlackLevelLift` component drives `_BlackLiftTex` / `_UseBlackLift`.
+- [x] `PMSDK/UnlitWarp`: uplift `c = c·(1−lift)+lift` at the black-level stage, raster UV1.
+- [x] `PMSDKMeshWarp` writes UV1 when a gain OR a black-lift map is active.
+- [x] Persist per-surface, quantized + base64 (`PMSDKGainCodec`), in the calibration JSON.
+- [x] Manager: `AutoBlackLevelAfterAlignAll` (opt-in) runs it after Shift+A; save/restore.
+- [x] EditMode tests: single-region lift-to-overlap, no-lift on uniform full overlap,
+      clamp, empty/missing-safe. Core also validated by a standalone compile-and-run harness.
+- Residual floor tint left to a per-projector `PMSDKColorCorrection` offset (RGB capture future).
+
 ## Milestone — camera-measured luminance compensation (2026-07-21) ✅ IMPLEMENTED
 
 Built (Unity binding; no native change — apply is a shader multiply). See D-027.
@@ -462,11 +480,59 @@ ProBuilder scene and live stereo verification are DEFERRED (Unity MCP was discon
 Build/run: `cmake --preset vs2022 && cmake --build build/vs2022 --config Release --target
 holotrack holotrack_harness`, then run `build/vs2022/bin/Release/holotrack_harness.exe`.
 
+## Depth-camera 3D / curved-surface mapping (SCOPED — not started, 2026-07-21)
+
+A proper feature project, not a camera swap. Reference device on hand: **Luxonis
+OAK-D-PRO-W** (stereo depth + wide FOV). Decision + rationale: **D-034**.
+
+**Why / when it's worth it.** The current auto-align is a 2D planar homography: it needs
+only a flat grayscale image of the wall and is already sub-pixel (0.55 px, hardware-run
+2026-07-17). On a flat wall the result is limited by projector focus / optics / light
+spill — NOT by the camera — so a depth camera does **not** improve the flat-wall blend.
+Depth becomes valuable only for problems the current pipeline cannot do:
+- **Curved / irregular walls** — reconstruct the actual surface and warp to it, instead
+  of hand-gridding in G-mode.
+- **Object mapping without a hand-built virtual twin** — scan the real geometry directly
+  (today F3 requires modelling the object in Unity first).
+
+**Explicit non-goal:** do NOT add this expecting better numbers on the flat wall. The one
+real flat-wall pain point (webcam auto-exposure forcing lights-off) is exposure *control*,
+not depth — solved more cheaply by the C-API exposure-lock item (D-025 follow-up), not by
+the OAK.
+
+**Hardware note (verified 2026-07-21):** the OAK-D enumerates as `Movidius MyriadX`
+(DepthAI/XLink), NOT a UVC webcam, so the current OpenCV `pmsdk_decoder` cannot open it
+(probed indices 0–6, all fail). Two ways in: (a) run it in Luxonis UVC mode → appears as a
+plain 2D webcam our existing path opens (gains nothing over the C270 — depth unused);
+(b) native DepthAI capture source (below), the only way to use its depth.
+
+**Scope (subtasks):**
+- [ ] DepthAI capture source: `IPMSDKCalibrationCamera` (or a depth-capable sibling
+  interface) backed by the `depthai` runtime over XLink — mono/RGB frames for decode +
+  the metric depth map. New third-party dep (`depthai`); keep it behind an optional
+  assembly/define so non-depth builds don't require it.
+- [ ] Metric camera + projector calibration: camera intrinsics (OAK ships factory
+  intrinsics) + projector intrinsics/extrinsics, so triangulation is metric.
+- [ ] Wire the native structured-light **triangulation** path into Unity
+  (`pmsdk_decoder_decode_and_triangulate` — exists in native, fixed 2026-07-17 CV_32F
+  bug, but not surfaced in the Unity flow) → dense 3D correspondence cloud.
+- [ ] 3D → warp: fit each projector's warp (dense grid / mesh) to the reconstructed
+  surface instead of a planar homography; reuse `PMSDKDenseWarp.FitGrid` where possible.
+- [ ] Workflows: curved-wall auto-map and object-scan auto-map (twin-free), analogous to
+  the F4 flat-wall flow.
+- [ ] Blend/luminance on non-planar surfaces (overlap width varies along a curved seam —
+  the measured `PMSDKAutoBlend`/luminance paths already suit this better than the analytic
+  constant band).
+
+**Effort:** multi-day; treat as its own milestone. Overlaps the existing backlog item
+"auto-align onto true 3D geometry via native stereo triangulation" — this supersedes and
+scopes it, with the OAK-D as the reference sensor.
+
 ## Next Items / Backlog
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)
 - [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter
-- [ ] Auto-align onto true 3D geometry via native stereo triangulation (needs metric camera+projector calibration)
-- [ ] True per-region black-level compensation (current `_BlackLevel` is a uniform floor)
+- [ ] Depth-camera 3D / curved-surface mapping — see the scoped milestone above (OAK-D reference device, D-034)
+- [x] True per-region black-level compensation (implemented 2026-07-21 — see milestone above, D-028; `_BlackLevel` uniform floor retained as a manual override)
 - [ ] GPU warp path for extreme projector counts / grid density
 - [ ] Milestone 19: Plugin SDK
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)

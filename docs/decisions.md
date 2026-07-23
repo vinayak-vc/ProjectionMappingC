@@ -177,6 +177,75 @@ Added `holotrack_oak_smoke`: a native executable that starts `ht_oak_*`, polls t
 short window, and prints frame/detection counts. It is intentionally not a CTest because it
 requires hardware, valid model blobs, and exclusive device access. Close OAK Viewer before using
 it; its logs show it owns/runs a DepthAI pipeline while open.
+## D-034 2026-07-21 — A depth camera (OAK-D) is a 3D-mapping enabler, not a flat-wall quality upgrade
+
+(Renumbered from D-029 on merge into the HoloTrack branch, which had already taken D-029..D-033.)
+
+Prompted by "will adding OAK-D-PRO-W support enhance our current results?" Verified answer:
+for the current flat-wall, 2D-homography blend — **no.**
+
+The current auto-align recovers a planar camera→projector homography from Gray-code
+correspondence; on a plane that fit is exact and already sub-pixel (0.55 px on real
+hardware, over ~1,500 RANSAC inliers). The visible seam is bounded by projector focus,
+lens quality, and light spill — physical factors a better *camera* does not change. A
+higher-res / global-shutter / depth sensor would shrink the reported reprojection number
+without changing what lands on the wall. The OAK's differentiators are unused by this
+pipeline: depth (2D homography ignores it), active IR (we decode *visible* projected
+light), global shutter (the sweep is static).
+
+The one real flat-wall pain point — webcam auto-exposure equalizing the white/black
+references (forcing lights-off) — is a property of exposure *control*, not depth, and is
+addressed by the D-025 follow-up (C-API exposure lock) on any controllable camera far more
+cheaply than by adopting a DepthAI device.
+
+Where a depth camera IS the right tool: **non-planar** targets — curved/irregular walls
+and twin-free object mapping — where the homography assumption breaks and a metric 3D
+reconstruction is genuinely required. That is a feature project (DepthAI capture source +
+metric calibration + structured-light triangulation + 3D→warp), scoped in
+docs/tasks.md ("Depth-camera 3D / curved-surface mapping"), with the OAK-D-PRO-W as the
+reference sensor. Decision: do not adopt the OAK to chase flat-wall numbers; adopt it only
+when curved-surface / 3D-scan mapping is greenlit, and treat it as that milestone's sensor.
+
+Verified on the machine (2026-07-21): the OAK-D enumerates as `Movidius MyriadX`
+(DepthAI/XLink), not UVC; OpenCV `pmsdk_decoder` cannot open it (indices 0–6 all fail),
+confirming it needs either Luxonis UVC mode (plain 2D, no depth benefit) or a native
+DepthAI source (to use depth).
+
+## D-028 2026-07-21 — Per-region black-level uplift is the additive twin of luminance comp
+
+The residual seam that luminance compensation (D-027) explicitly could NOT fix: on dark
+content a bright, slightly-yellow band sits over the projector overlap. Cause — projectors
+cannot emit true black; each leaks a floor at signal 0, and in the overlap BOTH floors add,
+so overlap black ≈ 2× a single projector's black. It is an ADDITIVE offset, so it dominates
+near-black content and vanishes on bright content (observed on the real wall). A multiply
+(the luminance gain) can't touch it: gain × 0 = 0.
+
+Fix — "black-level uplift": you can't remove the overlap's extra light, so raise every
+other region's black UP to match it; the whole wall then sits at one uniform, slightly-grey
+floor (the eye accepts a uniform grey far more readily than a bright band). Same architecture
+as D-027, additive instead of multiplicative:
+
+- **Measurement is (again) free.** The sweep already captures an all-BLACK frame per
+  projector for the shadow-mask gate; that frame IS each projector's per-pixel floor. Now
+  retained on `PMSDKAutoAlign.Result.Black` alongside `.White`.
+- **Pure core.** `PMSDKBlackLevelCompensation.Compute`: in camera space, count how many
+  projectors cover each pixel (`litCount`) and the summed floor there; the uplift target is
+  the high percentile of that summed floor (the overlap). Per projector, the deficit to the
+  target — `max(0, target − Σ floor) / litCount` — is converted to a signal lift by dividing
+  by that projector's own black→white span, then scattered into raster space. In the overlap
+  the summed floor already ≈ target so the lift is ~0; single-projector regions carry the
+  full lift. Correct even with unequal projector blacks (the deficit form, not an equal
+  share, avoids overshoot).
+- **Apply.** `_BlackLiftTex` in `PMSDK/UnlitWarp`, sampled by the same raster UV1 as the
+  gain map, applied at the black-level stage as `c = c·(1−lift) + lift`. `PMSDKMeshWarp`
+  writes UV1 when either map is active.
+- **Persistence / opt-in / revert:** identical to D-027 (`PMSDKGainCodec`,
+  `AutoBlackLevelAfterAlignAll` default OFF, disable the surface's `PMSDKBlackLevelLift`).
+
+Scope: the captures are single-channel luminance, so this flattens the band's BRIGHTNESS
+(the dominant artifact). A residual colour tint of the lifted floor is left to a
+per-projector `PMSDKColorCorrection` offset; measured per-channel tint would need an RGB
+capture (future).
 
 ## D-027 2026-07-21 — Camera-measured luminance compensation reuses the white sweep capture
 

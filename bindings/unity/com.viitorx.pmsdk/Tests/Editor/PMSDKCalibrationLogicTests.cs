@@ -404,5 +404,99 @@ namespace vxpmsdk.Tests
             Assert.IsNull(PMSDKGainCodec.Decode(null, 4));
             Assert.IsNull(PMSDKGainCodec.Encode(null));
         }
+
+        // ---------- per-region black-level compensation ----------
+
+        [Test]
+        public void BlackLevel_LiftsSingleProjectorRegionToOverlap()
+        {
+            int size = 64;
+            // Projector A covers the whole camera; B covers only the right half (x >= 32),
+            // so A-only is the left half and the overlap is the right half.
+            var corrA = MakeCorrespondence(size, size, (x, y) => (true, x, y));
+            var corrB = MakeCorrespondence(size, size, (x, y) =>
+                (x >= size / 2, Mathf.Clamp((x - size / 2) * 2, 0, size - 1), y));
+            // Uniform floors (20) and whites (200): span 180, overlap black 40.
+            var whiteA = WhiteCapture(size, (x, y) => 200);
+            var whiteB = WhiteCapture(size, (x, y) => 200);
+            var blackA = WhiteCapture(size, (x, y) => 20);
+            var blackB = WhiteCapture(size, (x, y) => 20);
+
+            var maps = PMSDKBlackLevelCompensation.Compute(
+                new List<byte[]> { whiteA, whiteB },
+                new List<byte[]> { blackA, blackB },
+                new List<PMSDKGrayCodeDecode.Correspondence[]> { corrA, corrB },
+                size, size, size, size, size, size,
+                maxLift: 0.5f, smoothRadius: 0, targetPercentile: 1f);
+
+            Assert.IsTrue(maps[0].Valid);
+            var a = maps[0].Lift;
+            // deficit in A-only region = overlap(40) - A(20) = 20; lift = 20/180 = 0.111.
+            Assert.AreEqual(20f / 180f, a[32 * size + 10], 0.01f); // left: A alone -> lifted
+            Assert.AreEqual(0f, a[32 * size + 50], 0.01f);         // right: overlap -> no lift
+            // B only ever appears in the overlap, so it needs no lift.
+            Assert.IsFalse(maps[1].Valid);
+        }
+
+        [Test]
+        public void BlackLevel_UniformFullOverlapNeedsNoLift()
+        {
+            int size = 32;
+            // Both projectors cover the whole camera identically -> every point is overlap,
+            // already at the target, so no uplift anywhere.
+            var corr = MakeCorrespondence(size, size, (x, y) => (true, x, y));
+            var white = WhiteCapture(size, (x, y) => 180);
+            var black = WhiteCapture(size, (x, y) => 15);
+            var maps = PMSDKBlackLevelCompensation.Compute(
+                new List<byte[]> { white, white },
+                new List<byte[]> { black, black },
+                new List<PMSDKGrayCodeDecode.Correspondence[]> { corr, corr },
+                size, size, size, size, size, size,
+                maxLift: 0.5f, smoothRadius: 0, targetPercentile: 1f);
+
+            Assert.IsFalse(maps[0].Valid);
+            Assert.IsFalse(maps[1].Valid);
+            foreach (var v in maps[0].Lift) Assert.AreEqual(0f, v, 1e-4f);
+        }
+
+        [Test]
+        public void BlackLevel_LiftClampedAtMax()
+        {
+            int size = 32;
+            var corrA = MakeCorrespondence(size, size, (x, y) => (true, x, y));
+            var corrB = MakeCorrespondence(size, size, (x, y) =>
+                (x >= size / 2, Mathf.Clamp((x - size / 2) * 2, 0, size - 1), y));
+            // Small span (50) but big overlap-vs-single deficit (40) -> lift 0.8, clamps.
+            var whiteA = WhiteCapture(size, (x, y) => 60);
+            var whiteB = WhiteCapture(size, (x, y) => 60);
+            var blackA = WhiteCapture(size, (x, y) => 10);
+            var blackB = WhiteCapture(size, (x, y) => 40);
+            var maps = PMSDKBlackLevelCompensation.Compute(
+                new List<byte[]> { whiteA, whiteB },
+                new List<byte[]> { blackA, blackB },
+                new List<PMSDKGrayCodeDecode.Correspondence[]> { corrA, corrB },
+                size, size, size, size, size, size,
+                maxLift: 0.15f, smoothRadius: 0, targetPercentile: 1f);
+
+            Assert.AreEqual(0.15f, maps[0].Lift[(size / 2) * size + 5], 1e-3f); // clamped
+        }
+
+        [Test]
+        public void BlackLevel_EmptyAndMissingInputsAreSafe()
+        {
+            var none = PMSDKBlackLevelCompensation.Compute(
+                new List<byte[]>(), new List<byte[]>(), new List<PMSDKGrayCodeDecode.Correspondence[]>(),
+                0, 0, 64, 64, 64, 64);
+            Assert.AreEqual(0, none.Length);
+
+            int size = 8;
+            var corr = MakeCorrespondence(size, size, (x, y) => (true, x, y));
+            var maps = PMSDKBlackLevelCompensation.Compute(
+                new List<byte[]> { null }, new List<byte[]> { null },
+                new List<PMSDKGrayCodeDecode.Correspondence[]> { corr },
+                size, size, size, size, size, size);
+            Assert.IsFalse(maps[0].Valid);
+            foreach (var v in maps[0].Lift) Assert.AreEqual(0f, v, 1e-6f);
+        }
     }
 }

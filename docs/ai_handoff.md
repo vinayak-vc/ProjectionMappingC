@@ -100,6 +100,22 @@ on a fresh machine it must be re-added (same as the pmsdk reference).
 only remaining HoloTrack work is the H4 real-OAK path (requires DepthAI C++ package + model blobs +
 exclusive camera access).**
 
+**Unified full-stack scene DONE + play-mode verified (2026-07-23).** `HoloProjectionStereoDemo`
+(nested repo `Scenes/`) is the first scene combining ALL THREE: **projection mapping + SBS 3D +
+head-tracking**. Head-tracked off-axis stereo content (HoloTrack drives the rig's eye cameras)
+renders into the rig's eye textures and flows through the two-projector `PMSDKStereoComposer`
+warp/blend path, packed SBS for 3D projectors. Composition rule confirmed (per
+`holotrack-architecture.md`): HoloTrack decides *what* each eye sees, projection mapping decides
+*where* it lands. Built by grafting `StereoMappingDemo`'s projection+SBS rig onto
+`HoloStereoDioramaDemo`'s head-track layer (framed diorama on the content layer, simulated head
+source; OAK is a one-flag swap). Key enabler: `PMSDKStereoHeadTrackBinder.DirectScreenSbs` is now a
+serialized option — `true` = direct-to-display SBS (the diorama demo, unchanged default), `false` =
+route eye textures through the composer (this scene). `DirectScreenSbs=true` and the composer path
+are mutually exclusive (true skips creating eye textures → composers idle). Verified: IsStereoReady
++ both composers active, 0.06 IPD; projector captures show split-sliced/warped/blended/SBS-packed
+head-tracked content; window-anchored parallax, depth-ordered + crossed stereo disparity. Nested
+commit `c09b4a0`.
+
 **H4 live unblocking pass (2026-07-22, current machine):** user-provided OAK Viewer logs confirm
 the connected camera: `OAK-D-PRO-W-97`, MXID `14442C10F143D3D200`, platform RVC2, calibrated,
 fully compatible. The logs also show OAK Viewer repeatedly polling/running the device and printing

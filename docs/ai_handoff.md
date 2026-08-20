@@ -1,5 +1,49 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk4 v1.6 (preset catalog: 10 iconic targets) COMPLETE (2026-08-20)
+
+**M-Sk4 v1.6 polish — preset catalog done, 205/205 EditMode tests green** (18 new + 187
+existing). Ten iconic projection-mapping targets ship as one-click presets so users
+learn the plugin AND accelerate common installations. The flagship (Preset #2, "Box: 3
+Faces Isometric") is exactly the shape the user asked to draw from the reference image.
+
+**Presets (`Tools > Projection Mapping > Skins > Presets > *`)**:
+1. Single Rectangle — beginner starter.
+2. **Box: 3 Faces Isometric ★** — cube from a corner view (front + right + top,
+   parallelogram/foreshortened layout). *The user's ask.*
+3. Box: 2 Faces (Top+Front) — box slightly from above.
+4. Column / Cylinder (3 strips) — vertical column as 3 rectangles; bend sides to match.
+5. Triangular Prism (2 faces) — polygon×2.
+6. Facade Grid 3×2 — regular window/panel grid.
+7. Arch / Tunnel — 11-vertex polygon tracing an arch.
+8. Dome / Sphere — Ellipse skin (shader mask).
+9. Star (5-point) — 10-vertex polygon with alternating radii.
+10. Diorama Stage — outer frame + inner stage.
+
+**API**:
+- `PMSDKSkinPresets.All` — the ten `Preset` records (Id, DisplayName, Description,
+  SkinDef[]). Each `SkinDef` = (Name, Kind, Vertices in raster space).
+- `PMSDKSkinPresets.TryFind(id, out preset)`, `PMSDKSkinPresets.DisplayNames()`.
+- `PMSDKSkinEditorController.ApplyPreset(preset, replaceExisting = true)` —
+  spawns one PMSDKSkin per SkinDef. Records ONE undo entry ("preset"), records so
+  Undo restores the pre-preset state. Z-order stack: last spawned = topmost.
+- `PMSDKSkinEditorController.ApplyPresetById(id, replaceExisting = true)` —
+  string-key overload.
+
+**Editor menu**: 10 items under `Tools > Projection Mapping > Skins > Presets`.
+Prompts before destroying existing skins (Replace / Add alongside / Cancel).
+
+**Tests** (`PMSDKSkinPresetsTests`, 18/18):
+- Catalog integrity: 10 presets, unique ids, every preset has skins, every skin has
+  a valid vertex count for its kind (rect/ellipse = 4, polygon 3..32, freeform 3..128),
+  every vertex in raster [0..1].
+- Apply flow: ApplyPreset spawns the right skin count, replaceExisting default is true,
+  add-alongside keeps existing skins, z-order stacks last-on-top, ApplyPresetById
+  returns false on unknown id, one undo entry per preset, Undo restores prior state.
+- Per-preset sanity: Dome is Ellipse, Star has 10 verts, Facade has 6 rectangles,
+  Arch has ≥7 verts (semi-arc coverage), Diorama has "frame" + "stage" skin names.
+- Geometry validity: every polygon has positive signed area (no degenerates).
+
 ## Multi-Skin single projector — M-Sk4 v1.5 (UGUI Canvas list + drag-reorder) COMPLETE (2026-08-20)
 
 **M-Sk4 v1.5 polish — UGUI skin list with drag-reorder done, 187/187 EditMode tests

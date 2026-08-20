@@ -112,6 +112,72 @@ namespace vxpmsdk.Components
             s.Vertices[idx] = PMSDKSkinEditorGeometry.ClampToRaster(s.Vertices[idx] + delta);
         }
 
+        // ---- Presets (M-Sk4 v1.6) ----
+
+        /// <summary>
+        /// Apply a <see cref="PMSDKSkinPresets.Preset"/> — spawn one skin per
+        /// <see cref="PMSDKSkinPresets.SkinDef"/>. When <paramref name="replaceExisting"/>
+        /// is true (default), all existing skins under this controller are destroyed
+        /// first, matching the "start from a fresh template" workflow users expect
+        /// when picking a new preset. Records a single "preset" undo entry.
+        /// </summary>
+        public void ApplyPreset(PMSDKSkinPresets.Preset preset, bool replaceExisting = true)
+        {
+            Undo.Record(this, "preset");
+
+            if (replaceExisting)
+            {
+                RefreshSkinList();
+                for (int i = Skins.Count - 1; i >= 0; i--)
+                {
+                    var s = Skins[i];
+                    if (s == null) continue;
+                    if (Application.isEditor && !Application.isPlaying) DestroyImmediate(s.gameObject);
+                    else Destroy(s.gameObject);
+                }
+                RefreshSkinList();
+            }
+
+            if (preset.Skins == null) return;
+
+            // Spawn in order: index 0 first (bottom of stack), last on top. ZOrder
+            // scales so the FIRST spawned ends up rendered BEHIND the LAST. Match
+            // the RefreshSkinList ZOrder-descending sort: last skin needs highest ZOrder.
+            var spawnedInOrder = new List<PMSDKSkin>();
+            for (int i = 0; i < preset.Skins.Length; i++)
+            {
+                var def = preset.Skins[i];
+                var skin = SpawnSkinFromSnapshot(
+                    def.Kind,
+                    def.Vertices != null ? new List<Vector2>(def.Vertices) : new List<Vector2>(),
+                    System.Guid.NewGuid().ToString("N").Substring(0, 8),
+                    string.IsNullOrEmpty(def.Name) ? $"{preset.Id}_{i}" : def.Name);
+                if (skin != null)
+                {
+                    skin.ZOrder = i; // last spawned = highest z = top of visual stack
+                    spawnedInOrder.Add(skin);
+                }
+            }
+
+            RefreshSkinList();
+            if (spawnedInOrder.Count > 0)
+            {
+                // Select the topmost (last spawned) so the inspector points at
+                // something visible.
+                SelectedSkinIndex = Skins.IndexOf(spawnedInOrder[spawnedInOrder.Count - 1]);
+                SelectedCornerIndex = 0;
+            }
+            UpdateStatus();
+        }
+
+        /// <summary>Convenience: look up + apply by <see cref="PMSDKSkinPresets.Preset.Id"/>.</summary>
+        public bool ApplyPresetById(string id, bool replaceExisting = true)
+        {
+            if (!PMSDKSkinPresets.TryFind(id, out var preset)) return false;
+            ApplyPreset(preset, replaceExisting);
+            return true;
+        }
+
         // ---- Reorder (M-Sk4 v1.5) ----
 
         /// <summary>

@@ -728,7 +728,15 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       skin's z-order so the sort matches the drop position, records an Undo entry).
       Auto-hides the sibling IMGUI list (`PMSDKSkinEditorHUD.DrawList`). Attached by
       default in the generated Skin Editor scene.
-      Deferred.
+- [x] Preset catalog — 10 iconic projection-mapping targets (M-Sk4 v1.6, done
+      2026-08-20; 18 new tests + 205/205 total green). `PMSDKSkinPresets.All` +
+      `PMSDKSkinEditorController.ApplyPreset` / `ApplyPresetById`. Menu items under
+      `Tools > Projection Mapping > Skins > Presets`. Shipping presets: Single
+      Rectangle, **Box: 3 Faces Isometric ★**, Box: 2 Faces, Column/Cylinder (3
+      strips), Triangular Prism, Facade Grid 3×2, Arch/Tunnel, Dome/Sphere, Star
+      (5-point), Diorama Stage. Each preset spawns configured skins with correct
+      z-order stack; records a single Undo entry; Replace / Add-alongside / Cancel
+      prompt in the Editor menu path.
 
 ## Next Items / Backlog
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)

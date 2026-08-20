@@ -1,5 +1,54 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk2.5 COMPLETE (2026-08-20)
+
+**M-Sk2.5 (author once, use in any scene) — done, 123/123 EditMode tests green** on Unity
+MCP (port 6402). The multi-skin feature now has its "portable artifact" surface: a
+`PMSDKSkinSet` ScriptableObject with a JSON sidecar, and a `PMSDKSkinLoader` that reads it
+back into any content scene.
+
+**Deliverables**:
+- `Runtime/Skin/PMSDKSkinSet.cs` — ScriptableObject wrapping `PMSDKSkinSetJson.Set`. Methods:
+  `CaptureFrom(controller)`, `ToJson()`, `FromJson(str)`, `SaveJsonTo(path)` (atomic .tmp+move),
+  `LoadJsonFrom(path)`, `ReloadFromSidecar()`, `GetSidecarPath()`. Editor menu creates via
+  `Create > PMSDK > Skin Set` or via `Tools > Projection Mapping > Skins > New Empty Skin Set…`.
+- `Runtime/Skin/PMSDKSkinLoader.cs` — runtime component; at Start, spawns one PMSDKSkin per
+  data entry (idempotent, `DespawnAll` for cleanup, `SpawnInEditMode` opt-in). Load path
+  precedence: (1) `-skinset <path>` CLI flag, (2) `OverrideJsonPath` on the component,
+  (3) SkinSet's JSON sidecar (if `ReloadFromSidecar` is on and file exists), (4) SkinSet's
+  in-memory `Data`.
+- `Runtime/Skin/PMSDKSkinBindings.cs` — scene-level content override per SkinId. Modes:
+  Texture / RenderTexture / VideoClip + playback fields (Loop/Mute/StartTime/PlaybackRate/Opacity).
+  Bindings ALWAYS beat the SkinSet's `defaultContent`.
+- `Runtime/Skin/PMSDKSkinSetJson.cs` — extended DTO with the design doc's `warp`, `mask`,
+  `transform`, `color`, `defaultContent` fields. JsonUtility-friendly (Vector2 stays as
+  `{x,y}` — schema note in D-037; canonical tuple form is a v3 migration behind a version
+  bump). ContentModes / TestPatternTypes serialize as strings.
+- `Editor/PMSDKSkinSetMenu.cs` — `Tools > Projection Mapping > Skins > Save Skin Set…`
+  (writes `.asset` + `.json` sidecar next to it, reuses existing GUID on overwrite),
+  `Load Skin Set…` (accepts either `.asset` or `.json`), `New Empty Skin Set Asset…`.
+- `Tests/Editor/PMSDKSkinSetTests.cs` — 12/12: capture, JSON round-trip, save+load via
+  filesystem, TestPattern fields serialize, Loader spawns per data entry, Loader default
+  content applied, Loader idempotent, Loader DespawnAll clears, OverrideJsonPath takes
+  precedence over the SO, Bindings TryGet, Bindings Apply, Bindings override beats
+  defaultContent.
+
+**Bug caught**: `PMSDKColorCorrection` exposes the gamma vector as `OutputGamma` (not
+`Gamma`) — first draft of `PMSDKSkinSetJson.CaptureColor` referenced the wrong name and
+would have CS1061'd. Fixed before compile.
+
+**Content authors' workflow now works end-to-end**:
+1. Author in the Skin Editor scene, `Ctrl+S` for the persistentDataPath quick-save,
+   `Tools > Projection Mapping > Skins > Save Skin Set…` for the portable SO + JSON sidecar.
+2. In any content scene: add `PMSDKSkinLoader` to (or a child of) the projector, assign the
+   `PMSDKSkinSet` asset. Optionally add `PMSDKSkinBindings` to point specific skins at
+   scene-local video clips / RTs.
+3. Press Play — geometry loads from the set, content flows from bindings or defaults.
+
+**Not in this pass**: canonical tuple-format JSON (v3), M-Sk3 content sources (Camera,
+VideoUrl, Spout, NDI, Webcam), M-Sk4 polish (drag-drop file assignment, per-edge mask,
+snap/guides, multi-select, canvas-based inspector).
+
 ## Multi-Skin single projector — M-Sk2 Phase A+B+C COMPLETE (2026-08-20)
 
 **All of M-Sk2 shipped in this session — 111/111 EditMode tests green** (24 Phase B/C +

@@ -658,11 +658,20 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       the UPM sample would be redundant. Revisit if a UPM-first distribution becomes
       relevant.
 
-### M-Sk2.5 — Persistence + playback
-- [ ] `PMSDKSkinSet` ScriptableObject + JSON round-trip (`pmsdk_skinset_<name>.json`).
-- [ ] `PMSDKSkinLoader` + `PMSDKSkinBindings`.
-- [ ] `defaultContent` auto-binding fallback.
-- [ ] JSON import/export from the editor; version field for future schema evolution.
+### M-Sk2.5 — Persistence + playback (done 2026-08-20; 12 new tests + 123/123 total green)
+- [x] `PMSDKSkinSet` ScriptableObject wrapping `PMSDKSkinSetJson.Set`. Methods: capture from
+      controller, JSON round-trip, atomic save-to-file (.tmp + move), load-from-file,
+      sidecar reload.
+- [x] `PMSDKSkinLoader` + `PMSDKSkinBindings` runtime path. Loader precedence: CLI
+      `-skinset <path>` > `OverrideJsonPath` > SkinSet sidecar > SkinSet in-memory `Data`.
+      Loader is idempotent (safe re-invoke) with `DespawnAll` for cleanup.
+- [x] `defaultContent` auto-binding fallback. Bindings ALWAYS beat defaults, per-skin by
+      SkinId. Modes covered: Texture / RenderTexture / VideoClip (+ Loop/Mute/StartTime/Rate).
+- [x] Extended JSON schema with `warp`, `mask`, `transform`, `color`, `defaultContent` per
+      design doc. Version field present for future canonical-tuple migration.
+- [x] Editor menus: `Tools > Projection Mapping > Skins > Save Skin Set…` (writes .asset +
+      .json sidecar), `Load Skin Set…` (accepts either), `New Empty Skin Set Asset…`.
+- Content authors' workflow now works end-to-end (author once, load in any scene).
 
 ### M-Sk3 — Content sources v1.1
 - [ ] `Camera` source (per-skin Unity camera → RT).

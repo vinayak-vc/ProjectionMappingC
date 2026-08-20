@@ -1,5 +1,59 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk2 Phase A COMPLETE (2026-08-20)
+
+**M-Sk2 Phase A (drawing engine + overlay + scene generator) — done, 87/87 EditMode tests
+green** on Unity MCP (port 6402). Ships the "draw a shape and drag its corners" experience
+in a dedicated `Assets/PMSDKDemo/SkinEditor.unity` scene generated on demand.
+
+New Unity files in `bindings/unity/com.viitorx.pmsdk/`:
+- `Runtime/Skin/PMSDKSkinEditorController.cs` — state machine + public API (tool switch,
+  pointer down/drag/up, cycle skin/corner, add default shape, delete). No input polling —
+  pure state, unit-testable.
+- `Runtime/Skin/PMSDKSkinEditorInput.cs` — reads keyboard + mouse each frame, converts
+  mouse to raster space via the same `Display.RelativeMouseAt` pattern as
+  `PMSDKCalibrationManager.TryGetPointerViewport`, dispatches to the controller.
+- `Runtime/Skin/PMSDKSkinEditorOverlay.cs` — GL immediate-mode overlay drawing outlines +
+  handles on the projector camera in `OnRenderObject`. Selected skin pulses yellow;
+  selected corner highlighted white; unselected dim gray.
+- `Runtime/Skin/PMSDKSkinEditorGeometry.cs` — pure static helpers (pick corner /
+  edge-midpoint, point-in-polygon / -ellipse, bounding box, build-rect-from-drag,
+  clamp-to-raster). All unit-tested.
+- `Runtime/Skin/PMSDKSkinEditorHUD.cs` — IMGUI status line + F1 help overlay on
+  Display 1 (Canvas HUD is deferred to Phase B).
+- `Runtime/Shaders/SkinEditorOverlay.shader` — trivial per-vertex-color line/quad
+  shader (ZTest Always, alpha blend) for the overlay's GL draws.
+- `Editor/PMSDKSkinEditorSceneGenerator.cs` — `Tools > Projection Mapping > Skins >
+  Generate Skin Editor Scene` — creates a self-contained scene with runtime services +
+  ortho projector on Display 2 + editor rig, idempotent.
+
+**Tests** (M-Sk2 Phase A):
+- `PMSDKSkinEditorGeometryTests` — 11/11 (pick corner/edge, point-in-polygon,
+  point-in-ellipse, build-rect-from-drag, clamp, bounds).
+- `PMSDKSkinEditorControllerTests` — 13/13 (draw-rectangle drag flow, corner drag,
+  edge-midpoint drag moving both adjacent corners, click-select, delete, cycle, nudge
+  with clamp). Directly drives `OnPointerDown/Drag/Up` — no Play mode needed.
+
+**Bug caught by controller tests**: `PMSDKSkinMeshBuilder.BuildUnitQuadMesh` and
+`BuildPolygonMesh` weren't setting mesh **normals**, but `PMSDKMeshWarp.InitializeNativeMeshes`
+reads `normals[i]` unconditionally — would have `IndexOutOfRangeException` at runtime for
+any Rectangle/Ellipse skin. Fixed to set explicit `-Z` normals per vertex.
+
+**Key map (Phase A)**:
+- `R / E / P / F` pick tool, `Esc` select tool.
+- Drag on empty canvas with `R/E` — draw new rectangle/ellipse.
+- Drag corner or edge midpoint — reshape any existing skin.
+- `N` add default shape, `Del`/`Backspace` delete.
+- `PgUp/PgDn` cycle skins, `Tab`/`Shift+Tab` cycle corners.
+- Arrows nudge (Shift = fine, Ctrl = coarse).
+- `F1` help overlay.
+- Not in Phase A: polygon click-to-draw, freeform stroke, solo/mute, Ctrl+D duplicate,
+  z-order `[`/`]`, Ctrl+S save, Ctrl+Z undo — deferred to Phase B/C.
+
+**Playback of a saved skin set** is still M-Sk2.5 (PMSDKSkinSet SO + JSON sidecar +
+PMSDKSkinLoader + PMSDKSkinBindings). The Skin Editor scene lives in memory only at Phase A
+— no persistence yet.
+
 ## Multi-Skin single projector — M-Sk1 CODE COMPLETE (2026-08-20)
 
 Single projector hosts N independent content regions ("skins"), each a shape

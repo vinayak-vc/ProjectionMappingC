@@ -610,12 +610,43 @@ scene; playback via `PMSDKSkinLoader` in any content scene. Native SDK unchanged
       keeps tests Editor-only.
 
 ### M-Sk2 — Skin Editor scene
-- [ ] `PMSDKSkinEditorController` — drawing engine (draw, select, move corner/edge,
-      insert/remove vertex, solo, test pattern).
-- [ ] Shape toolbar + skin list + skin inspector on the operator console.
-- [ ] Undo/redo, coalesced groups (reuse the F2 undo pattern).
-- [ ] Ship in `Samples~/SkinEditor/` and add `Tools > Projection Mapping > Generate Skin
-      Editor Scene` (writes to `Assets/PMSDKDemo/SkinEditor.unity`).
+
+Phase A (drawing engine, done 2026-08-20; 24/24 new tests green, 87/87 total EditMode):
+- [x] `PMSDKSkinEditorController` — pointer state machine + tool + selection + skin list.
+- [x] `PMSDKSkinEditorInput` — keyboard + mouse polling, multi-display routing via
+      `Display.RelativeMouseAt`.
+- [x] `PMSDKSkinEditorOverlay` — GL immediate-mode outlines + corner handles on the
+      projector camera in `OnRenderObject`.
+- [x] `PMSDKSkinEditorGeometry` — pure static helpers (pick corner/edge, point-in-polygon
+      / -ellipse, build-rect-from-drag).
+- [x] `PMSDKSkinEditorHUD` — IMGUI status line + F1 help.
+- [x] `SkinEditorOverlay.shader` — trivial vertex-color line/quad shader for GL.
+- [x] Draw new rectangle/ellipse via mouse-drag on canvas with `R`/`E` tools.
+- [x] Drag corner / drag edge midpoint (both adjacent verts move together) on any skin.
+- [x] Arrow-key nudge (Shift=fine, Ctrl=coarse); PgUp/PgDn cycle skins; Tab cycle corners.
+- [x] Add default shape (`N`); Delete (`Del`/`Backspace`).
+- [x] `Tools > Projection Mapping > Skins > Generate Skin Editor Scene` — writes
+      `Assets/PMSDKDemo/SkinEditor.unity` with the full editor rig.
+- [x] Bug fix: `PMSDKSkinMeshBuilder` was omitting mesh normals; `PMSDKMeshWarp` reads
+      `normals[i]` unconditionally and would crash any Rectangle/Ellipse skin at runtime.
+      Now explicit -Z normals per vertex.
+
+Phase B (drawing polish + editor UI — not started):
+- [ ] Polygon click-to-draw (each click adds a vertex; Enter closes) and Freeform
+      stroke-to-draw.
+- [ ] Insert / remove polygon vertex (`+` / `-` on selected edge).
+- [ ] Ctrl+D duplicate; `[` / `]` z-order.
+- [ ] Solo / mute (`X` / `Shift+X`); test pattern cycle (`Y` / `Shift+Y`).
+- [ ] Canvas-based skin list + skin inspector on the operator console (Display 1) —
+      replaces the IMGUI status/help stub.
+
+Phase C (save/undo + sample — not started):
+- [ ] Undo/redo, coalesced groups (reuse the F2 undo pattern in `PMSDKCalibrationManager`).
+- [ ] Ctrl+S save (writes to `Assets/PMSDKDemo/Skins/<name>.asset` + JSON sidecar —
+      interim; the `PMSDKSkinSet` ScriptableObject formalizes this in M-Sk2.5).
+- [ ] Ctrl+Shift+E / Ctrl+Shift+I JSON export / import.
+- [ ] Ship in `Samples~/SkinEditor/` as a UPM Package Manager sample too (alongside the
+      local generator).
 
 ### M-Sk2.5 — Persistence + playback
 - [ ] `PMSDKSkinSet` ScriptableObject + JSON round-trip (`pmsdk_skinset_<name>.json`).

@@ -62,6 +62,14 @@ namespace vxpmsdk.Components
             // until an EdgeBlend attaches. Sizing the colors array to vertex count avoids a
             // "colors array size mismatch" warning if a later stage touches it.
             m.colors = new Color[] { Color.white, Color.white, Color.white, Color.white };
+            // Normals must be present — PMSDKMeshWarp.InitializeNativeMeshes reads normals[i]
+            // unconditionally when copying into the native vertex buffer, and would throw
+            // IndexOutOfRangeException on a normals-less mesh. All normals point -Z (facing
+            // the ortho projector camera which sits at -Z looking +Z into the raster plane).
+            m.normals = new Vector3[] {
+                new Vector3(0f, 0f, -1f), new Vector3(0f, 0f, -1f),
+                new Vector3(0f, 0f, -1f), new Vector3(0f, 0f, -1f),
+            };
             m.RecalculateBounds();
             return m;
         }
@@ -136,6 +144,12 @@ namespace vxpmsdk.Components
             var colors = new Color[p.Length];
             for (int i = 0; i < colors.Length; i++) colors[i] = Color.white;
             m.colors = colors;
+            // See BuildUnitQuadMesh: normals are required for PMSDKMeshWarp — even though
+            // polygon skins bypass the native warp, the same GameObject may still have a
+            // (disabled) PMSDKMeshWarp component whose OnEnable will run. All -Z.
+            var normals = new Vector3[p.Length];
+            for (int i = 0; i < normals.Length; i++) normals[i] = new Vector3(0f, 0f, -1f);
+            m.normals = normals;
             m.RecalculateBounds();
             return m;
         }

@@ -151,6 +151,12 @@ namespace vxpmsdk.Components
                     Controller.SelectedCornerIndex = 0;
                 }
 
+#if UNITY_EDITOR
+                // M-Sk4 polish: drag-drop file / asset onto this row assigns the skin's
+                // content. Editor-only (UnityEditor.DragAndDrop). Same rect as the label.
+                HandleRowDrop(labelRect, s);
+#endif
+
                 // Z-order up / down / visibility toggle.
                 GUI.color = Color.white;
                 float bx = labelRect.xMax + 2;
@@ -252,6 +258,20 @@ namespace vxpmsdk.Components
                 Controller.CycleTestPatternSelected(+1);
             if (GUI.Button(new Rect(x + 116, row, 100, 24), "Delete", toolButtonStyle))
                 Controller.DeleteSelected();
+            row += 32;
+
+#if UNITY_EDITOR
+            // Drop zone at the bottom of the inspector. Same behavior as row drops but a
+            // single visible target for authors — drop an image/video/RenderTexture/VideoClip
+            // or a PMSDKSkinSet asset onto the primary skin.
+            var dropRect = new Rect(x + 8, row, w - 16, 44);
+            GUI.color = new Color(0.15f, 0.15f, 0.15f, 0.6f);
+            GUI.DrawTexture(dropRect, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(dropRect.x, dropRect.y, dropRect.width, dropRect.height),
+                "Drop image / video / asset here", helpStyle);
+            HandleRowDrop(dropRect, s);
+#endif
         }
 
         // -------- status line (bottom) + F1 hint --------
@@ -313,6 +333,12 @@ namespace vxpmsdk.Components
                 "  Alignment: dragging a corner near another skin's vertex X/Y snaps + shows a dashed guide.",
                 "  List row buttons: ^/v change z-order, o/- toggle visibility.",
                 "",
+                "Drag-drop (Editor only):",
+                "  Drag an image / video / VideoClip / RenderTexture asset onto a skin row",
+                "  or the inspector drop zone — assigns as that skin's content.",
+                "  Drag a .json onto any row — LoadFrom (whole skin set replace).",
+                "  Drag a PMSDKSkinSet asset — whole-set replace via the controller.",
+                "",
                 "Save location: " + Controller.DefaultSavePath,
             };
 
@@ -329,6 +355,64 @@ namespace vxpmsdk.Components
                 y += 22;
             }
         }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Accept drag-drop payloads over a rect and route them to the given skin's
+        /// content. Editor-only (UnityEditor.DragAndDrop). Handles:
+        ///   - Project-window drops of Texture / RenderTexture / VideoClip / PMSDKSkinSet.
+        ///   - OS-explorer drops of image / video files (loaded at runtime) and .json
+        ///     (delegated to the controller's LoadFrom for whole-set loading).
+        /// </summary>
+        private void HandleRowDrop(Rect rowRect, PMSDKSkin skin)
+        {
+            var e = Event.current;
+            if (e == null || !rowRect.Contains(e.mousePosition)) return;
+            if (e.type != EventType.DragUpdated && e.type != EventType.DragPerform) return;
+
+            UnityEditor.DragAndDrop.visualMode = UnityEditor.DragAndDropVisualMode.Copy;
+            if (e.type != EventType.DragPerform) { e.Use(); return; }
+
+            UnityEditor.DragAndDrop.AcceptDrag();
+            if (skin == null) { e.Use(); return; }
+
+            // Ensure a content component exists — new skins get one, but a user could
+            // have deleted it.
+            var content = skin.GetComponent<PMSDKSkinContent>();
+            if (content == null) content = skin.gameObject.AddComponent<PMSDKSkinContent>();
+
+            // Try asset object references first (Project window drops).
+            foreach (var obj in UnityEditor.DragAndDrop.objectReferences)
+            {
+                if (PMSDKSkinDragDrop.ApplyObject(content, obj, out var skinSet))
+                {
+                    if (skinSet != null)
+                    {
+                        // Whole-set replace via the controller path.
+                        PMSDKSkinSetJson.Apply(Controller, skinSet.Data);
+                    }
+                    Debug.Log($"PMSDKSkinDragDrop: '{obj.name}' assigned to skin '{skin.DisplayName}'.");
+                    e.Use();
+                    return;
+                }
+            }
+            // Then OS file paths (Explorer drops).
+            foreach (var path in UnityEditor.DragAndDrop.paths)
+            {
+                if (PMSDKSkinDragDrop.ApplyPath(content, path, out var jsonPath))
+                {
+                    if (!string.IsNullOrEmpty(jsonPath))
+                    {
+                        Controller.LoadFrom(jsonPath);
+                    }
+                    Debug.Log($"PMSDKSkinDragDrop: '{path}' assigned to skin '{skin.DisplayName}'.");
+                    e.Use();
+                    return;
+                }
+            }
+            e.Use();
+        }
+#endif
 
         private void EnsureStyles()
         {

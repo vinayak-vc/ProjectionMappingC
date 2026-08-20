@@ -1,5 +1,54 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk4 v1.3 (drag-drop file assignment) COMPLETE (2026-08-20)
+
+**M-Sk4 v1.3 polish — drag-drop file assignment on the HUD done, 168/168 EditMode tests
+green** (10 new + 158 existing). Editor-only (guarded by `#if UNITY_EDITOR`) since
+`UnityEditor.DragAndDrop` doesn't exist in standalone builds — a standalone play-mode
+file-drop path would need a native plugin and is documented as deferred.
+
+**Where it works**:
+- Each skin list row is a drop target.
+- Inspector has a labeled drop zone ("Drop image / video / asset here").
+- Both accept OS-file drops from Explorer AND asset drops from the Project window.
+
+**Payload routing**:
+- **OS files** (via `DragAndDrop.paths`):
+  - `.png / .jpg / .jpeg / .tga / .exr / .psd / .bmp` → `Mode=Texture`, `Texture2D.LoadImage(bytes)`.
+  - `.mp4 / .mov / .webm / .mkv / .avi / .m4v` → `Mode=VideoUrl` with `file://` URI.
+  - `.json` → routed to `controller.LoadFrom(path)` (whole-set replace).
+- **Unity asset drops** (via `DragAndDrop.objectReferences`, Editor-only path):
+  - `Texture` / `Texture2D` / `Sprite` → Texture mode.
+  - `RenderTexture` → RenderTexture mode.
+  - `VideoClip` → VideoClip mode.
+  - `PMSDKSkinSet` → whole-set replace via `PMSDKSkinSetJson.Apply(controller, set.Data)`.
+
+**Utility** (`PMSDKSkinDragDrop`):
+- `KindForPath(path)` returns `PMSDKSkinDropKind`.
+- `ApplyPath(content, path, out jsonPathOut)` — pure; runtime-safe. JSON drops set
+  `jsonPathOut` so the caller (HUD) forwards to the controller.
+- `ApplyObject(content, obj, out skinSetOut)` — Editor-only; `PMSDKSkinSet` drops set
+  `skinSetOut` for controller-side apply.
+- Utility lives in Runtime with `#if UNITY_EDITOR` around the asset-object path;
+  Editor and Runtime tests both compile against it.
+
+**HUD** (`PMSDKSkinEditorHUD`):
+- `HandleRowDrop(rect, skin)` — Editor-only helper that intercepts `DragUpdated`
+  / `DragPerform` on any rect. Called for each skin list row + the inspector drop zone.
+- F1 help panel updated with a "Drag-drop (Editor only)" section.
+
+**Tests** (`PMSDKSkinDragDropTests`, 10/10):
+- Extension classification for image / video / json / unknown.
+- Image path: encode a real PNG via `EncodeToPNG`, write to disk, apply, verify
+  `Mode=Texture` and dimensions.
+- Missing file: warns + returns false.
+- Video path: converts to `file://` URI.
+- JSON path: signals `jsonPathOut` to caller without mutating content.
+- Unknown extension: no-op.
+- Editor-only: `Texture` / `RenderTexture` / `VideoClip` / `PMSDKSkinSet` asset drops
+  route to the right modes; `PMSDKSkinSet` sets `skinSetOut` instead of touching content;
+  unknown types (`GameObject`) return false.
+
 ## Multi-Skin single projector — M-Sk4 v1.2 (per-edge feather) COMPLETE (2026-08-20)
 
 **M-Sk4 v1.2 polish — per-edge feather done, 158/158 EditMode tests green** (6 new + 152

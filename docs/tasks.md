@@ -707,8 +707,13 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       fallback tiled across all four channels keeps back-compat. Ellipse-only in the HUD
       (the only shape whose shader has a mask). JSON populates `mask.perEdgeFeather`
       when enabled; absent otherwise — legacy files load as scalar.
-- [ ] Drag-and-drop file assignment onto a skin in the HUD — IMGUI `DragAndDrop` is
-      Editor-only; play-mode file drops are a separate integration. Deferred.
+- [x] Drag-and-drop file assignment (M-Sk4 v1.3, done 2026-08-20; 10 new tests + 168/168
+      total green). Editor-only (guarded by `#if UNITY_EDITOR`). Skin list rows +
+      inspector drop zone accept OS file drops (image → Texture via `LoadImage`, video
+      → VideoUrl file:// URI, .json → controller `LoadFrom`) and Project-window asset
+      drops (Texture/RT/VideoClip/PMSDKSkinSet). Utility `PMSDKSkinDragDrop` with pure
+      `KindForPath` / `ApplyPath` (runtime-safe) + Editor-only `ApplyObject`.
+      Standalone play-mode file drops still need a native plugin — deferred.
 - [ ] Canvas-based inspector — IMGUI is functional; a UGUI rewrite is non-blocking.
       Deferred.
 

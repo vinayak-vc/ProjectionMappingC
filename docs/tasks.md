@@ -719,8 +719,15 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       + right-aligned panel on Display 1 (Text/InputField/Slider/Toggle/Button; legacy
       UGUI — no TMP). Auto-hides the sibling IMGUI HUD's inspector while active
       (`PMSDKSkinEditorHUD.DrawInspector`). Attached by default in the generated Skin
-      Editor scene. Deferred v1.5: drag-reorder in the skin list (UGUI drag events on
-      rows).
+      Editor scene.
+- [x] UGUI Canvas skin list + drag-reorder (M-Sk4 v1.5, done 2026-08-20; 8 new tests +
+      187/187 total green). New `PMSDKSkinEditorCanvasList` component builds a left-side
+      Canvas panel with a `VerticalLayoutGroup` of rows. Each row implements
+      `IBeginDrag/IDrag/IEndDrag` — drag reorders the hierarchy live, drop commits via
+      `PMSDKSkinEditorController.MoveSkinToIndex(skin, targetIndex)` (rewrites every
+      skin's z-order so the sort matches the drop position, records an Undo entry).
+      Auto-hides the sibling IMGUI list (`PMSDKSkinEditorHUD.DrawList`). Attached by
+      default in the generated Skin Editor scene.
       Deferred.
 
 ## Next Items / Backlog

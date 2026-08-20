@@ -81,6 +81,10 @@ namespace vxpmsdk.Editor
             // auto-flips the IMGUI HUD's DrawInspector off while enabled.
             var canvasInspector = editorGO.AddComponent<PMSDKSkinEditorCanvasInspector>();
             canvasInspector.Controller = controller;
+            // M-Sk4 v1.5 UGUI polish: attach the Canvas skin list (drag-reorder). Also
+            // auto-flips the IMGUI HUD's DrawList off while enabled.
+            var canvasList = editorGO.AddComponent<PMSDKSkinEditorCanvasList>();
+            canvasList.Controller = controller;
 
             // ---- save ----
             EditorSceneManager.SaveScene(scene, ScenePath);

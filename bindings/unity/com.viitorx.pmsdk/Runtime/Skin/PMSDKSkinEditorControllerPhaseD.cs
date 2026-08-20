@@ -112,6 +112,38 @@ namespace vxpmsdk.Components
             s.Vertices[idx] = PMSDKSkinEditorGeometry.ClampToRaster(s.Vertices[idx] + delta);
         }
 
+        // ---- Reorder (M-Sk4 v1.5) ----
+
+        /// <summary>
+        /// Move <paramref name="skin"/> to a specific slot in the skin list, rewriting
+        /// every skin's z-order so the resulting sort places it at
+        /// <paramref name="targetIndex"/>. Index 0 is the top of the stack (highest
+        /// ZOrder, drawn in front). Used by the UGUI skin list's drag-reorder.
+        /// </summary>
+        public void MoveSkinToIndex(PMSDKSkin skin, int targetIndex)
+        {
+            if (skin == null) return;
+            RefreshSkinList();
+            int currentIndex = Skins.IndexOf(skin);
+            if (currentIndex < 0) return;
+            targetIndex = Mathf.Clamp(targetIndex, 0, Skins.Count - 1);
+            if (currentIndex == targetIndex) return;
+
+            Undo.Record(this, "reorder");
+            var reordered = new List<PMSDKSkin>(Skins);
+            reordered.RemoveAt(currentIndex);
+            reordered.Insert(targetIndex, skin);
+            // Skins[0] is topmost after ZOrder desc sort — assign so higher list index
+            // maps to lower ZOrder.
+            for (int i = 0; i < reordered.Count; i++)
+            {
+                if (reordered[i] != null) reordered[i].ZOrder = reordered.Count - i;
+            }
+            RefreshSkinList();
+            SelectedSkinIndex = Skins.IndexOf(skin);
+            UpdateStatus();
+        }
+
         // ---- Visibility toggle ----
 
         /// <summary>Toggle a skin's <see cref="MeshRenderer"/> — hide/show without touching

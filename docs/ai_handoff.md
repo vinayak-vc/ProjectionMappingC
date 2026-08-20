@@ -1,5 +1,46 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk4 v1.5 (UGUI Canvas list + drag-reorder) COMPLETE (2026-08-20)
+
+**M-Sk4 v1.5 polish — UGUI skin list with drag-reorder done, 187/187 EditMode tests
+green** (8 new + 179 existing). The skin list on Display 1 is now a proper UGUI Canvas
+panel; rows implement IBeginDrag/IDrag/IEndDrag for reorder. All originally-listed
+M-Sk4 polish items are now shipped.
+
+**Deliverables**:
+- `Runtime/Skin/PMSDKSkinEditorCanvasList.cs` (new) — builds a left-side Canvas panel
+  with a `VerticalLayoutGroup` of rows. Rebuilds rows lazily when the skin list changes
+  (hashed signature = count + skin IDs + z-orders). Coexists with the v1.4 Canvas
+  inspector on the same display (both use `sortingOrder = 100`, own Canvas).
+- `PMSDKSkinCanvasRow` (in the same file) — one row per skin. Implements
+  `IBeginDragHandler` / `IDragHandler` / `IEndDragHandler`. Drag moves the row in the
+  hierarchy live (layout group shifts siblings out of the way), and on end-drag calls
+  `PMSDKSkinEditorController.MoveSkinToIndex(skin, newIndex)`.
+- `PMSDKSkinEditorController.MoveSkinToIndex(skin, targetIndex)` (new, in the Phase D
+  partial) — rewrites every skin's z-order so the resulting sort places `skin` at
+  `targetIndex`. Records an Undo entry ("reorder"); no-ops on same-index moves.
+- `PMSDKSkinEditorHUD` — new `bool DrawList` field (matches the `DrawInspector` pattern
+  from v1.4). Canvas list flips it off while active, restores on disable.
+- Editor scene generator: attaches `PMSDKSkinEditorCanvasList` alongside the other
+  editor rig components.
+
+**Tests** (`PMSDKSkinEditorCanvasListTests`, 8/8):
+- Canvas built after `RebuildForTests`.
+- IMGUI HUD's `DrawList` flips off with canvas active.
+- Rows populate one-per-skin; row visuals reflect the skin's DisplayName.
+- `MoveSkinToIndex` reorders the visual stack, clamps out-of-range targets,
+  no-ops on same-index moves (undo depth unchanged), and undo restores the prior
+  order. Drag-event simulation is skipped — the pointer-event dispatch trips
+  ShouldRunBehaviour in EditMode; the reorder LOGIC is what matters and is
+  covered directly.
+
+**All M-Sk4 polish rounds now complete**:
+- v1.0 core (snap + multi-select + visibility)
+- v1.2 per-edge feather (Ellipse shader)
+- v1.3 drag-drop file assignment (Editor)
+- v1.4 UGUI Canvas inspector (right panel)
+- **v1.5 UGUI Canvas list with drag-reorder (left panel)** ← this pass
+
 ## Multi-Skin single projector — M-Sk4 v1.4 (UGUI Canvas inspector) COMPLETE (2026-08-20)
 
 **M-Sk4 v1.4 polish — UGUI Canvas inspector done, 179/179 EditMode tests green** (11 new

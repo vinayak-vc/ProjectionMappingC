@@ -29,6 +29,10 @@ namespace vxpmsdk.Components
                  "(useful when PMSDKSkinEditorCanvasInspector is present, which auto-flips this).")]
         public bool DrawInspector = true;
 
+        [Tooltip("M-Sk4 v1.5 UGUI polish: set false to hide the IMGUI skin list panel " +
+                 "(auto-flipped by PMSDKSkinEditorCanvasList when present).")]
+        public bool DrawList = true;
+
         private GUIStyle statusStyle, labelStyle, helpStyle, toolButtonStyle, listButtonStyle;
 
         private void Update()
@@ -42,7 +46,7 @@ namespace vxpmsdk.Components
             EnsureStyles();
 
             DrawToolbar();
-            DrawSkinList();
+            if (DrawList) DrawSkinList();
             if (DrawInspector) DrawSkinInspector();
             DrawStatusLine();
             if (ShowHelp) DrawHelpPanel();

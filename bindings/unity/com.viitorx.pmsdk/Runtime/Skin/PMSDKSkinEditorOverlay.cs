@@ -28,7 +28,9 @@ namespace vxpmsdk.Components
         public Color SelectedColor = new Color(1f, 0.85f, 0.05f, 1f);
         public Color SelectedCornerColor = new Color(1f, 1f, 1f, 1f);
         public Color UnselectedColor = new Color(0.55f, 0.55f, 0.55f, 0.75f);
+        public Color MultiSelectedColor = new Color(0.3f, 0.8f, 1f, 0.9f);  // M-Sk4
         public Color DrawGuideColor = new Color(0.2f, 0.9f, 1f, 0.8f);
+        public Color SnapGuideColor = new Color(1f, 0.3f, 0.9f, 0.9f);      // M-Sk4
 
         [Header("Sizes (raster units)")]
         [Tooltip("Half-side of the square drawn at each vertex handle.")]
@@ -79,9 +81,14 @@ namespace vxpmsdk.Components
                 var s = skins[i];
                 if (s == null || s.Vertices == null || s.Vertices.Count < 2) continue;
                 bool selected = i == Controller.SelectedSkinIndex;
-                Color outlineColor = selected ? SelectedColor : UnselectedColor;
+                bool multi = Controller.MultiSelectedIndices.Contains(i);
+                Color outlineColor = selected ? SelectedColor
+                                    : (multi ? MultiSelectedColor : UnselectedColor);
                 DrawOutline(s, outlineColor, selected ? pulseOffset : 0f);
             }
+            // Snap guides — M-Sk4. Drawn as dashed magenta lines spanning the raster
+            // canvas so the user can eyeball alignment during a corner drag.
+            DrawSnapGuidesIfActive();
             GL.End();
 
             // Handles as GL_QUADS (small filled squares).
@@ -91,12 +98,51 @@ namespace vxpmsdk.Components
                 var s = skins[i];
                 if (s == null || s.Vertices == null) continue;
                 bool selected = i == Controller.SelectedSkinIndex;
-                DrawHandles(s, selected, Controller.SelectedCornerIndex);
+                bool multi = Controller.MultiSelectedIndices.Contains(i);
+                DrawHandles(s, selected, multi, Controller.SelectedCornerIndex);
             }
             GL.End();
         }
 
         // ---- draw helpers ----
+
+        /// <summary>Dashed snap-alignment lines spanning the raster canvas. Renders in
+        /// LOCAL space of whichever skin has this GameObject's transform — for a spawned
+        /// skin the raster-to-world mapping is `localScale=(16/9,1,1)`, so we render in
+        /// the projector's parent frame via the first skin's transform when available.</summary>
+        private void DrawSnapGuidesIfActive()
+        {
+            if (!Controller.SnapGuides.XActive && !Controller.SnapGuides.YActive) return;
+            var skins = Controller.Skins;
+            if (skins == null || skins.Count == 0) return;
+            var t = skins[0].transform;
+            GL.Color(SnapGuideColor);
+            // Dash by drawing short segments alternating with gaps.
+            const int Dashes = 40;
+            float dashLen = 1f / (Dashes * 2f);
+            if (Controller.SnapGuides.XActive)
+            {
+                float x = Controller.SnapGuides.XLine;
+                for (int d = 0; d < Dashes; d++)
+                {
+                    float y0 = 2f * d * dashLen;
+                    float y1 = y0 + dashLen;
+                    GL.Vertex(t.TransformPoint(new Vector3(x, y0, 0f)));
+                    GL.Vertex(t.TransformPoint(new Vector3(x, y1, 0f)));
+                }
+            }
+            if (Controller.SnapGuides.YActive)
+            {
+                float y = Controller.SnapGuides.YLine;
+                for (int d = 0; d < Dashes; d++)
+                {
+                    float x0 = 2f * d * dashLen;
+                    float x1 = x0 + dashLen;
+                    GL.Vertex(t.TransformPoint(new Vector3(x0, y, 0f)));
+                    GL.Vertex(t.TransformPoint(new Vector3(x1, y, 0f)));
+                }
+            }
+        }
 
         private void DrawOutline(PMSDKSkin skin, Color c, float radiusOffset)
         {
@@ -122,11 +168,12 @@ namespace vxpmsdk.Components
             }
         }
 
-        private void DrawHandles(PMSDKSkin skin, bool selected, int highlightIndex)
+        private void DrawHandles(PMSDKSkin skin, bool selected, bool multiSelected, int highlightIndex)
         {
             var verts = skin.Vertices;
             var t = skin.transform;
-            Color baseColor = selected ? SelectedColor : UnselectedColor;
+            Color baseColor = selected ? SelectedColor
+                            : (multiSelected ? MultiSelectedColor : UnselectedColor);
             for (int i = 0; i < verts.Count; i++)
             {
                 bool isSelectedCorner = selected && i == highlightIndex;

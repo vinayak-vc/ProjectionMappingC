@@ -689,12 +689,24 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       ExternalTexture preserve mode only (scene refs re-wired at load time).
 - [x] `PMSDKSkinBindings.Binding` + `Apply` switch cover all four new modes.
 
-### M-Sk4 — Polish
-- [ ] Duplicate + reorder (drag in the skin list; `Ctrl+D`; `[`/`]` z-order).
-- [ ] Drag-and-drop file assignment onto a skin in the HUD.
-- [ ] Per-edge soft mask (`softMask` array UI).
-- [ ] Snap-to-grid, alignment guides.
-- [ ] Multi-select + group nudge.
+### M-Sk4 — Polish (done 2026-08-20; 16 new tests + 152/152 total green)
+- [x] Duplicate (Ctrl+D, already in M-Sk2 B); reorder via up/down arrows in each skin
+      list row + `[` / `]` shortcut (M-Sk2 B). Row also gets a visibility toggle (o/-).
+- [x] Snap-to-grid: toolbar cycles OFF → 0.05 → 0.10 → OFF; applied inside the corner
+      drag path. Snap-to-other-vertices (alignment guides): dashed magenta lines span
+      the canvas while a drag is snapping to another skin's vertex X/Y.
+- [x] Multi-select (Ctrl or Shift + click on the projector canvas toggles the hit skin
+      in `MultiSelectedIndices`); group nudge (arrow keys move the same-index corner
+      across every selected skin at once). Multi-selected skins render in cyan in the
+      overlay.
+- [x] Per-skin visibility toggle (`SetSkinVisibility` + `ToggleVisibilitySelected`;
+      row button in HUD). Independent of solo/mute.
+- [ ] Per-edge soft mask UI + shader — schema stores `perEdgeFeather` from M-Sk2.5 but
+      the shader still uses a scalar. Deferred to v1.2 (shader work).
+- [ ] Drag-and-drop file assignment onto a skin in the HUD — IMGUI `DragAndDrop` is
+      Editor-only; play-mode file drops are a separate integration. Deferred.
+- [ ] Canvas-based inspector — IMGUI is functional; a UGUI rewrite is non-blocking.
+      Deferred.
 
 ## Next Items / Backlog
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)

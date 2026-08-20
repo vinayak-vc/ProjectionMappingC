@@ -90,6 +90,21 @@ namespace vxpmsdk.Components
             x += btnW + pad;
             if (GUI.Button(new Rect(x, y, btnW, toolbarH), "Load [Ctrl+L]", toolButtonStyle))
                 Controller.LoadDefault();
+
+            // Snap toggle (M-Sk4). Reserved snap steps: 0 = off, 0.05 = 5% grid, 0.1 = 10%.
+            // Clicking cycles OFF → 0.05 → 0.1 → OFF.
+            x += btnW + pad;
+            string snapLabel = Controller.SnapGridStep <= 0f
+                ? "Snap: OFF"
+                : $"Snap: {Controller.SnapGridStep:F2}";
+            GUI.color = Controller.SnapGridStep > 0f ? new Color(0.3f, 0.9f, 1f, 1f) : Color.white;
+            if (GUI.Button(new Rect(x, y, btnW, toolbarH), snapLabel, toolButtonStyle))
+            {
+                if      (Controller.SnapGridStep <= 0f)     Controller.SnapGridStep = 0.05f;
+                else if (Controller.SnapGridStep < 0.075f)  Controller.SnapGridStep = 0.10f;
+                else                                        Controller.SnapGridStep = 0f;
+            }
+            GUI.color = Color.white;
         }
 
         // -------- skin list (left) --------
@@ -115,15 +130,38 @@ namespace vxpmsdk.Components
                 var s = Controller.Skins[i];
                 if (s == null) continue;
                 bool sel = i == Controller.SelectedSkinIndex;
-                var row = new Rect(x + 6, rowY, w - 12, rowH - 2);
-                GUI.color = sel ? new Color(1f, 0.85f, 0.05f, 1f) : new Color(0.9f, 0.9f, 0.9f, 1f);
+                bool multi = Controller.MultiSelectedIndices.Contains(i);
+
+                // Row rect and inline mini-buttons: [Label ...] [up] [down] [eye].
+                float miniW = 20 * TextScale;
+                var labelRect = new Rect(x + 6, rowY, w - 12 - 3 * miniW - 6, rowH - 2);
+                GUI.color = sel ? new Color(1f, 0.85f, 0.05f, 1f)
+                          : (multi ? new Color(0.3f, 0.8f, 1f, 1f)
+                                  : new Color(0.9f, 0.9f, 0.9f, 1f));
                 string mutedGlyph = Controller.IsMuted(s) ? " (muted)" : "";
-                string label = $"{i + 1}. {s.DisplayName}  <{s.Kind}>{mutedGlyph}";
-                if (GUI.Button(row, label, listButtonStyle))
+                bool visible = Controller.IsVisible(s);
+                string hiddenGlyph = visible ? "" : " (hidden)";
+                string label = $"{i + 1}. {s.DisplayName}  <{s.Kind}>{mutedGlyph}{hiddenGlyph}";
+                if (GUI.Button(labelRect, label, listButtonStyle))
                 {
+                    // Ctrl+click here would be nice for multi-select, but IMGUI buttons
+                    // don't expose modifier state — pointer-based multi-select is on the
+                    // projector canvas via the Input layer. This click always sets the primary.
                     Controller.SelectedSkinIndex = i;
                     Controller.SelectedCornerIndex = 0;
                 }
+
+                // Z-order up / down / visibility toggle.
+                GUI.color = Color.white;
+                float bx = labelRect.xMax + 2;
+                if (GUI.Button(new Rect(bx, rowY, miniW, rowH - 2), "^", toolButtonStyle))
+                { Controller.SelectedSkinIndex = i; Controller.MoveSelectedZOrder(+1); }
+                if (GUI.Button(new Rect(bx + miniW + 1, rowY, miniW, rowH - 2), "v", toolButtonStyle))
+                { Controller.SelectedSkinIndex = i; Controller.MoveSelectedZOrder(-1); }
+                if (GUI.Button(new Rect(bx + 2 * miniW + 2, rowY, miniW, rowH - 2),
+                    visible ? "o" : "-", toolButtonStyle))
+                { Controller.SetSkinVisibility(s, !visible); }
+
                 rowY += rowH;
                 if (rowY + rowH > y + h - 8) break;
             }
@@ -201,7 +239,11 @@ namespace vxpmsdk.Components
             GUI.color = Color.white;
             GUI.Label(new Rect(rect.x + 10, rect.y + 4, rect.width - 20, rect.height - 8), content, statusStyle);
 
-            var hint = $"F1: help  |  Undo depth: {Controller.Undo.UndoDepth}/{100}  Redo: {Controller.Undo.RedoDepth}";
+            int groupN = Controller.SelectionGroupCount;
+            string selBadge = groupN > 1 ? $"  |  Selected: {groupN} (group)" : "";
+            string snapBadge = Controller.SnapGridStep > 0f
+                ? $"  |  Snap grid: {Controller.SnapGridStep:F3}" : "";
+            var hint = $"F1: help  |  Undo depth: {Controller.Undo.UndoDepth}/{100}  Redo: {Controller.Undo.RedoDepth}{selBadge}{snapBadge}";
             var hintSize = helpStyle.CalcSize(new GUIContent(hint));
             GUI.color = new Color(1f, 1f, 1f, 0.8f);
             GUI.Label(new Rect(rect.x, rect.y - hintSize.y - 4, hintSize.x + 20, hintSize.y + 4), hint, helpStyle);
@@ -236,6 +278,13 @@ namespace vxpmsdk.Components
                 "History & files:",
                 "  Ctrl+Z / Ctrl+Y — undo / redo.",
                 "  Ctrl+S — save to default path.  Ctrl+L — load from default path.",
+                "",
+                "Selection / snap (M-Sk4):",
+                "  Ctrl or Shift + click a skin — toggle in multi-select group.",
+                "  Arrows with a group — nudge the same-index corner across every selected skin.",
+                "  Snap toolbar button — cycle grid off/0.05/0.10.",
+                "  Alignment: dragging a corner near another skin's vertex X/Y snaps + shows a dashed guide.",
+                "  List row buttons: ^/v change z-order, o/- toggle visibility.",
                 "",
                 "Save location: " + Controller.DefaultSavePath,
             };

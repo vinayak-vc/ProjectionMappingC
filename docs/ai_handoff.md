@@ -1,5 +1,62 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk4 COMPLETE (2026-08-20)
+
+**M-Sk4 polish — done, 152/152 EditMode tests green**. All five multi-skin milestones now
+shipped. Skin Editor gains snap-to-grid, alignment guides between skins, multi-select
+(Ctrl/Shift+click), group nudge, and per-skin visibility toggle + z-order arrows in the
+HUD list rows.
+
+**Deliverables**:
+- `Runtime/Skin/PMSDKSkinEditorSnap.cs` (new) — pure static: `SnapToGrid`, `SnapToVertices`,
+  `CollectVertices` (excludes the dragged skin). `PMSDKSkinEditorSnapGuides` struct
+  tracks live guide lines for the overlay.
+- `Runtime/Skin/PMSDKSkinEditorControllerPhaseD.cs` (new partial file) — snap config
+  (`SnapGridStep`, `SnapGridTolerance`, `SnapAlignTolerance`), multi-select
+  (`MultiSelectedIndices`, `AddToSelection`, `ToggleInSelection`, `ClearMultiSelection`,
+  `IsInSelectionGroup`, `SelectionGroupCount`), group nudge (`NudgeSelectedGroup` —
+  falls back to single-corner when set is empty), visibility (`ToggleVisibilitySelected`,
+  `SetSkinVisibility`, `IsVisible`), internal `ApplySnaps(target, dragged)` /
+  `ClearSnapGuides()` called from Phase A's corner-drag path + OnPointerUp.
+- `Runtime/Skin/PMSDKSkinEditorController.cs` — added public `HitTestSkinAt(raster)` so
+  Input can route modifier-clicks; wired `ApplySnaps` into `OnPointerDrag`'s DraggingCorner
+  branch; `ClearSnapGuides` in `OnPointerUp`.
+- `Runtime/Skin/PMSDKSkinEditorInput.cs` — Ctrl/Shift+click in Select mode toggles the hit
+  skin in multi-select instead of running the default select-or-draw flow. Arrow-key nudge
+  now always calls `NudgeSelectedGroup` (which falls through to single-corner when the
+  group is empty).
+- `Runtime/Skin/PMSDKSkinEditorOverlay.cs` — multi-selected skins render in cyan
+  (`MultiSelectedColor`); snap guides drawn as dashed magenta lines spanning the raster
+  canvas while a corner drag is snapping.
+- `Runtime/Skin/PMSDKSkinEditorHUD.cs` — snap toggle button in the toolbar (cycles
+  OFF → 0.05 → 0.10 → OFF), multi-select + snap badges in the status hint, per-row
+  z-order up/down arrows + visibility toggle (o/-) in the skin list, extended F1 help.
+
+**Tests (M-Sk4)**: `PMSDKSkinEditorPhaseDTests` — 16/16:
+- `PMSDKSkinEditorSnap` unit math: SnapToGrid within/outside tolerance, step=0 pass-through,
+  SnapToVertices sets X-only / both-axis guides, CollectVertices excludes the dragged skin.
+- `ApplySnaps` during corner drag snaps to the grid; alignment snap exposes the guide
+  state and clears on pointer-up.
+- Multi-select: ToggleInSelection adds/removes/promotes when the primary is toggled,
+  ClearMultiSelection empties the set.
+- Group nudge: moves every selected skin's same-index corner; empty group falls back to
+  single-corner nudge.
+- Visibility: `SetSkinVisibility` toggles the MeshRenderer; `ToggleVisibilitySelected`
+  toggles the primary.
+
+**Bug caught**: same "skin-index instability at equal ZOrder" issue as M-Sk2.5 —
+`ToggleInSelection_PrimaryClick_PromotesOrClears` captured indices too early. Fixed by
+capturing skin references and re-resolving indices after all spawns.
+
+**Deferred with notes** (documented in tasks.md):
+- **Per-edge feather UI + shader** — schema stores `perEdgeFeather` but visual effect
+  requires shader work; better as a v1.2 pass.
+- **Drag-drop file assignment onto skins in the HUD** — IMGUI `DragAndDrop` is Editor-only;
+  play-mode file drops are a separate integration.
+- **Canvas-based inspector** — IMGUI works; Canvas rewrite is non-blocking.
+
+**Full multi-skin roadmap status**: **M-Sk1..M-Sk4 all done**.
+
 ## Multi-Skin single projector — M-Sk3 COMPLETE (2026-08-20)
 
 **M-Sk3 v1.1 content sources — done, 136/136 EditMode tests green**. Skins can now source

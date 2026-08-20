@@ -210,8 +210,9 @@ namespace vxpmsdk.Components
                 case DragState.DraggingCorner:
                     if (activeSkin != null && activeVertexIndex >= 0)
                     {
-                        activeSkin.Vertices[activeVertexIndex] =
-                            PMSDKSkinEditorGeometry.ClampToRaster(raster);
+                        // M-Sk4: apply grid + alignment snap (see PMSDKSkinEditorSnap and
+                        // the guide state the overlay reads).
+                        activeSkin.Vertices[activeVertexIndex] = ApplySnaps(raster, activeSkin);
                     }
                     break;
 
@@ -271,6 +272,7 @@ namespace vxpmsdk.Components
             activeVertexIndex = -1;
             activeEdgeIndex = -1;
             transientDrawSkin = null;
+            ClearSnapGuides();
             UpdateStatus();
         }
 
@@ -312,6 +314,10 @@ namespace vxpmsdk.Components
             }
             UpdateStatus();
         }
+
+        /// <summary>Public entry to the point-in-skin hit test — used by Input to route
+        /// modifier-clicks (Ctrl / Shift) to multi-select instead of the default flow.</summary>
+        public int HitTestSkinAt(Vector2 raster) => HitTestSkinContaining(raster);
 
         private int HitTestSkinContaining(Vector2 raster)
         {

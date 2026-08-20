@@ -126,7 +126,9 @@ namespace vxpmsdk.Components
             {
                 float step = shift ? controller.NudgeFine
                            : (ctrl ? controller.NudgeCoarse : controller.NudgeNormal);
-                controller.NudgeSelectedCorner(axis * step * Time.deltaTime * 60f);
+                // M-Sk4: NudgeSelectedGroup nudges every skin in the multi-select set at
+                // once (falls back to single-corner nudge when the set is empty).
+                controller.NudgeSelectedGroup(axis * step * Time.deltaTime * 60f);
             }
         }
 
@@ -153,6 +155,16 @@ namespace vxpmsdk.Components
                     freeformStrokeActive = true;
                     pointerHeld = true;
                     return;
+                }
+
+                // M-Sk4: Ctrl/Shift+click on a skin toggles the multi-select set
+                // instead of running the default select-or-draw flow.
+                bool ctrlNow = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+                bool shiftNow = Input.GetKey(KeyCode.LeftShift)   || Input.GetKey(KeyCode.RightShift);
+                if ((ctrlNow || shiftNow) && tool == PMSDKSkinEditorController.Tool.Select)
+                {
+                    int hit = controller.HitTestSkinAt(raster);
+                    if (hit >= 0) { controller.ToggleInSelection(hit); return; }
                 }
 
                 pointerHeld = true;

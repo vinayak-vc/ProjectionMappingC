@@ -5,6 +5,10 @@
 //   2. sample content
 //   3. edge blend      — multiply by the vertex-color falloff ramp the native blend
 //                        stage bakes into COLOR (PMSDKMeshWarp/pmsdk_blendconfig_apply_to_mesh)
+//   3a. shape mask     — for Ellipse skins, cut a feathered circular hole in the
+//                        quad's UV space (PMSDKSkin, M-Sk1). Discards outside the
+//                        mask so overlapping skins can safely coexist.
+//   3b. opacity        — per-skin opacity multiplier (PMSDKSkin, M-Sk1).
 //   4. luminance gain  — multiply by a camera-measured per-projector vignette gain map
 //                        sampled in raster space (UV1)              (PMSDKLuminanceGain)
 //   5. black level     — uniform floor lift + per-region uplift map that raises
@@ -35,6 +39,10 @@ Shader "PMSDK/UnlitWarp"
         _ColorGain ("Color Gain", Color) = (1,1,1,1)
         _ColorOffset ("Color Offset", Color) = (0,0,0,0)
         _OutGamma ("Output Gamma (per channel)", Vector) = (1,1,1,0)
+        // Shape mask + opacity (PMSDKSkin, M-Sk1). Defaults are no-op.
+        _ShapeMask ("Shape Mask (0=None, 1=Ellipse)", Float) = 0
+        _MaskFeather ("Mask Feather (UV units)", Range(0, 0.5)) = 0
+        _Opacity ("Skin Opacity", Range(0, 1)) = 1
     }
     SubShader
     {
@@ -63,6 +71,9 @@ Shader "PMSDK/UnlitWarp"
             fixed4 _ColorGain;
             fixed4 _ColorOffset;
             float3 _OutGamma;
+            float _ShapeMask;
+            float _MaskFeather;
+            float _Opacity;
 
             struct appdata
             {
@@ -112,6 +123,27 @@ Shader "PMSDK/UnlitWarp"
                 // Edge blend: fold the vertex-color ramp (alpha) into RGB — a
                 // projector blends to black at its overlap edges.
                 c.rgb *= i.color.rgb * i.color.a;
+
+                // Shape mask (PMSDKSkin): discard pixels outside an ellipse inscribed
+                // in the [0,1]^2 UV quad, with a feathered edge. Non-quad skins
+                // (Polygon/Freeform) already have their shape as raw geometry and set
+                // _ShapeMask=0. Discard so overlapping skins render correctly.
+                // Uses i.uv (raw mesh UV), NOT the transformed content-sampling UV — the
+                // mask defines the PHYSICAL projected region, so a content rotation via
+                // PMSDKOutputTransform must not rotate the mask along with it.
+                if (_ShapeMask > 0.5)
+                {
+                    float2 d = (i.uv - 0.5) * 2.0;
+                    float r = length(d);
+                    float feather = max(_MaskFeather, 0.0001);
+                    float mask = smoothstep(1.0, 1.0 - feather, r);
+                    if (mask <= 0.001) discard;
+                    c.rgb *= mask;
+                }
+
+                // Per-skin opacity (multiplied on RGB — projector outputs light, so
+                // reducing opacity fades toward black, which is "no projected light").
+                c.rgb *= _Opacity;
 
                 // Luminance gain: dim bright (centre) regions toward the shared target
                 // measured by the camera, so vignetting leaves no brighter/darker band.

@@ -463,3 +463,74 @@ stock Unlit/Texture ignores it). Multi-display output requires `PMSDKDisplayActi
 ## D-019 2026-07-13 — Direct SDK Camera Capture for Structured Light
 
 Instead of requiring the host engine (Unity/Unreal) to capture WebCam frames, allocate large `Texture2D` memory on the main thread, and serialize/pass them to the SDK, we enabled the `GrayCodeDecoder` to directly bind to the physical camera hardware using OpenCV's `cv::VideoCapture`. This keeps memory and frame extraction strictly off the host's main thread, drastically improving performance.
+
+## D-036 2026-08-20 — Single projector can host multiple independent skins
+
+**Context.** One projector currently owns exactly one warp surface that samples a horizontal
+slice of `Projection_RT`. Physical objects with several visible faces (box, prism, signage
+cluster) need one projector with N independent content regions, each with its own geometry
+and its own source (video, image, RT). Industry tools (Resolume slices, MadMapper surfaces,
+TouchDesigner) all separate "geometry" from "content" and let one projector host many
+"slices".
+
+**Decision.** Introduce `PMSDKSkin` — one skin per content region — and lift the "one warp
+surface per projector" invariant. A projector may host N skins, each a raster-space mesh
+child of the projector's warp root, each carrying its own content-source binding.
+
+Shape primitives in v1: Rectangle/Square, Ellipse/Circle, N-gon (up to 32 vertices), Freeform
+polygon (up to 128 vertices). Three underlying warp paths keep the native SDK unchanged:
+
+- **Rectangle/Ellipse** → existing `PMSDKCornerPin` (projective, `PerspectiveWarp`), with the
+  ellipse cut by a shader mask (`_ShapeMask=1`).
+- **N-gon/Freeform** → Unity mesh regenerated from the vertex list; no native warp; content
+  mapped via axis-aligned bounding-box UVs.
+- **Curved faces** → promote a skin to `PMSDKGridWarp` (existing).
+
+**Alternatives considered.**
+
+- *One composite RT per projector, sub-sampled by skins in shader.* Rejected — loses the
+  per-skin corner-pin homography benefit; overkill.
+- *Native composition node (`pmsdk_projector_composite`) to render N skins GPU-side.*
+  Deferred — the per-skin overhead in Unity (one small mesh + one MPB per skin) is negligible
+  at the scales expected here (tens of skins per projector). Revisit if a real workload
+  needs it.
+
+**Consequences.** The current single-warp-surface projectors continue to work unchanged
+(a projector without any `PMSDKSkin` children uses the split-slice RT path as before).
+Adding skins to a projector opts it out of the split-slice path — each skin brings its own
+source. Native SDK unchanged for v1. Design: `docs/multi-skin-design.md`.
+
+## D-037 2026-08-20 — Skin authoring lives in a dedicated scene; the artifact is a portable `PMSDKSkinSet`
+
+**Context.** Authoring skins and playing back content are two different jobs done by two
+different people (or at two different times). Coupling them into one scene forces content
+authors to re-align geometry every time they change scenes, and forces tech-ops to know the
+content pipeline. The industry pattern (MadMapper's mapping vs content mode, Resolume's
+slice editor vs composition) separates them.
+
+**Decision.**
+
+1. Ship a **Skin Editor scene** (`PMSDKSkinEditor.unity`) in the package. Its job is drawing
+   and stretching skins on live projector output — nothing else. It writes a `PMSDKSkinSet`
+   asset and a JSON sidecar.
+2. Any content scene loads a `PMSDKSkinSet` via a **`PMSDKSkinLoader`** component. At
+   runtime the loader instantiates one `PMSDKSkin` per saved skin, with saved geometry /
+   shape / mask / color. A separate `PMSDKSkinBindings` component (optional) binds content
+   sources per skin ID; if omitted, the loader falls back to each skin's optional
+   `defaultContent`.
+3. The skin set is persisted as **both a ScriptableObject** (Unity-native reference) **and a
+   JSON sidecar** (portable canonical form). The SO reads the JSON; the JSON is
+   authoritative.
+4. Skin set JSON files are kept **separate from `pmsdk_calibration.json`** — the
+   calibration file continues to hold per-projector corner-pin + blend as today; skin sets
+   are their own files (`pmsdk_skinset_<name>.json`). This keeps back-compat and lets a
+   project version-control skin sets independently.
+5. Ship the editor scene **in both channels**:
+   - `Samples~/SkinEditor/SkinEditor.unity` — imported via UPM Package Manager > Samples.
+   - `Tools > Projection Mapping > Generate Skin Editor Scene` — creates a local copy at
+     `Assets/PMSDKDemo/SkinEditor.unity` (same pattern as the existing demo generator).
+
+**Consequences.** One calibration is reused across many content scenes. Content authors
+never touch geometry unless they want to. The skin set is a portable artifact — copy the
+JSON to another machine and it works if the physical setup matches. The Skin Editor scene
+becomes the canonical mapping surface. Design: `docs/multi-skin-design.md`.

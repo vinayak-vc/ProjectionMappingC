@@ -581,6 +581,61 @@ plain 2D webcam our existing path opens (gains nothing over the C270 — depth u
 "auto-align onto true 3D geometry via native stereo triangulation" — this supersedes and
 scopes it, with the OAK-D as the reference sensor.
 
+## Multi-Skin single projector (PLANNED — 2026-08-20)
+
+Design: `docs/multi-skin-design.md`; decisions D-036 (multi-skin architecture) + D-037 (skin
+editor scene + `PMSDKSkinSet` asset). Skin = one content region on one projector; a
+projector may host many skins; each has its own shape (rect/ellipse/polygon/freeform),
+geometry, mask, color, opacity, and content source. Authoring in a dedicated Skin Editor
+scene; playback via `PMSDKSkinLoader` in any content scene. Native SDK unchanged for v1
+(quad skins reuse `PerspectiveWarp`; polygon skins are regenerated Unity meshes).
+
+### M-Sk1 — Foundation
+- [x] `PMSDKSkin` + `PMSDKSkinContent` components (SkinShape folded into `PMSDKSkin` as
+      `Kind`/`Vertices`/`SoftMask` fields — no separate MonoBehaviour, less inspector noise).
+- [x] Rectangle + Ellipse (quad + shader mask) using existing `PMSDKCornerPin`.
+- [x] Polygon (Unity mesh regen, ear-clip triangulation, bounding-box UVs;
+      `PMSDKSkinMeshBuilder`; caps 32 polygon / 128 freeform).
+- [x] `PMSDK/UnlitWarp` extensions (`_ShapeMask`, `_MaskFeather`, `_Opacity`). Ellipse mask
+      uses raw mesh UV so `PMSDKOutputTransform` doesn't rotate it.
+- [x] Content sources: `Texture`, `RenderTexture`, `VideoClip`, `TestPattern`.
+- [x] Editor menu (`Tools > Projection Mapping > Skins > Add Skin > {Rectangle, Ellipse,
+      Polygon, Freeform}`). "Convert Projector to Multi-Skin" is a stub in v1 (a projector
+      already tolerates sibling skins; M-Sk2 strips the classic split-slice material).
+- [x] Unit tests written and **passing**: `PMSDKSkinMeshBuilderTests` (13) +
+      `PMSDKSkinTests` (12) = **25/25 green**; pre-existing suites still **38/38** (no
+      regressions). Total EditMode 63/63. Test discovery unblocked by dropping the
+      redundant `UNITY_INCLUDE_TESTS` define constraint from
+      `Tests/Editor/vxpmsdk.Tests.Editor.asmdef` — `includePlatforms: ["Editor"]` already
+      keeps tests Editor-only.
+
+### M-Sk2 — Skin Editor scene
+- [ ] `PMSDKSkinEditorController` — drawing engine (draw, select, move corner/edge,
+      insert/remove vertex, solo, test pattern).
+- [ ] Shape toolbar + skin list + skin inspector on the operator console.
+- [ ] Undo/redo, coalesced groups (reuse the F2 undo pattern).
+- [ ] Ship in `Samples~/SkinEditor/` and add `Tools > Projection Mapping > Generate Skin
+      Editor Scene` (writes to `Assets/PMSDKDemo/SkinEditor.unity`).
+
+### M-Sk2.5 — Persistence + playback
+- [ ] `PMSDKSkinSet` ScriptableObject + JSON round-trip (`pmsdk_skinset_<name>.json`).
+- [ ] `PMSDKSkinLoader` + `PMSDKSkinBindings`.
+- [ ] `defaultContent` auto-binding fallback.
+- [ ] JSON import/export from the editor; version field for future schema evolution.
+
+### M-Sk3 — Content sources v1.1
+- [ ] `Camera` source (per-skin Unity camera → RT).
+- [ ] `VideoUrl` streaming source.
+- [ ] Per-skin `Spout`/`NDI` via existing `PMSDKSpoutIn`/`PMSDKNdiIn` and `PMSDKExternalContent`.
+- [ ] `Webcam` source (`WebCamTexture`).
+
+### M-Sk4 — Polish
+- [ ] Duplicate + reorder (drag in the skin list; `Ctrl+D`; `[`/`]` z-order).
+- [ ] Drag-and-drop file assignment onto a skin in the HUD.
+- [ ] Per-edge soft mask (`softMask` array UI).
+- [ ] Snap-to-grid, alignment guides.
+- [ ] Multi-select + group nudge.
+
 ## Next Items / Backlog
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)
 - [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter

@@ -1,5 +1,90 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk1 CODE COMPLETE (2026-08-20)
+
+Single projector hosts N independent content regions ("skins"), each a shape
+(Rectangle/Ellipse/Polygon/Freeform) drawn on the projector's raster output and mapped to a
+physical face. Design: `docs/multi-skin-design.md`. Decisions: D-036 (multi-skin
+architecture — quad shapes reuse `PerspectiveWarp`; polygon shapes are regenerated Unity
+meshes; native SDK unchanged for v1), D-037 (dedicated Skin Editor scene + `PMSDKSkinSet`
+as the authoring artifact).
+
+**M-Sk1 (Foundation) — done, Unity-compile-verified, MCP test-run deferred.** Files added
+in `bindings/unity/com.viitorx.pmsdk/`:
+- `Runtime/Skin/PMSDKSkin.cs` — the skin component. `Kind ∈ {Rectangle, Ellipse, Polygon,
+  Freeform}`; `Vertices : List<Vector2>` in raster-space [0..1] y-UP; auto-manages the
+  underlying warp path (Rectangle/Ellipse → `PMSDKMeshWarp`+`PMSDKCornerPin` on the same
+  GameObject; Polygon/Freeform → disables those and owns a regenerated Unity mesh).
+  Pushes `_ShapeMask`, `_MaskFeather`, `_Opacity` and `_MainTex` via MPB. Z-order maps to
+  small localPosition.z offsets.
+- `Runtime/Skin/PMSDKSkinShape` — folded into `PMSDKSkin` as its `Kind`/`Vertices`/`SoftMask`
+  fields (kept the design-doc term inline in code comments; no separate MonoBehaviour to
+  reduce inspector noise).
+- `Runtime/Skin/PMSDKSkinContent.cs` — content-source binding.
+  `Mode ∈ {None, Texture, RenderTexture, VideoClip, TestPattern}`; owns per-skin
+  `VideoPlayer`+`RenderTexture` only in VideoClip mode and a `Texture2D` in TestPattern
+  mode; tears them down on mode switch. Playback controls (Play/Loop/Mute/Rate/StartTime)
+  wire to `VideoPlayer`.
+- `Runtime/Skin/PMSDKSkinMeshBuilder.cs` — pure static utility. Unit-quad, polygon
+  triangulation (ear-clip, O(n²), handles CW input by internal reversal), bounding-box UV
+  mapping. Vertex caps `MaxPolygonVertices = 32` / `MaxFreeformVertices = 128`.
+- `Runtime/Shaders/UnlitWarp.shader` — three new uniforms with no-op defaults:
+  `_ShapeMask` (0=None, 1=Ellipse), `_MaskFeather`, `_Opacity`. Ellipse mask uses raw mesh
+  UV (`i.uv`, not the content-transformed `uv`) so `PMSDKOutputTransform` rotations don't
+  rotate the mask along with content. Existing pipeline (edge blend → luminance gain →
+  black level → color correct) unchanged.
+- `Editor/PMSDKSkinMenu.cs` — `Tools > Projection Mapping > Skins > Add Skin > {Rectangle,
+  Ellipse, Polygon (Hexagon), Freeform (empty)}`. Creates a fully-configured GameObject
+  under the selected projector (matches existing warp-surface transform convention: identity
+  rotation, `localScale=(16/9,1,1)`, `PMSDK/UnlitWarp` material). Quad kinds get
+  `PMSDKMeshWarp`+`PMSDKCornerPin` companions; polygon kinds do not. `Convert Projector to
+  Multi-Skin` is a stub (v1: projectors already tolerate multiple sibling skins; M-Sk2 will
+  strip the classic split-slice material).
+- `Tests/Editor/PMSDKSkinMeshBuilderTests.cs` — pure-logic unit tests: unit-quad
+  winding/UVs, signed area, CW/CCW normalization, concave ear-clip, degenerate rejection,
+  BuildPolygon bounding-box UV, cap-sized (128-gon) triangulation.
+- `Tests/Editor/PMSDKSkinTests.cs` — integration tests: kind-driven mesh selection, MPB
+  uniform push, z-order transform, `OnValidate` clamping/padding, content lifecycle
+  (None/Texture/TestPattern mode switching, owned-texture release).
+
+**Verification state**:
+- Unity **compile** clean — 0 `error CS`, 0 errors in Unity console, .meta files
+  auto-generated on save.
+- **EditMode tests 63/63 green** on Unity MCP (port 6402):
+  - New M-Sk1 tests: **25/25** (13 in `PMSDKSkinMeshBuilderTests`, 12 in `PMSDKSkinTests`).
+  - Pre-existing: **38/38** (Calibration + Math + Osc + TestPattern) — no regressions.
+- Test discovery unblocked by removing the `UNITY_INCLUDE_TESTS` define constraint from
+  `Tests/Editor/vxpmsdk.Tests.Editor.asmdef` — `includePlatforms: ["Editor"]` already keeps
+  tests Editor-only, so the constraint was redundant belt-and-suspenders. The Multi Projector
+  template didn't have `UNITY_INCLUDE_TESTS` in its scripting defines and is ReadOnly per
+  the machine setup, so this fix lives in the SDK package (the right layer).
+- MCP `run_tests` filter API gotcha: `assembly_names` filter returns `total: 0`. Use
+  `test_names` with class fixture names (e.g. `"vxpmsdk.Tests.PMSDKSkinTests"`) or full test
+  paths. Bake this into the next agent's memory.
+- **Runtime path** (playing a scene with a skin) — deferred; needs a scene actually holding
+  a `PMSDKSkin`. Recommended smoke: `Tools > Projection Mapping > Generate Demo Scene`,
+  then use the new `Add Skin > Ellipse` menu to drop a skin onto the projector, hit play,
+  confirm the ellipse mask cuts a circular region and the corner-pin drag still works.
+
+**Convention decisions locked during implementation** (worth carrying forward):
+- `PMSDKSkin.Vertices` and all skin geometry are **y-UP normalized `[0..1]`** raster
+  coordinates (matches `PMSDKCornerPin`'s corner fields and Unity's world convention). The
+  design doc's earlier "top-left origin" note was inconsistent; the actual on-disk
+  convention (both in-memory and future JSON persistence) is y-UP.
+- **Kind swap at runtime**: `PMSDKSkin` DOES auto-enable/disable its
+  `PMSDKMeshWarp`+`PMSDKCornerPin` companions when `Kind` changes between quad and polygon
+  families. Users can flip kind mid-session without deleting the skin (not a documented
+  workflow, but robust to inspector edits).
+- **Shape mask discards** outside pixels (rather than blending with alpha), so skins can
+  safely overlap without one skin's black falloff writing over another. Alpha blending
+  would require a queue change; discard keeps the queue at `Geometry` with `ZWrite On`.
+
+**Next**: **M-Sk2** — Skin Editor scene (drawing tools: draw with mouse, corner/edge drag,
+insert/remove polygon vertex, solo/mute, undo/redo). Ship in `Samples~/SkinEditor/` and
+add the `Tools > Projection Mapping > Generate Skin Editor Scene` menu that writes a copy
+to `Assets/PMSDKDemo/SkinEditor.unity`. **Before M-Sk2** it's worth spending 10 min to fix
+the MCP test discovery so the M-Sk1 tests can gate M-Sk2 work.
+
 ## HoloTrackSDK — NEW independent product (2026-07-21)
 
 Branch `Head-Tracked-Holographic-Projection-System` (off `main`). Building the **Head-Tracked

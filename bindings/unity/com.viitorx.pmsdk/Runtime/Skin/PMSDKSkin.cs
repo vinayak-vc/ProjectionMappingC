@@ -77,6 +77,15 @@ namespace vxpmsdk.Components
 
         [Range(0f, 0.5f)] public float SoftMask = 0f;
 
+        [Tooltip("M-Sk4 polish: use PMSDKSkin.EdgeFeather (per-edge Top/Right/Bottom/Left) " +
+                 "instead of the scalar SoftMask. Applies only to Ellipse skins (the " +
+                 "only shape with a shader mask).")]
+        public bool PerEdgeFeatherEnabled = false;
+
+        [Tooltip("Per-edge feather in raster/UV units: (Top, Right, Bottom, Left). Ignored " +
+                 "unless PerEdgeFeatherEnabled and the skin is an Ellipse.")]
+        public Vector4 EdgeFeather = Vector4.zero;
+
         /// <summary>Higher z-order draws in front. Implemented as a small localPosition.z
         /// offset so it composes with the projector's ortho camera without touching the
         /// renderer's sorting order. Range is clamped to keep skins within the camera's
@@ -101,10 +110,11 @@ namespace vxpmsdk.Components
         private PMSDKSkinShapeKind lastAppliedKind = (PMSDKSkinShapeKind)(-1);
         private Mesh ownedMesh;
 
-        private static readonly int ID_ShapeMask   = Shader.PropertyToID("_ShapeMask");
-        private static readonly int ID_MaskFeather = Shader.PropertyToID("_MaskFeather");
-        private static readonly int ID_Opacity     = Shader.PropertyToID("_Opacity");
-        private static readonly int ID_MainTex     = Shader.PropertyToID("_MainTex");
+        private static readonly int ID_ShapeMask    = Shader.PropertyToID("_ShapeMask");
+        private static readonly int ID_MaskFeather  = Shader.PropertyToID("_MaskFeather");
+        private static readonly int ID_MaskFeather4 = Shader.PropertyToID("_MaskFeather4");
+        private static readonly int ID_Opacity      = Shader.PropertyToID("_Opacity");
+        private static readonly int ID_MainTex      = Shader.PropertyToID("_MainTex");
 
         private void OnEnable()
         {
@@ -256,6 +266,14 @@ namespace vxpmsdk.Components
             meshRenderer.GetPropertyBlock(mpb);
             mpb.SetFloat(ID_ShapeMask,   Kind == PMSDKSkinShapeKind.Ellipse ? 1f : 0f);
             mpb.SetFloat(ID_MaskFeather, Mathf.Max(SoftMask, 0f));
+            // M-Sk4 polish v1.2: push per-edge feather. Default (PerEdgeFeatherEnabled
+            // = false) tiles the scalar SoftMask across all four channels so the shader
+            // behaves identically to the M-Sk1 scalar path.
+            Vector4 f4 = PerEdgeFeatherEnabled
+                ? new Vector4(Mathf.Max(EdgeFeather.x, 0f), Mathf.Max(EdgeFeather.y, 0f),
+                              Mathf.Max(EdgeFeather.z, 0f), Mathf.Max(EdgeFeather.w, 0f))
+                : new Vector4(SoftMask, SoftMask, SoftMask, SoftMask);
+            mpb.SetVector(ID_MaskFeather4, f4);
             mpb.SetFloat(ID_Opacity,     Mathf.Clamp01(Opacity));
 
             // Content texture: test-pattern override > PMSDKSkinContent.CurrentTexture > leave

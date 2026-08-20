@@ -701,8 +701,12 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       overlay.
 - [x] Per-skin visibility toggle (`SetSkinVisibility` + `ToggleVisibilitySelected`;
       row button in HUD). Independent of solo/mute.
-- [ ] Per-edge soft mask UI + shader — schema stores `perEdgeFeather` from M-Sk2.5 but
-      the shader still uses a scalar. Deferred to v1.2 (shader work).
+- [x] Per-edge soft mask UI + shader (M-Sk4 v1.2, done 2026-08-20; 6 new tests + 158/158
+      total green). Shader gains `_MaskFeather4 (T,R,B,L)` with a per-pixel weighted
+      formula. `PMSDKSkin.PerEdgeFeatherEnabled` + `EdgeFeather` (Vector4). Scalar
+      fallback tiled across all four channels keeps back-compat. Ellipse-only in the HUD
+      (the only shape whose shader has a mask). JSON populates `mask.perEdgeFeather`
+      when enabled; absent otherwise — legacy files load as scalar.
 - [ ] Drag-and-drop file assignment onto a skin in the HUD — IMGUI `DragAndDrop` is
       Editor-only; play-mode file drops are a separate integration. Deferred.
 - [ ] Canvas-based inspector — IMGUI is functional; a UGUI rewrite is non-blocking.

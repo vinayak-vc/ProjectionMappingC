@@ -129,6 +129,15 @@ namespace vxpmsdk.Components
             var content = s.GetComponent<PMSDKSkinContent>();
             var color = s.GetComponent<PMSDKColorCorrection>();
             var transform = s.GetComponent<PMSDKOutputTransform>();
+            var mask = new MaskCfg { kind = MaskForShape(s.Kind), feather = s.SoftMask };
+            // Per-edge feather (M-Sk4 v1.2): when enabled, store four values in the
+            // (top, right, bottom, left) order matching the shader's _MaskFeather4.
+            if (s.PerEdgeFeatherEnabled)
+            {
+                mask.perEdgeFeather = new List<float> {
+                    s.EdgeFeather.x, s.EdgeFeather.y, s.EdgeFeather.z, s.EdgeFeather.w
+                };
+            }
             return new Skin
             {
                 id = s.SkinId,
@@ -136,7 +145,7 @@ namespace vxpmsdk.Components
                 shape = ShapeToString(s.Kind),
                 warp = WarpForShape(s.Kind),
                 vertices = new List<Vector2>(s.Vertices ?? new List<Vector2>()),
-                mask = new MaskCfg { kind = MaskForShape(s.Kind), feather = s.SoftMask },
+                mask = mask,
                 transform = CaptureTransform(transform),
                 color = CaptureColor(color),
                 opacity = s.Opacity,
@@ -197,6 +206,18 @@ namespace vxpmsdk.Components
             s.Opacity = dto.opacity;
             s.SoftMask = dto.softMask;
             s.ZOrder = dto.zOrder;
+            // Per-edge feather (M-Sk4 v1.2): only accept exactly 4 values.
+            if (dto.mask != null && dto.mask.perEdgeFeather != null && dto.mask.perEdgeFeather.Count == 4)
+            {
+                s.PerEdgeFeatherEnabled = true;
+                s.EdgeFeather = new Vector4(
+                    dto.mask.perEdgeFeather[0], dto.mask.perEdgeFeather[1],
+                    dto.mask.perEdgeFeather[2], dto.mask.perEdgeFeather[3]);
+            }
+            else
+            {
+                s.PerEdgeFeatherEnabled = false;
+            }
             ApplyDefaultContent(s, dto.defaultContent);
         }
 

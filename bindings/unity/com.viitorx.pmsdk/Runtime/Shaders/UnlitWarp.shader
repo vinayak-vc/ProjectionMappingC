@@ -41,7 +41,11 @@ Shader "PMSDK/UnlitWarp"
         _OutGamma ("Output Gamma (per channel)", Vector) = (1,1,1,0)
         // Shape mask + opacity (PMSDKSkin, M-Sk1). Defaults are no-op.
         _ShapeMask ("Shape Mask (0=None, 1=Ellipse)", Float) = 0
-        _MaskFeather ("Mask Feather (UV units)", Range(0, 0.5)) = 0
+        _MaskFeather ("Mask Feather (UV units) — scalar fallback", Range(0, 0.5)) = 0
+        // Per-edge feather (Top, Right, Bottom, Left). M-Sk4 v1.2 polish: PMSDKSkin
+        // pushes (SoftMask, SoftMask, SoftMask, SoftMask) by default; if
+        // PerEdgeFeatherEnabled, pushes the user-authored EdgeFeather values instead.
+        _MaskFeather4 ("Mask Feather per-edge (T,R,B,L)", Vector) = (0,0,0,0)
         _Opacity ("Skin Opacity", Range(0, 1)) = 1
     }
     SubShader
@@ -73,6 +77,7 @@ Shader "PMSDK/UnlitWarp"
             float3 _OutGamma;
             float _ShapeMask;
             float _MaskFeather;
+            float4 _MaskFeather4;
             float _Opacity;
 
             struct appdata
@@ -128,6 +133,14 @@ Shader "PMSDK/UnlitWarp"
                 // in the [0,1]^2 UV quad, with a feathered edge. Non-quad skins
                 // (Polygon/Freeform) already have their shape as raw geometry and set
                 // _ShapeMask=0. Discard so overlapping skins render correctly.
+                //
+                // Per-edge feather (M-Sk4 v1.2 polish): _MaskFeather4 = (Top, Right,
+                // Bottom, Left). Pixels closer to a given side use that side's feather;
+                // in between, weighted by |nx| / (|nx|+|ny|). Falls back to scalar
+                // _MaskFeather when all four channels are zero (PMSDKSkin's default
+                // push for skins without PerEdgeFeatherEnabled sends the scalar tiled
+                // across all four, so this branch is rare).
+                //
                 // Uses i.uv (raw mesh UV), NOT the transformed content-sampling UV — the
                 // mask defines the PHYSICAL projected region, so a content rotation via
                 // PMSDKOutputTransform must not rotate the mask along with it.
@@ -135,7 +148,15 @@ Shader "PMSDK/UnlitWarp"
                 {
                     float2 d = (i.uv - 0.5) * 2.0;
                     float r = length(d);
-                    float feather = max(_MaskFeather, 0.0001);
+
+                    float4 f4 = _MaskFeather4;
+                    if ((f4.x + f4.y + f4.z + f4.w) < 0.0001) f4 = _MaskFeather.xxxx;
+                    float fY = (d.y >= 0.0) ? f4.x : f4.z; // top / bottom
+                    float fX = (d.x >= 0.0) ? f4.y : f4.w; // right / left
+                    float2 an = abs(d);
+                    float denom = max(an.x + an.y, 0.0001);
+                    float feather = max((fX * an.x + fY * an.y) / denom, 0.0001);
+
                     float mask = smoothstep(1.0, 1.0 - feather, r);
                     if (mask <= 0.001) discard;
                     c.rgb *= mask;

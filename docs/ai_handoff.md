@@ -1,5 +1,37 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk4 v1.2 (per-edge feather) COMPLETE (2026-08-20)
+
+**M-Sk4 v1.2 polish — per-edge feather done, 158/158 EditMode tests green** (6 new + 152
+existing). Ellipse skins can now feather each edge independently: T/R/B/L each with its
+own softness value. When disabled, the scalar `SoftMask` continues to work exactly as
+before (back-compat by construction — the Skin pushes `(SoftMask, SoftMask, SoftMask,
+SoftMask)` into `_MaskFeather4`).
+
+**Shader**:
+- New uniform `_MaskFeather4 (Top, Right, Bottom, Left)`.
+- Per-pixel weighted feather: `fY = d.y>=0 ? f4.x : f4.z; fX = d.x>=0 ? f4.y : f4.w;
+  feather = (fX*|dx| + fY*|dy|) / (|dx| + |dy|)`. Smooth transition around the ellipse.
+- Scalar fallback when all four channels are zero (defensive; PMSDKSkin always pushes
+  something so this branch is rare).
+
+**Component**: `PMSDKSkin.PerEdgeFeatherEnabled` (bool) + `EdgeFeather` (Vector4 TRBL).
+When enabled, `PushMaterialProperties` clamps negative values to zero then pushes
+`_MaskFeather4` from EdgeFeather. When disabled, pushes the scalar tiled — perfect
+back-compat.
+
+**JSON schema**: `mask.perEdgeFeather` (List&lt;float&gt; of length 4) is populated when
+enabled, empty/absent otherwise. Round-trip restores `PerEdgeFeatherEnabled` +
+`EdgeFeather`. Legacy JSON without the field lands as `PerEdgeFeatherEnabled = false`.
+
+**HUD**: an "Ellipse selected?" gate reveals the toggle + four T/R/B/L sliders when the
+selected skin is an Ellipse. Sliders live in the skin inspector under the scalar Feather
+slider.
+
+**Tests** (`PMSDKSkinPerEdgeFeatherTests`, 6/6): default pushes uniform scalar, enabled
+pushes per-edge, negative values clamp to zero, JSON serializes when enabled, scalar-only
+skin leaves `perEdgeFeather` absent, full JSON round-trip restores per-edge state.
+
 ## Multi-Skin single projector — M-Sk4 COMPLETE (2026-08-20)
 
 **M-Sk4 polish — done, 152/152 EditMode tests green**. All five multi-skin milestones now

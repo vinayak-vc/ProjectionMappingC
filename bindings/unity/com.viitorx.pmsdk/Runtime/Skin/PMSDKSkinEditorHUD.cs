@@ -208,6 +208,33 @@ namespace vxpmsdk.Components
             s.SoftMask = GUI.HorizontalSlider(new Rect(x + 100, row + 6, w - 108, 12), s.SoftMask, 0f, 0.5f);
             row += 24;
 
+            // Per-edge feather (M-Sk4 v1.2): only meaningful for Ellipse (the only
+            // shape with a shader mask). Rectangle/Polygon/Freeform have no mask, so
+            // the feather sliders are a no-op there.
+            if (s.Kind == PMSDKSkinShapeKind.Ellipse)
+            {
+                s.PerEdgeFeatherEnabled = GUI.Toggle(new Rect(x + 8, row, w - 16, 22),
+                    s.PerEdgeFeatherEnabled, "Per-edge feather (T/R/B/L)", labelStyle);
+                row += 24;
+                if (s.PerEdgeFeatherEnabled)
+                {
+                    var f = s.EdgeFeather;
+                    GUI.Label(new Rect(x + 8, row, 60, 22), $"T {f.x:F2}", labelStyle);
+                    f.x = GUI.HorizontalSlider(new Rect(x + 70, row + 6, w - 78, 12), f.x, 0f, 0.5f);
+                    row += 22;
+                    GUI.Label(new Rect(x + 8, row, 60, 22), $"R {f.y:F2}", labelStyle);
+                    f.y = GUI.HorizontalSlider(new Rect(x + 70, row + 6, w - 78, 12), f.y, 0f, 0.5f);
+                    row += 22;
+                    GUI.Label(new Rect(x + 8, row, 60, 22), $"B {f.z:F2}", labelStyle);
+                    f.z = GUI.HorizontalSlider(new Rect(x + 70, row + 6, w - 78, 12), f.z, 0f, 0.5f);
+                    row += 22;
+                    GUI.Label(new Rect(x + 8, row, 60, 22), $"L {f.w:F2}", labelStyle);
+                    f.w = GUI.HorizontalSlider(new Rect(x + 70, row + 6, w - 78, 12), f.w, 0f, 0.5f);
+                    row += 24;
+                    s.EdgeFeather = f;
+                }
+            }
+
             GUI.Label(new Rect(x + 8, row, 100, 22), $"Z: {s.ZOrder}", labelStyle);
             if (GUI.Button(new Rect(x + 108, row, 60, 22), "back [", toolButtonStyle))
                 Controller.MoveSelectedZOrder(-1);

@@ -25,6 +25,10 @@ namespace vxpmsdk.Components
         [Tooltip("HUD text scale — bump on high-DPI displays.")]
         public float TextScale = 1.0f;
 
+        [Tooltip("M-Sk4 v1.4 UGUI polish: set false to hide the IMGUI inspector panel " +
+                 "(useful when PMSDKSkinEditorCanvasInspector is present, which auto-flips this).")]
+        public bool DrawInspector = true;
+
         private GUIStyle statusStyle, labelStyle, helpStyle, toolButtonStyle, listButtonStyle;
 
         private void Update()
@@ -39,7 +43,7 @@ namespace vxpmsdk.Components
 
             DrawToolbar();
             DrawSkinList();
-            DrawSkinInspector();
+            if (DrawInspector) DrawSkinInspector();
             DrawStatusLine();
             if (ShowHelp) DrawHelpPanel();
         }

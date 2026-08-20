@@ -714,7 +714,13 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       drops (Texture/RT/VideoClip/PMSDKSkinSet). Utility `PMSDKSkinDragDrop` with pure
       `KindForPath` / `ApplyPath` (runtime-safe) + Editor-only `ApplyObject`.
       Standalone play-mode file drops still need a native plugin — deferred.
-- [ ] Canvas-based inspector — IMGUI is functional; a UGUI rewrite is non-blocking.
+- [x] Canvas-based inspector (M-Sk4 v1.4, done 2026-08-20; 11 new tests + 179/179 total
+      green). New `PMSDKSkinEditorCanvasInspector` component builds a full UGUI Canvas
+      + right-aligned panel on Display 1 (Text/InputField/Slider/Toggle/Button; legacy
+      UGUI — no TMP). Auto-hides the sibling IMGUI HUD's inspector while active
+      (`PMSDKSkinEditorHUD.DrawInspector`). Attached by default in the generated Skin
+      Editor scene. Deferred v1.5: drag-reorder in the skin list (UGUI drag events on
+      rows).
       Deferred.
 
 ## Next Items / Backlog

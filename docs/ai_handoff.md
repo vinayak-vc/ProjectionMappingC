@@ -1,5 +1,47 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk4 v1.4 (UGUI Canvas inspector) COMPLETE (2026-08-20)
+
+**M-Sk4 v1.4 polish — UGUI Canvas inspector done, 179/179 EditMode tests green** (11 new
++ 168 existing). The skin inspector on Display 1 is now a proper UGUI Canvas panel
+(Text/InputField/Slider/Toggle/Button) instead of IMGUI immediate-mode. Rest of the HUD
+(toolbar, skin list, status/help) stays IMGUI — non-blocker.
+
+**Component**: `PMSDKSkinEditorCanvasInspector`.
+- Builds the entire Canvas hierarchy in code on `OnEnable` (no prefab assets needed).
+- Right-aligned panel with `VerticalLayoutGroup` + `ContentSizeFitter`; each row is a
+  `HorizontalLayoutGroup` with label + control.
+- Fields: name `InputField`, kind label, verts label, opacity `Slider` with numeric
+  readout, feather `Slider`, per-edge `Toggle` + four T/R/B/L sliders (visible only on
+  Ellipse skins with PerEdgeFeatherEnabled), z-order back/forward buttons, action row
+  (Duplicate / Solo / Pattern / Delete).
+- Legacy `Text` + `InputField` — no TMP dependency.
+- Auto-creates an `EventSystem` + `StandaloneInputModule` if the scene lacks one.
+- **Auto-hides the sibling IMGUI HUD's inspector**: on enable, sets
+  `PMSDKSkinEditorHUD.DrawInspector = false`; on disable, restores the prior value.
+  New `DrawInspector` flag added to the IMGUI HUD for this.
+- `RebuildForTests()` — public convenience to force a deterministic build after
+  Controller assignment (EditMode's enable/disable timing around AddComponent is
+  finicky).
+
+**Scene generator**: adds `PMSDKSkinEditorCanvasInspector` alongside the IMGUI HUD in
+the generated scene. Users can disable one or the other to switch back.
+
+**Tests** (`PMSDKSkinEditorCanvasInspectorTests`, 11/11):
+- Canvas + EventSystem built; NameField / OpacitySlider / FeatherSlider / PerEdgeToggle
+  exist.
+- IMGUI HUD's DrawInspector flips off with canvas active; OnDisable restores it.
+- Selection change: RebindFieldsFromSkin updates the text + slider to the new skin's
+  state; per-edge toggle visibility gates on Ellipse.
+- Handlers write back: OnNameChanged / OnOpacityChanged / OnFeatherChanged /
+  OnPerEdgeToggled / OnPerEdgeChanged all mutate the selected skin (invoked via
+  reflection to bypass UGUI's own dispatch, which trips internal
+  `ShouldRunBehaviour` assertions in EditMode).
+
+**Deferred v1.5**: drag-reorder in the skin list (UGUI drag events on rows). Explicit
+up/down buttons already exist in the IMGUI list; a UGUI list rewrite plus drag is a
+follow-up refinement.
+
 ## Multi-Skin single projector — M-Sk4 v1.3 (drag-drop file assignment) COMPLETE (2026-08-20)
 
 **M-Sk4 v1.3 polish — drag-drop file assignment on the HUD done, 168/168 EditMode tests

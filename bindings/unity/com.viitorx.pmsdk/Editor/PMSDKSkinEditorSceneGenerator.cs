@@ -77,6 +77,10 @@ namespace vxpmsdk.Editor
             overlay.Controller = controller;
             var hud = editorGO.AddComponent<PMSDKSkinEditorHUD>();
             hud.Controller = controller;
+            // M-Sk4 v1.4 UGUI polish: attach the Canvas inspector by default. It
+            // auto-flips the IMGUI HUD's DrawInspector off while enabled.
+            var canvasInspector = editorGO.AddComponent<PMSDKSkinEditorCanvasInspector>();
+            canvasInspector.Controller = controller;
 
             // ---- save ----
             EditorSceneManager.SaveScene(scene, ScenePath);

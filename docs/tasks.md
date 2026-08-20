@@ -631,22 +631,32 @@ Phase A (drawing engine, done 2026-08-20; 24/24 new tests green, 87/87 total Edi
       `normals[i]` unconditionally and would crash any Rectangle/Ellipse skin at runtime.
       Now explicit -Z normals per vertex.
 
-Phase B (drawing polish + editor UI — not started):
-- [ ] Polygon click-to-draw (each click adds a vertex; Enter closes) and Freeform
-      stroke-to-draw.
-- [ ] Insert / remove polygon vertex (`+` / `-` on selected edge).
-- [ ] Ctrl+D duplicate; `[` / `]` z-order.
-- [ ] Solo / mute (`X` / `Shift+X`); test pattern cycle (`Y` / `Shift+Y`).
-- [ ] Canvas-based skin list + skin inspector on the operator console (Display 1) —
-      replaces the IMGUI status/help stub.
+Phase B (drawing polish + editor UI, done 2026-08-20; 24 new tests green):
+- [x] Polygon click-to-draw (`P` tool; click adds vertex, Enter or near-start click closes).
+- [x] Freeform stroke-to-draw (`F` tool; drag traces points at `FreeformSampleSpacing`,
+      release closes; <3 verts cancels).
+- [x] Insert / remove polygon vertex (`+` / `-` on selected corner's edge / at that corner;
+      respects min-3-verts floor; rectangle/ellipse no-op).
+- [x] `Ctrl+D` duplicate (offsets by +0.02, new SkinId); `[` / `]` z-order back / forward.
+- [x] `X` solo (mutes every other MeshRenderer); `Shift+X` unmute all.
+- [x] `Y` / `Shift+Y` cycles the selected skin's test pattern via `PMSDKSkinContent`.
+- [x] Extended IMGUI HUD: tool toolbar with active-highlight, skin list (click to select,
+      muted glyph), skin inspector (name field, opacity/feather sliders, z-order
+      back/fwd + duplicate + solo + pattern-cycle + delete). Canvas-based polish is a
+      later refinement, not blocking.
 
-Phase C (save/undo + sample — not started):
-- [ ] Undo/redo, coalesced groups (reuse the F2 undo pattern in `PMSDKCalibrationManager`).
-- [ ] Ctrl+S save (writes to `Assets/PMSDKDemo/Skins/<name>.asset` + JSON sidecar —
-      interim; the `PMSDKSkinSet` ScriptableObject formalizes this in M-Sk2.5).
-- [ ] Ctrl+Shift+E / Ctrl+Shift+I JSON export / import.
-- [ ] Ship in `Samples~/SkinEditor/` as a UPM Package Manager sample too (alongside the
-      local generator).
+Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
+- [x] Undo/redo with coalesced groups (0.7s window, depth cap 100). Every mutating op
+      records before mutating: draw-rect / corner-drag / edge-drag / add-default / delete /
+      duplicate / poly-start / freeform-start / vertex-insert / vertex-remove / zorder /
+      solo / unmute / pattern-cycle / nudge / load.
+- [x] `Ctrl+S` save / `Ctrl+L` load — atomic write via `<path>.tmp` + move; default path
+      `Application.persistentDataPath/pmsdk_skinset_default.json`.
+- [x] `PMSDKSkinSetJson` — JsonUtility-based round-trip. Reconciles on `SkinId` (in-place
+      update, spawn missing, destroy removed).
+- [ ] UPM `Samples~/SkinEditor/` — deferred. Local generator already provides the scene;
+      the UPM sample would be redundant. Revisit if a UPM-first distribution becomes
+      relevant.
 
 ### M-Sk2.5 — Persistence + playback
 - [ ] `PMSDKSkinSet` ScriptableObject + JSON round-trip (`pmsdk_skinset_<name>.json`).

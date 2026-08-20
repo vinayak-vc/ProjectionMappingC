@@ -1,5 +1,62 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk2 Phase A+B+C COMPLETE (2026-08-20)
+
+**All of M-Sk2 shipped in this session — 111/111 EditMode tests green** (24 Phase B/C +
+24 Phase A + 25 M-Sk1 + 38 pre-existing). Drawing, editing, undo/redo, and JSON save/load
+all working. Only M-Sk2.5 (portable `PMSDKSkinSet` ScriptableObject) and M-Sk3/4 (v1.1
+content sources + polish) remain.
+
+**Phase B (drawing polish + editor UI) — done**:
+- Polygon click-to-draw: `P` tool + click adds a vertex, click near start (or `Enter`) closes.
+- Freeform stroke-to-draw: `F` tool + drag traces points at `FreeformSampleSpacing`, release closes.
+- Insert / remove polygon vertex (`+` / `-`) on the selected corner's edge / at that corner.
+- `Ctrl+D` duplicate (offsets by +0.02); `[` / `]` z-order back / forward.
+- `X` solo (mutes every other skin's MeshRenderer); `Shift+X` unmute all.
+- `Y` / `Shift+Y` cycles the selected skin's test pattern (routes through `PMSDKSkinContent`,
+  auto-sets Mode = TestPattern).
+- Extended IMGUI HUD: tool toolbar with active-highlight, skin list (click to select, muted
+  glyph), skin inspector (name field, opacity/feather sliders, z-order + duplicate + solo +
+  pattern-cycle + delete buttons), extended F1 help.
+
+**Phase C (undo/redo + JSON save/load) — done**:
+- `PMSDKSkinEditorUndo`: coalesced snapshot stack (0.7s window, depth cap 100, same feel
+  as F2 calibration). Nudge bursts collapse to one entry.
+- All mutating operations record before mutating: draw-rect, corner-drag, edge-drag,
+  add-default, delete, duplicate, poly-start, poly close, freeform-start, vertex-insert,
+  vertex-remove, zorder, solo/unmute, pattern-cycle, nudge, load.
+- `Ctrl+Z` / `Ctrl+Y` undo/redo — restores state by JSON round-trip via `PMSDKSkinSetJson.Apply`
+  which reconciles scene skins on `SkinId` (in-place update, spawn missing, destroy removed).
+- `PMSDKSkinSetJson`: JsonUtility-backed round-trip. Atomic write (write to `<path>.tmp`,
+  move-over). Default save path: `Application.persistentDataPath/pmsdk_skinset_default.json`.
+  Interim schema — matching the canonical JSON in the design doc becomes M-Sk2.5's job.
+- `Ctrl+S` save / `Ctrl+L` load bindings on the input, plus toolbar buttons.
+
+**Bug caught by Phase B/C tests**:
+- `BeginFreeformStroke`, `ContinueFreeformStroke`, `EndFreeformStroke` were declared `internal`,
+  so the Tests/Editor asmdef (a separate assembly) couldn't call them → CS1061. Bumped to
+  `public`. Also added `using UnityEngine.TestTools;` for `LogAssert`.
+
+**Files added / modified in Phase B/C** (`bindings/unity/com.viitorx.pmsdk/`):
+- `Runtime/Skin/PMSDKSkinEditorControllerPhaseBC.cs` (new) — partial class with all
+  Phase B/C methods + state.
+- `Runtime/Skin/PMSDKSkinEditorUndo.cs` (new) — coalesced undo stack.
+- `Runtime/Skin/PMSDKSkinSetJson.cs` (new) — JSON round-trip + snapshot capture / apply.
+- `Runtime/Skin/PMSDKSkinEditorController.cs` — marked `partial`; added Undo.Record hooks
+  in NudgeSelectedCorner, DeleteSelected, AddDefaultShape, BeginHandleDrag, OnPointerDown
+  (draw-rect branch).
+- `Runtime/Skin/PMSDKSkinEditorInput.cs` — added polygon click-to-draw routing, freeform
+  stroke routing, Enter close, +/- vertex, [/] z-order, X/Shift+X solo, Y/Shift+Y pattern,
+  Ctrl+D duplicate, Ctrl+Z/Y undo/redo, Ctrl+S/L save/load, Esc cancels polygon draw.
+- `Runtime/Skin/PMSDKSkinEditorHUD.cs` — extended IMGUI with toolbar + skin list + inspector.
+- `Tests/Editor/PMSDKSkinEditorPhaseBCTests.cs` (new) — 24 tests covering polygon draw,
+  freeform, insert/remove vertex, duplicate, z-order, solo/unmute, pattern cycle,
+  undo/redo (incl. coalesce), JSON round-trip, save/load, missing-file handling.
+
+**Not in this pass**: UPM `Samples~/SkinEditor/` — the local generator (`Tools > Projection
+Mapping > Skins > Generate Skin Editor Scene`) is the primary distribution, and a UPM
+sample would be redundant with the generator's output. Marked deferred in tasks.md.
+
 ## Multi-Skin single projector — M-Sk2 Phase A COMPLETE (2026-08-20)
 
 **M-Sk2 Phase A (drawing engine + overlay + scene generator) — done, 87/87 EditMode tests

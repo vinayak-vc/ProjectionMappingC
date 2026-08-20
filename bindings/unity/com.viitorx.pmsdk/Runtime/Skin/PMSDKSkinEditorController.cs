@@ -18,7 +18,7 @@ namespace vxpmsdk.Components
     ///   - Skin/corner cycling, arrow-key nudge with Shift/Ctrl scaling, delete, add-default.
     /// </summary>
     [DisallowMultipleComponent]
-    public class PMSDKSkinEditorController : MonoBehaviour
+    public partial class PMSDKSkinEditorController : MonoBehaviour
     {
         public enum Tool { Select, Rectangle, Ellipse, Polygon, Freeform }
         public enum DragState { Idle, DrawingRect, DraggingCorner, DraggingEdge }
@@ -119,6 +119,9 @@ namespace vxpmsdk.Components
         {
             var s = Selected;
             if (s == null || s.Vertices == null || SelectedCornerIndex < 0 || SelectedCornerIndex >= s.Vertices.Count) return;
+            // Coalesce consecutive nudges into one undo slot — the Undo class' Record()
+            // merges same-reason entries inside a 0.7s window.
+            Undo.Record(this, "nudge");
             s.Vertices[SelectedCornerIndex] = PMSDKSkinEditorGeometry.ClampToRaster(
                 s.Vertices[SelectedCornerIndex] + delta);
         }
@@ -127,6 +130,7 @@ namespace vxpmsdk.Components
         {
             var s = Selected;
             if (s == null) return;
+            Undo.Record(this, "delete");
             if (Application.isEditor && !Application.isPlaying) DestroyImmediate(s.gameObject);
             else Destroy(s.gameObject);
             RefreshSkinList();
@@ -143,6 +147,7 @@ namespace vxpmsdk.Components
                 Tool.Freeform => PMSDKSkinShapeKind.Freeform,
                 _ => PMSDKSkinShapeKind.Rectangle,
             };
+            Undo.Record(this, "add-default");
             var skin = SpawnSkin(kind, DefaultVerticesFor(kind, new Vector2(0.5f, 0.5f), 0.15f));
             SelectSkin(skin);
         }
@@ -177,6 +182,7 @@ namespace vxpmsdk.Components
             // drawing a new rectangle/ellipse.
             if (CurrentTool == Tool.Rectangle || CurrentTool == Tool.Ellipse)
             {
+                Undo.Record(this, "draw-rect");
                 // Defer creation until we've moved past MinDrawDistance; until then behave
                 // as a click-select on any skin under the cursor.
                 State = DragState.DrawingRect;
@@ -291,6 +297,7 @@ namespace vxpmsdk.Components
 
         private void BeginHandleDrag(PMSDKSkin skin, int cornerIndex, int edgeIndex)
         {
+            Undo.Record(this, cornerIndex >= 0 ? "corner-drag" : "edge-drag");
             activeSkin = skin;
             activeVertexIndex = cornerIndex;
             activeEdgeIndex = edgeIndex;

@@ -673,11 +673,21 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       .json sidecar), `Load Skin Set…` (accepts either), `New Empty Skin Set Asset…`.
 - Content authors' workflow now works end-to-end (author once, load in any scene).
 
-### M-Sk3 — Content sources v1.1
-- [ ] `Camera` source (per-skin Unity camera → RT).
-- [ ] `VideoUrl` streaming source.
-- [ ] Per-skin `Spout`/`NDI` via existing `PMSDKSpoutIn`/`PMSDKNdiIn` and `PMSDKExternalContent`.
-- [ ] `Webcam` source (`WebCamTexture`).
+### M-Sk3 — Content sources v1.1 (done 2026-08-20; 13 new tests + 136/136 total green)
+- [x] `Camera` source — per-skin Unity camera → owned RT, restores camera's prior
+      `targetTexture` on mode switch / disable.
+- [x] `VideoUrl` streaming source — VideoPlayer.source = Url + reuses owned video RT
+      + Loop/Mute/StartTime/PlaybackRate.
+- [x] `Webcam` source — owns a `WebCamTexture`; EditMode allocates without calling
+      `.Play()` to avoid keeping the device open across domain reloads.
+- [x] `ExternalTexture` mode + per-skin adapters `PMSDKSkinSpoutIn` (Interop/Spout,
+      Klak.Spout receiver) and `PMSDKSkinNdiIn` (Interop/Ndi, Klak.Ndi receiver). Both
+      auto-configure their receiver on enable, force ExternalTexture mode, and restore
+      prior Mode on disable.
+- [x] JSON schema extended: `defaultContent.url` (VideoUrl) and
+      `defaultContent.webcamDeviceName` (Webcam) survive round-trip. Camera and
+      ExternalTexture preserve mode only (scene refs re-wired at load time).
+- [x] `PMSDKSkinBindings.Binding` + `Apply` switch cover all four new modes.
 
 ### M-Sk4 — Polish
 - [ ] Duplicate + reorder (drag in the skin list; `Ctrl+D`; `[`/`]` z-order).

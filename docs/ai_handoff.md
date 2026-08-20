@@ -1,5 +1,70 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk3 COMPLETE (2026-08-20)
+
+**M-Sk3 v1.1 content sources — done, 136/136 EditMode tests green**. Skins can now source
+their pixels from a Unity Camera, a streaming URL, a webcam, an arbitrary external
+texture (Spout / NDI / user code) — on top of the M-Sk1 set (Texture / RenderTexture /
+VideoClip / TestPattern).
+
+**Deliverables**:
+- `Runtime/Skin/PMSDKSkinContent.cs` — 4 new modes:
+  - **Camera**: assign a `Camera` reference; content owns a per-skin RT, sets it as
+    that camera's `targetTexture`, and restores the camera's prior target on mode
+    switch / disable (matched to `ownedCameraRT` so a user reassignment isn't overwritten).
+  - **VideoUrl**: extends the existing VideoPlayer pipeline with `source = Url`; reuses
+    the owned RT + Loop/Mute/StartTime/PlaybackRate.
+  - **Webcam**: owns a `WebCamTexture` (device name, WxH, FPS). Only calls `Play()` in
+    Play mode — EditMode allocates but skips activation to avoid keeping the device open
+    across domain reloads.
+  - **ExternalTexture**: exposes a public `Texture ExternalTexture` field read each
+    frame — adapter components (see below) push their frame here.
+- `Runtime/Interop/Spout/PMSDKSkinSpoutIn.cs` — per-skin `Klak.Spout.SpoutReceiver`
+  adapter; pushes `receivedTexture` into `PMSDKSkinContent.ExternalTexture` each frame,
+  forces `Mode = ExternalTexture` while enabled (restores prior Mode on disable).
+  Compile-gated on `PMSDK_KLAK_SPOUT` — inherits the same `versionDefines` as the
+  existing scene-wide `PMSDKSpoutIn`.
+- `Runtime/Interop/Ndi/PMSDKSkinNdiIn.cs` — same for `Klak.Ndi.NdiReceiver`.
+- `Runtime/Skin/PMSDKSkinSetJson.cs` — schema extended: `defaultContent` gains
+  `url` (VideoUrl) and `webcamDeviceName` (Webcam) fields. Camera/ExternalTexture
+  preserve only their mode (scene refs must be re-wired at load time).
+- `Runtime/Skin/PMSDKSkinBindings.cs` — `Binding` gains `VideoUrl`, `SourceCamera`,
+  `WebcamDeviceName`, `ExternalTexture` fields; `Apply` switch extended to the four
+  new modes.
+- `Runtime/Skin/PMSDKSkinLoader.cs` — `PMSDKSkinSetJsonExt.ApplyDefaultContent` switch
+  extended to handle VideoUrl/Webcam on load.
+
+**Tests** (M-Sk3): `PMSDKSkinContentV11Tests` — 13/13:
+- Camera mode allocates the owned RT, swaps `Camera.targetTexture`, restores the prior
+  target on mode switch (assertion order-fixed with `cam.targetTexture = null` before
+  release in the finally block).
+- Camera mode with null camera → null CurrentTexture.
+- VideoUrl mode with empty URL → null. With a URL → `VideoSource.Url` + `vp.url` set.
+- Webcam mode allocates the texture but doesn't `.Play()` in EditMode.
+- ExternalTexture mode exposes the assigned texture and tracks field changes across
+  frames.
+- JSON schema serializes VideoUrl.url and Webcam.deviceName.
+- `Bindings.Apply` correctly wires each of VideoUrl, Camera, Webcam, ExternalTexture.
+
+**Two bugs caught by the new tests**:
+1. `TeardownAll` released the owned camera RT BEFORE restoring the camera's prior
+   `targetTexture`, which meant the RT was still bound to the camera at Release time →
+   Unity logs "Releasing render texture that is set as Camera.targetTexture!". Fixed
+   by reordering: `RestoreTrackedCamera()` runs first.
+2. `OnDestroy` called `DestroyImmediate(videoPlayer)` on an attached component, but
+   Unity's own GameObject-destroy cleanup runs after OnDestroy and destroys the same
+   component → "Destroying object multiple times." Fixed by removing OnDestroy entirely
+   and moving the VideoPlayer teardown into `TeardownAll` (which just stops + detaches;
+   Unity handles the final destroy).
+
+**How to use the new sources**:
+- Camera: set `PMSDKSkinContent.Mode = Camera`, `SourceCamera = <your camera>`.
+- Video URL: `Mode = VideoUrl`, `VideoUrl = "https://..."`, Play/Loop/Mute as usual.
+- Webcam: `Mode = Webcam`, `WebcamDeviceName = ""` (default) or a specific device name.
+- Spout: add `PMSDKSkinSpoutIn` component to the same GameObject as `PMSDKSkinContent`
+  — the adapter auto-configures a `SpoutReceiver` and streams frames into the skin.
+  Same pattern for NDI via `PMSDKSkinNdiIn`.
+
 ## Multi-Skin single projector — M-Sk2.5 COMPLETE (2026-08-20)
 
 **M-Sk2.5 (author once, use in any scene) — done, 123/123 EditMode tests green** on Unity

@@ -31,8 +31,16 @@ namespace vxpmsdk.Components
             public Texture Texture;
             public RenderTexture RenderTexture;
             public VideoClip VideoClip;
+            [Tooltip("VideoUrl mode — HTTP/HTTPS or file:// URL.")]
+            public string VideoUrl;
+            [Tooltip("Camera mode — a scene camera to render into a per-skin RT.")]
+            public Camera SourceCamera;
+            [Tooltip("Webcam mode — device name. Empty = first available.")]
+            public string WebcamDeviceName;
+            [Tooltip("ExternalTexture mode — arbitrary texture (Spout/NDI/etc).")]
+            public Texture ExternalTexture;
 
-            [Header("Playback (VideoClip)")]
+            [Header("Playback (VideoClip / VideoUrl)")]
             public bool Loop = true;
             public bool Mute = false;
             public double StartTime = 0.0;
@@ -65,8 +73,8 @@ namespace vxpmsdk.Components
             content.Mode = b.Mode;
             switch (b.Mode)
             {
-                case PMSDKSkinContentMode.Texture:       content.StaticTexture = b.Texture; break;
-                case PMSDKSkinContentMode.RenderTexture: content.ExternalRenderTexture = b.RenderTexture; break;
+                case PMSDKSkinContentMode.Texture:         content.StaticTexture = b.Texture; break;
+                case PMSDKSkinContentMode.RenderTexture:   content.ExternalRenderTexture = b.RenderTexture; break;
                 case PMSDKSkinContentMode.VideoClip:
                     content.VideoClip = b.VideoClip;
                     content.Loop = b.Loop;
@@ -74,7 +82,17 @@ namespace vxpmsdk.Components
                     content.StartTime = b.StartTime;
                     content.PlaybackRate = b.PlaybackRate;
                     break;
-                // None / TestPattern have no per-scene binding fields worth overriding at v1.
+                case PMSDKSkinContentMode.VideoUrl:
+                    content.VideoUrl = b.VideoUrl;
+                    content.Loop = b.Loop;
+                    content.Mute = b.Mute;
+                    content.StartTime = b.StartTime;
+                    content.PlaybackRate = b.PlaybackRate;
+                    break;
+                case PMSDKSkinContentMode.Camera:          content.SourceCamera = b.SourceCamera; break;
+                case PMSDKSkinContentMode.Webcam:          content.WebcamDeviceName = b.WebcamDeviceName ?? ""; break;
+                case PMSDKSkinContentMode.ExternalTexture: content.ExternalTexture = b.ExternalTexture; break;
+                // None / TestPattern have no per-scene binding fields worth overriding.
             }
         }
     }

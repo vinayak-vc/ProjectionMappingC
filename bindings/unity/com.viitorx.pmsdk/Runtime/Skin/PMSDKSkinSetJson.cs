@@ -83,8 +83,12 @@ namespace vxpmsdk.Components
 
         [Serializable] public class DefaultContent
         {
-            public string mode = "None";     // None | Texture | RenderTexture | VideoClip | TestPattern
-            public string path;              // Unity-project-relative or absolute
+            public string mode = "None";     // None | Texture | RenderTexture | VideoClip |
+                                             // VideoUrl | Camera | Webcam | ExternalTexture |
+                                             // TestPattern
+            public string path;              // Texture / RenderTexture / VideoClip asset path
+            public string url;               // VideoUrl streaming URL
+            public string webcamDeviceName;  // Webcam device — empty = default
             public bool loop = true;
             public bool mute;
             public double startTime;
@@ -292,6 +296,20 @@ namespace vxpmsdk.Components
                     dc.mute = content.Mute;
                     dc.startTime = content.StartTime;
                     break;
+                case PMSDKSkinContentMode.VideoUrl:
+                    dc.url = content.VideoUrl;
+                    dc.loop = content.Loop;
+                    dc.mute = content.Mute;
+                    dc.startTime = content.StartTime;
+                    break;
+                case PMSDKSkinContentMode.Webcam:
+                    dc.webcamDeviceName = content.WebcamDeviceName;
+                    break;
+                case PMSDKSkinContentMode.Camera:
+                case PMSDKSkinContentMode.ExternalTexture:
+                    // Scene-object refs; mode preserved but the specific source must be
+                    // re-wired at load time (or driven by an adapter like PMSDKSkinSpoutIn).
+                    break;
                 case PMSDKSkinContentMode.TestPattern:
                     dc.testPatternType = TestPatternTypeToString(content.TestPatternType);
                     dc.testPatternSize = content.TestPatternSize;
@@ -344,6 +362,19 @@ namespace vxpmsdk.Components
                     content.Loop = dc.loop;
                     content.Mute = dc.mute;
                     content.StartTime = dc.startTime;
+                    break;
+                case PMSDKSkinContentMode.VideoUrl:
+                    content.VideoUrl = dc.url;
+                    content.Loop = dc.loop;
+                    content.Mute = dc.mute;
+                    content.StartTime = dc.startTime;
+                    break;
+                case PMSDKSkinContentMode.Webcam:
+                    content.WebcamDeviceName = dc.webcamDeviceName ?? "";
+                    break;
+                case PMSDKSkinContentMode.Camera:
+                case PMSDKSkinContentMode.ExternalTexture:
+                    // Scene-ref modes — no field to restore from JSON. User re-wires.
                     break;
                 case PMSDKSkinContentMode.TestPattern:
                     content.TestPatternType = StringToTestPatternType(dc.testPatternType);

@@ -258,6 +258,19 @@ namespace vxpmsdk.Components
                     content.Mute = dc.mute;
                     content.StartTime = dc.startTime;
                     break;
+                case PMSDKSkinContentMode.VideoUrl:
+                    content.VideoUrl = dc.url;
+                    content.Loop = dc.loop;
+                    content.Mute = dc.mute;
+                    content.StartTime = dc.startTime;
+                    break;
+                case PMSDKSkinContentMode.Webcam:
+                    content.WebcamDeviceName = dc.webcamDeviceName ?? "";
+                    break;
+                case PMSDKSkinContentMode.Camera:
+                case PMSDKSkinContentMode.ExternalTexture:
+                    // Scene-ref modes — user or a scene-side script provides the ref.
+                    break;
                 case PMSDKSkinContentMode.TestPattern:
                     content.TestPatternType = PMSDKSkinSetJson.StringToTestPatternType(dc.testPatternType);
                     content.TestPatternSize = Mathf.Max(16, dc.testPatternSize);

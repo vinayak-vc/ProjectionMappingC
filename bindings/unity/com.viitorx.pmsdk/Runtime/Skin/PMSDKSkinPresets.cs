@@ -54,6 +54,25 @@ namespace vxpmsdk.Components
             return v;
         }
 
+        /// <summary>
+        /// Regular n-gon centered at (cx, cy), radius r, first vertex at
+        /// <paramref name="startAngleDeg"/> (measured CCW from +X, y-UP). Used by
+        /// the Hexagon and Honeycomb presets; kept general so future regular n-gon
+        /// presets (pentagon, octagon) can reuse it.
+        /// </summary>
+        private static Vector2[] RegularNGon(float cx, float cy, float r, int n, float startAngleDeg = 90f)
+        {
+            var v = new Vector2[n];
+            float a0 = startAngleDeg * Mathf.Deg2Rad;
+            float step = 2f * Mathf.PI / n;
+            for (int k = 0; k < n; k++)
+            {
+                float ang = a0 + k * step;
+                v[k] = new Vector2(cx + Mathf.Cos(ang) * r, cy + Mathf.Sin(ang) * r);
+            }
+            return v;
+        }
+
         private static Vector2[] Arch(float cx, float baseY, float topY, float halfWidth, int steps)
         {
             // Rectangle base + a semi-arc across the top. Vertices ordered CCW.
@@ -228,6 +247,18 @@ namespace vxpmsdk.Components
                                   Vertices = Rect(0.10f, 0.10f, 0.90f, 0.90f) },
                     new SkinDef { Name = "stage", Kind = PMSDKSkinShapeKind.Rectangle,
                                   Vertices = Rect(0.25f, 0.25f, 0.75f, 0.75f) },
+                },
+            },
+
+            // v1.7 — first regular n-gon in the catalog. Cheap on vertices (6) and
+            // maps directly onto hex signage, hex stools, single-cell honeycomb tiles.
+            new Preset {
+                Id = "hexagon",
+                DisplayName = "Hexagon",
+                Description = "Regular six-sided polygon — hex signage, honeycomb cells, hex-stool tops. Pointy-top orientation.",
+                Skins = new[] {
+                    new SkinDef { Name = "hex", Kind = PMSDKSkinShapeKind.Polygon,
+                                  Vertices = RegularNGon(cx: 0.50f, cy: 0.50f, r: 0.30f, n: 6, startAngleDeg: 90f) },
                 },
             },
         };

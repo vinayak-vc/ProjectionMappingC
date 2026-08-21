@@ -1,5 +1,17 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk4 v1.7 (preset catalog +Hexagon) COMPLETE (2026-08-21)
+
+**M-Sk4 v1.7 polish — hexagon preset added, 207/207 EditMode tests green** (2 new + 205
+existing). First regular n-gon in the catalog. Uses a new `RegularNGon(cx, cy, r, n,
+startAngleDeg)` factory in `PMSDKSkinPresets` so future regular n-gon presets
+(pentagon, octagon) reuse the same helper — currently invoked for the six-vertex
+hexagon centered at raster (0.5, 0.5) with radius 0.30, pointy-top (first vertex at
+90°). Kind = Polygon → routed through the regenerated-mesh path (native SDK still
+untouched). Tests: `Preset_Hexagon_IsPolygonWithSixVertices` and
+`Preset_Hexagon_HasRoughlyEqualEdgeLengths` (regular-polygon edge-length equality
+within 1e-3). Menu item at priority 360 as "11. Hexagon".
+
 ## Multi-Skin single projector — M-Sk4 v1.6 (preset catalog: 10 iconic targets) COMPLETE (2026-08-20)
 
 **M-Sk4 v1.6 polish — preset catalog done, 205/205 EditMode tests green** (18 new + 187

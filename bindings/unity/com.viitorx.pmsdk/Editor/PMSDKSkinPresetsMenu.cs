@@ -48,6 +48,11 @@ namespace vxpmsdk.Editor
         [MenuItem(Root + "10. Diorama Stage (Frame+Stage)", priority = 350)]
         private static void P10() => Apply("diorama");
 
+        // ---- v1.7 additions ----
+
+        [MenuItem(Root + "11. Hexagon", priority = 360)]
+        private static void P11() => Apply("hexagon");
+
         // ---- shared apply path ----
 
         private static void Apply(string presetId)

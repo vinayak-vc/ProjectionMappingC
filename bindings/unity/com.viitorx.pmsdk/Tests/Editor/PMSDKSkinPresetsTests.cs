@@ -43,8 +43,9 @@ namespace vxpmsdk.Tests
         [Test]
         public void Catalog_ContainsExpectedCount()
         {
-            Assert.AreEqual(10, PMSDKSkinPresets.All.Length,
-                "Ten iconic presets are the shipping baseline.");
+            // v1.6 baseline was 10; v1.7 adds hexagon → 11.
+            Assert.AreEqual(11, PMSDKSkinPresets.All.Length,
+                "Catalog size drifted — update this assertion when adding/removing a preset.");
         }
 
         [Test]
@@ -252,6 +253,31 @@ namespace vxpmsdk.Tests
             Assert.AreEqual(PMSDKSkinShapeKind.Polygon, p.Skins[0].Kind);
             Assert.GreaterOrEqual(p.Skins[0].Vertices.Length, 7,
                 "Arch should have enough vertices to trace a semi-circular top.");
+        }
+
+        [Test]
+        public void Preset_Hexagon_IsPolygonWithSixVertices()
+        {
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("hexagon", out var p));
+            Assert.AreEqual(1, p.Skins.Length);
+            Assert.AreEqual(PMSDKSkinShapeKind.Polygon, p.Skins[0].Kind);
+            Assert.AreEqual(6, p.Skins[0].Vertices.Length,
+                "A regular hexagon has exactly six vertices.");
+        }
+
+        [Test]
+        public void Preset_Hexagon_HasRoughlyEqualEdgeLengths()
+        {
+            // Regular polygon sanity: consecutive edges within a tight tolerance.
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("hexagon", out var p));
+            var v = p.Skins[0].Vertices;
+            float e0 = Vector2.Distance(v[0], v[1]);
+            for (int i = 1; i < v.Length; i++)
+            {
+                float ei = Vector2.Distance(v[i], v[(i + 1) % v.Length]);
+                Assert.That(ei, Is.EqualTo(e0).Within(1e-3f),
+                    $"Hexagon edge {i} length {ei} differs from edge 0 length {e0}.");
+            }
         }
 
         [Test]

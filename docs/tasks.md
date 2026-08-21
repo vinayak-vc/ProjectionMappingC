@@ -737,6 +737,10 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       (5-point), Diorama Stage. Each preset spawns configured skins with correct
       z-order stack; records a single Undo entry; Replace / Add-alongside / Cancel
       prompt in the Editor menu path.
+- [x] Preset catalog — Hexagon (M-Sk4 v1.7, done 2026-08-21; 2 new tests + 207/207
+      total green). First regular n-gon; adds a general-purpose
+      `RegularNGon(cx, cy, r, n, startAngleDeg)` factory. Menu item "11. Hexagon" at
+      priority 360.
 
 ## Next Items / Backlog
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)

@@ -43,8 +43,9 @@ namespace vxpmsdk.Tests
         [Test]
         public void Catalog_ContainsExpectedCount()
         {
-            // v1.6 baseline was 10; v1.7 adds hexagon → 11.
-            Assert.AreEqual(11, PMSDKSkinPresets.All.Length,
+            // v1.6 = 10, v1.7 = +1 hexagon, v1.8 = +7 (honeycomb-7, silhouette,
+            // arcade-2, staircase, corner-2, column-n, logo-wordmark) → 18.
+            Assert.AreEqual(18, PMSDKSkinPresets.All.Length,
                 "Catalog size drifted — update this assertion when adding/removing a preset.");
         }
 
@@ -287,6 +288,163 @@ namespace vxpmsdk.Tests
             Assert.AreEqual(2, p.Skins.Length);
             Assert.AreEqual("frame", p.Skins[0].Name);
             Assert.AreEqual("stage", p.Skins[1].Name);
+        }
+
+        // ---- v1.8 per-preset sanity ----
+
+        [Test]
+        public void Preset_Honeycomb7_HasSevenHexagonPolygons()
+        {
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("honeycomb-7", out var p));
+            Assert.AreEqual(7, p.Skins.Length, "One center + six neighbors = seven cells.");
+            foreach (var s in p.Skins)
+            {
+                Assert.AreEqual(PMSDKSkinShapeKind.Polygon, s.Kind);
+                Assert.AreEqual(6, s.Vertices.Length, $"Cell '{s.Name}' should be a hexagon.");
+            }
+        }
+
+        [Test]
+        public void Preset_Honeycomb7_CellNamesCoverAllDirections()
+        {
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("honeycomb-7", out var p));
+            var names = new HashSet<string>();
+            foreach (var s in p.Skins) names.Add(s.Name);
+            foreach (var expected in new[] { "center", "e", "w", "ne", "nw", "se", "sw" })
+                Assert.IsTrue(names.Contains(expected), $"Missing honeycomb cell '{expected}'.");
+        }
+
+        [Test]
+        public void Preset_Silhouette_IsSinglePolygonWithinCap()
+        {
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("silhouette", out var p));
+            Assert.AreEqual(1, p.Skins.Length);
+            Assert.AreEqual(PMSDKSkinShapeKind.Polygon, p.Skins[0].Kind);
+            int n = p.Skins[0].Vertices.Length;
+            Assert.GreaterOrEqual(n, 15, "Silhouette should have enough vertices to trace head+arms+legs.");
+            Assert.LessOrEqual(n, PMSDKSkinMeshBuilder.MaxPolygonVertices,
+                "Silhouette exceeded the polygon vertex cap.");
+        }
+
+        [Test]
+        public void Preset_Arcade2_HasTwoArchPolygons()
+        {
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("arcade-2", out var p));
+            Assert.AreEqual(2, p.Skins.Length);
+            foreach (var s in p.Skins)
+            {
+                Assert.AreEqual(PMSDKSkinShapeKind.Polygon, s.Kind);
+                Assert.GreaterOrEqual(s.Vertices.Length, 7,
+                    $"Arcade arch '{s.Name}' should trace a semicircular top.");
+            }
+            var names = new HashSet<string>();
+            foreach (var s in p.Skins) names.Add(s.Name);
+            Assert.IsTrue(names.Contains("arch-l"));
+            Assert.IsTrue(names.Contains("arch-r"));
+        }
+
+        [Test]
+        public void Preset_Staircase_HasFiveRectanglesStackedByY()
+        {
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("staircase", out var p));
+            Assert.AreEqual(5, p.Skins.Length);
+            float prevBottom = -1f;
+            for (int i = 0; i < p.Skins.Length; i++)
+            {
+                var s = p.Skins[i];
+                Assert.AreEqual(PMSDKSkinShapeKind.Rectangle, s.Kind);
+                // Rect() layout: y-min at index 0 and 1, y-max at 2 and 3.
+                float yMin = Mathf.Min(s.Vertices[0].y, s.Vertices[1].y);
+                Assert.Greater(yMin, prevBottom,
+                    $"Step {i} does not sit above step {i - 1}.");
+                prevBottom = yMin;
+            }
+        }
+
+        [Test]
+        public void Preset_Staircase_StepsNarrowGoingUp()
+        {
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("staircase", out var p));
+            float prevWidth = float.MaxValue;
+            foreach (var s in p.Skins)
+            {
+                float xMin = Mathf.Min(s.Vertices[0].x, s.Vertices[3].x);
+                float xMax = Mathf.Max(s.Vertices[1].x, s.Vertices[2].x);
+                float w = xMax - xMin;
+                Assert.Less(w, prevWidth,
+                    $"Step '{s.Name}' width {w} is not narrower than previous width {prevWidth}.");
+                prevWidth = w;
+            }
+        }
+
+        [Test]
+        public void Preset_BuildingCorner_TwoFacesShareCentralVerticalEdge()
+        {
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("corner-2", out var p));
+            Assert.AreEqual(2, p.Skins.Length);
+            // Both should contain the vertices (0.50, 0.15) and (0.50, 0.85) — the
+            // shared central edge that makes the "corner" wrap read as one continuous
+            // surface once the user drags either face's outer corners.
+            bool ContainsPoint(Vector2[] v, Vector2 target)
+            {
+                foreach (var pt in v)
+                    if (Mathf.Abs(pt.x - target.x) < 1e-4f && Mathf.Abs(pt.y - target.y) < 1e-4f)
+                        return true;
+                return false;
+            }
+            foreach (var s in p.Skins)
+            {
+                Assert.AreEqual(PMSDKSkinShapeKind.Rectangle, s.Kind);
+                Assert.IsTrue(ContainsPoint(s.Vertices, new Vector2(0.50f, 0.15f)),
+                    $"Face '{s.Name}' missing shared bottom vertex (0.50, 0.15).");
+                Assert.IsTrue(ContainsPoint(s.Vertices, new Vector2(0.50f, 0.85f)),
+                    $"Face '{s.Name}' missing shared top vertex (0.50, 0.85).");
+            }
+        }
+
+        [Test]
+        public void Preset_ColumnN_CatalogEntryDefaultsToSixStrips()
+        {
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("column-n", out var p));
+            Assert.AreEqual(6, p.Skins.Length,
+                "Catalog 'column-n' entry ships with N = 6 for one-click apply.");
+            foreach (var s in p.Skins)
+                Assert.AreEqual(PMSDKSkinShapeKind.Rectangle, s.Kind);
+        }
+
+        [Test]
+        public void MakeColumnN_ProducesN_ContiguousStrips()
+        {
+            for (int n = 3; n <= 12; n++)
+            {
+                var p = PMSDKSkinPresets.MakeColumnN(n);
+                Assert.AreEqual(n, p.Skins.Length, $"MakeColumnN({n}) should produce {n} strips.");
+                // Consecutive strips share an x-edge.
+                for (int i = 1; i < n; i++)
+                {
+                    float prevRight = Mathf.Max(p.Skins[i - 1].Vertices[1].x, p.Skins[i - 1].Vertices[2].x);
+                    float currLeft  = Mathf.Min(p.Skins[i].Vertices[0].x,   p.Skins[i].Vertices[3].x);
+                    Assert.That(currLeft, Is.EqualTo(prevRight).Within(1e-4f),
+                        $"MakeColumnN({n}) strip {i} does not butt strip {i - 1}: {currLeft} vs {prevRight}.");
+                }
+            }
+        }
+
+        [Test]
+        public void MakeColumnN_ClampsToRange3To12()
+        {
+            Assert.AreEqual(3, PMSDKSkinPresets.MakeColumnN(0).Skins.Length,
+                "Below-range N clamps to 3.");
+            Assert.AreEqual(12, PMSDKSkinPresets.MakeColumnN(999).Skins.Length,
+                "Above-range N clamps to 12.");
+        }
+
+        [Test]
+        public void Preset_LogoWordmark_HasFourRectangles()
+        {
+            Assert.IsTrue(PMSDKSkinPresets.TryFind("logo-wordmark", out var p));
+            Assert.AreEqual(4, p.Skins.Length);
+            foreach (var s in p.Skins) Assert.AreEqual(PMSDKSkinShapeKind.Rectangle, s.Kind);
         }
 
         // ---- geometry validity ----

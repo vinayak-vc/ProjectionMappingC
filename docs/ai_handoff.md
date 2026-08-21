@@ -1,5 +1,54 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk4 v1.8 (preset catalog +7 more) COMPLETE (2026-08-21)
+
+**M-Sk4 v1.8 polish — seven more presets, 218/218 EditMode tests green** (11 new + 207
+existing). Rounds the catalog out from 11 to 18 with the shapes users hit most on real
+installations. First parametric preset (Column-N via an EditorWindow dialog).
+
+**New presets** (menu items 12–18 under `Tools > Projection Mapping > Skins > Presets`,
+priorities 361-391):
+
+12. **Honeycomb (7 cells)** — 1 center + 6 neighbor hexagons using
+    `RegularNGon` at pointy-top-hex offsets `(√3·r, 0)` / `(√3·r/2, 1.5·r)` so cell
+    edges meet without gaps or overlap. Seven independent polygon skins ⇒ per-cell
+    content assignment.
+13. **Human Silhouette** — one 21-vertex Polygon tracing head, shoulders, arms,
+    torso, legs. First "trace-an-outline" preset; CCW-ordered (signed area > 0).
+14. **Double Arch (Arcade)** — two `Arch()` polygons side by side at cx=0.30 and
+    cx=0.70 (halfWidth 0.16, steps 6 → 9 verts each).
+15. **Staircase / Ziggurat** — 5 rectangles stacked in y and narrowing in x.
+    Real-world surfaces: theatre risers, storefront steps, temple facades.
+16. **Building Corner (2 Faces)** — two Rectangle-kind parallelograms sharing the
+    central vertical edge (0.50, 0.15)-(0.50, 0.85). Distinct from Box:3-Faces
+    (small box viewpoint) — this is one corner of a large building.
+17. **Column (N strips)** — first *parametric* preset. Menu opens
+    `PMSDKSkinPresetsColumnDialog` (EditorWindow with an IntSlider 3..12), then
+    invokes `PMSDKSkinPresets.MakeColumnN(n)` and the shared apply path. Catalog
+    entry `column-n` still ships with N=6 for one-click apply.
+18. **Logo Wordmark (4 blocks)** — four side-by-side rectangles as letter-block
+    placeholders. Retail-cutout / sponsor-bay layout.
+
+**New API**:
+- `PMSDKSkinPresets.MakeColumnN(int n)` — parametric factory; clamps to [3..12].
+- `PMSDKSkinPresetsMenu.ApplyPreset(Preset)` (internal) — shared apply path used
+  by both fixed menu items and the Column-N dialog.
+
+**Tests** — 11 new (218/218 total):
+- `Preset_Honeycomb7_HasSevenHexagonPolygons`, `Preset_Honeycomb7_CellNamesCoverAllDirections`
+- `Preset_Silhouette_IsSinglePolygonWithinCap`
+- `Preset_Arcade2_HasTwoArchPolygons`
+- `Preset_Staircase_HasFiveRectanglesStackedByY`, `Preset_Staircase_StepsNarrowGoingUp`
+- `Preset_BuildingCorner_TwoFacesShareCentralVerticalEdge`
+- `Preset_ColumnN_CatalogEntryDefaultsToSixStrips`
+- `MakeColumnN_ProducesN_ContiguousStrips` (loops N=3..12, asserts strip contiguity)
+- `MakeColumnN_ClampsToRange3To12`
+- `Preset_LogoWordmark_HasFourRectangles`
+
+Also updated `Catalog_ContainsExpectedCount` 11 → 18. Existing
+`Preset_AllPolygonSkins_HavePositiveArea` sweeps the new polygon presets too, catching
+any accidentally-CW-wound outline.
+
 ## Multi-Skin single projector — M-Sk4 v1.7 (preset catalog +Hexagon) COMPLETE (2026-08-21)
 
 **M-Sk4 v1.7 polish — hexagon preset added, 207/207 EditMode tests green** (2 new + 205

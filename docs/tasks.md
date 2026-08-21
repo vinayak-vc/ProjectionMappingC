@@ -741,6 +741,12 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       total green). First regular n-gon; adds a general-purpose
       `RegularNGon(cx, cy, r, n, startAngleDeg)` factory. Menu item "11. Hexagon" at
       priority 360.
+- [x] Preset catalog — 7 more shapes (M-Sk4 v1.8, done 2026-08-21; 11 new tests +
+      218/218 total green). Honeycomb (7 cells), Human Silhouette, Double Arch,
+      Staircase/Ziggurat, Building Corner, Column-N (parametric via EditorWindow
+      dialog), Logo Wordmark. New `PMSDKSkinPresets.MakeColumnN(n)` factory and
+      `PMSDKSkinPresetsColumnDialog` EditorWindow. Menu items 12-18 at priorities
+      361-391.
 
 ## Next Items / Backlog
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)

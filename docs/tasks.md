@@ -747,6 +747,12 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       dialog), Logo Wordmark. New `PMSDKSkinPresets.MakeColumnN(n)` factory and
       `PMSDKSkinPresetsColumnDialog` EditorWindow. Menu items 12-18 at priorities
       361-391.
+- [x] Loader corner-pin sync bugfix (M-Sk4 v1.9.1, done 2026-08-21). Widened the
+      `PMSDKSkin.Update` re-cache guard to also recover when `cornerPin == null` on
+      a quad-kind skin — the loader adds `PMSDKSkin` before `PMSDKCornerPin`, so
+      OnEnable's initial cache was landing null and `SyncQuadDeformation` silently
+      no-op'd. New EditMode test `Loader_Rectangle_CornerPinReceivesWarpedVertices`.
+      219/219 total green. Live-verified in the generated `SkinPlayback.unity` scene.
 - [x] Skin Playback scene generator (M-Sk4 v1.9, done 2026-08-21).
       `Tools > Projection Mapping > Skins > Generate Skin Playback Scene` writes
       `Assets/PMSDKDemo/SkinPlayback.unity` with the projector rig + `PMSDKSkinLoader`

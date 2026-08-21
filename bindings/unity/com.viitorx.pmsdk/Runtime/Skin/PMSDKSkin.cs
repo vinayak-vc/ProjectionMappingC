@@ -163,7 +163,12 @@ namespace vxpmsdk.Components
 
         private void Update()
         {
-            if (meshFilter == null) CacheRefs();
+            // Re-cache when EITHER the mesh filter is missing OR we're a quad kind
+            // and the corner-pin cache is null. The second condition covers callers
+            // (e.g. PMSDKSkinLoader in earlier versions) that add PMSDKSkin BEFORE
+            // adding PMSDKCornerPin — OnEnable's cache lands null, and without this
+            // check SyncQuadDeformation would never push corners.
+            if (meshFilter == null || (IsQuadKind && cornerPin == null)) CacheRefs();
             EnsureMeshForKind(force: false);
             ApplyZOrder();
             SyncQuadDeformation();

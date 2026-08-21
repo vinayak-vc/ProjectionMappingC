@@ -153,6 +153,70 @@ namespace vxpmsdk.Tests
         // ---- PMSDKSkinLoader: spawn ----
 
         [Test]
+        public void Loader_Rectangle_CornerPinReceivesWarpedVertices()
+        {
+            // Regression for the "loader spawns Rectangle skins as full-viewport unit
+            // quads" bug: PMSDKSkin was added BEFORE its sibling PMSDKCornerPin, so
+            // PMSDKSkin.OnEnable → CacheRefs cached cornerPin = null. Then
+            // SyncQuadDeformation silently no-op'd and the corner-pin kept its
+            // identity (0,0)-(1,1) defaults, making the projective warp render as
+            // a full unit quad regardless of the saved corners. Now the loader adds
+            // the corner-pin FIRST (and PMSDKSkin.Update re-caches defensively).
+            controller.PickTool(PMSDKSkinEditorController.Tool.Rectangle);
+            controller.AddDefaultShape();
+            // Override the default axis-aligned corners with a distinctly warped quad
+            // so an identity (default) corner-pin is trivially distinguishable.
+            var warped = new List<Vector2>
+            {
+                new Vector2(0.5323f, 0.5989f), // BL
+                new Vector2(0.6464f, 0.1932f), // BR
+                new Vector2(0.6547f, 0.3817f), // TR
+                new Vector2(0.5379f, 1.0000f), // TL
+            };
+            controller.Selected.Vertices = new List<Vector2>(warped);
+
+            var set = ScriptableObject.CreateInstance<PMSDKSkinSet>();
+            set.CaptureFrom(controller);
+
+            foreach (var s in Object.FindObjectsByType<PMSDKSkin>(FindObjectsSortMode.None))
+                Object.DestroyImmediate(s.gameObject);
+            controller.RefreshSkinList();
+
+            var loaderGO = new GameObject("Loader");
+            var loader = loaderGO.AddComponent<PMSDKSkinLoader>();
+            loader.SkinSet = set;
+            loader.Projector = controller.Projector;
+            try
+            {
+                loader.SpawnAll();
+                Assert.AreEqual(1, loader.Spawned.Count);
+                var spawned = loader.Spawned[0];
+                // Force one Update tick — EditMode tests don't drive Update
+                // automatically. Uses reflection since Update is private.
+                var updateMi = typeof(PMSDKSkin).GetMethod("Update",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.IsNotNull(updateMi, "PMSDKSkin.Update method not found via reflection.");
+                updateMi.Invoke(spawned, null);
+
+                var pin = spawned.GetComponent<PMSDKCornerPin>();
+                Assert.IsNotNull(pin, "Rectangle-kind skin missing PMSDKCornerPin.");
+                Assert.That(pin.BottomLeft.x,  Is.EqualTo(warped[0].x).Within(1e-4f));
+                Assert.That(pin.BottomLeft.y,  Is.EqualTo(warped[0].y).Within(1e-4f));
+                Assert.That(pin.BottomRight.x, Is.EqualTo(warped[1].x).Within(1e-4f));
+                Assert.That(pin.BottomRight.y, Is.EqualTo(warped[1].y).Within(1e-4f));
+                Assert.That(pin.TopRight.x,    Is.EqualTo(warped[2].x).Within(1e-4f));
+                Assert.That(pin.TopRight.y,    Is.EqualTo(warped[2].y).Within(1e-4f));
+                Assert.That(pin.TopLeft.x,     Is.EqualTo(warped[3].x).Within(1e-4f));
+                Assert.That(pin.TopLeft.y,     Is.EqualTo(warped[3].y).Within(1e-4f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(loaderGO);
+                Object.DestroyImmediate(set);
+            }
+        }
+
+        [Test]
         public void Loader_SpawnAll_CreatesOneSkinPerData()
         {
             controller.PickTool(PMSDKSkinEditorController.Tool.Rectangle);

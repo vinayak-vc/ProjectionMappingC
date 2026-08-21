@@ -1,5 +1,43 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk4 v1.9.1 (loader corner-pin sync bugfix) COMPLETE (2026-08-21)
+
+**Fix + regression test, 219/219 EditMode tests green** (218 baseline + 1 new). Live-
+verified in the generated `SkinPlayback.unity` scene: two warped-quad Rectangle skins
+now render with their authored corners instead of the full-viewport unit quad.
+
+**The bug**: `PMSDKSkinLoader.SpawnOne` adds `PMSDKSkin` first, then
+`PMSDKMeshWarp` and `PMSDKCornerPin`. `PMSDKSkin.OnEnable → CacheRefs()` therefore
+cached `cornerPin = null`. `Update()` only re-cached when `meshFilter` was null, so
+`SyncQuadDeformation()` silently no-op'd for the skin's entire lifetime — the
+corner-pin kept its identity (0,0)-(1,1) defaults and the projective warp rendered
+every skin as a full-viewport unit quad regardless of the saved corners.
+
+**Why not just add the components in the other order in the loader?** That path was
+tried and introduced a secondary bug: `PMSDKMeshWarp.OnEnable` reads
+`meshFilter.sharedMesh` to seed its `warpedMesh` and `nativeInputMesh`. If MeshWarp
+is added before PMSDKSkin, that sharedMesh is still null (PMSDKSkin's
+`EnsureMeshForKind` hasn't run yet) → `nativeInputMesh = IntPtr.Zero` → MeshWarp
+`Update` early-returns forever. So the correct fix is a defensive re-cache in
+`PMSDKSkin.Update`.
+
+**Fix** (`Runtime/Skin/PMSDKSkin.cs`): widen the re-cache guard in `Update()` from
+`meshFilter == null` to `meshFilter == null || (IsQuadKind && cornerPin == null)`.
+`SyncQuadDeformation` now picks up the corner-pin on the first tick even if it was
+added after `PMSDKSkin`.
+
+**Also** (`Runtime/Skin/PMSDKSkinLoader.cs`): kept the original add-order (Skin
+first, then MeshWarp/CornerPin) — necessary for MeshWarp's OnEnable to see a valid
+sharedMesh — but added a block comment explaining the constraint so a future
+refactor doesn't reintroduce the same trap.
+
+**Regression test** (`Tests/Editor/PMSDKSkinSetTests.cs`):
+`Loader_Rectangle_CornerPinReceivesWarpedVertices` authors a Rectangle skin with a
+distinctly non-axis-aligned quad, saves + wipes, spawns via loader, forces one
+`PMSDKSkin.Update` tick via reflection, then asserts each of the four corner-pin
+corners (BL/BR/TR/TL) equals the authored vertex within 1e-4. Fails on the pre-fix
+tree; passes cleanly on the fixed tree.
+
 ## Multi-Skin single projector — M-Sk4 v1.9 (Skin Playback scene generator) COMPLETE (2026-08-21)
 
 **M-Sk4 v1.9 — one-click "content scene" template**, 218/218 EditMode tests still green

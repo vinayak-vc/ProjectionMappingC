@@ -206,6 +206,17 @@ namespace vxpmsdk.Components
                 go.GetComponent<MeshRenderer>().sharedMaterial =
                     new Material(shader) { name = $"{go.name}_Material" };
 
+            // Add PMSDKSkin FIRST so its OnEnable can assign the unit-quad mesh into
+            // MeshFilter.sharedMesh. PMSDKMeshWarp's OnEnable reads that sharedMesh to
+            // create its warpedMesh + native mesh handles; adding MeshWarp before the
+            // Skin would land sharedMesh=null and leave nativeInputMesh=IntPtr.Zero,
+            // silently no-op'ing warp processing forever.
+            //
+            // The trade-off is that PMSDKSkin.OnEnable caches its own sibling refs and
+            // won't see PMSDKCornerPin (which we add below). PMSDKSkin.Update carries
+            // a defensive re-cache for that case (see `IsQuadKind && cornerPin == null`
+            // branch) so SyncQuadDeformation still pushes the corners into the
+            // corner-pin on the very first tick.
             var skin = go.AddComponent<PMSDKSkin>();
             skin.Kind = kind;
             skin.SkinId = string.IsNullOrEmpty(data.id)

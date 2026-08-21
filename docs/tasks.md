@@ -747,6 +747,12 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       dialog), Logo Wordmark. New `PMSDKSkinPresets.MakeColumnN(n)` factory and
       `PMSDKSkinPresetsColumnDialog` EditorWindow. Menu items 12-18 at priorities
       361-391.
+- [x] Skin Playback scene generator (M-Sk4 v1.9, done 2026-08-21).
+      `Tools > Projection Mapping > Skins > Generate Skin Playback Scene` writes
+      `Assets/PMSDKDemo/SkinPlayback.unity` with the projector rig + `PMSDKSkinLoader`
+      + `PMSDKSkinBindings`. Auto-detects a SkinSet at `Assets/PMSDKDemo/Skins/SkinSet.asset`
+      or falls back to the newest-modified `PMSDKSkinSet` in the project. 218/218
+      tests still green (generator is Editor-only I/O, no runtime logic to unit-test).
 
 ## Next Items / Backlog
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)

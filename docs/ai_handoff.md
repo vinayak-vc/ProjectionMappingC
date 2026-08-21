@@ -1,5 +1,31 @@
 # AI Agent Handoff Document
 
+## Multi-Skin single projector — M-Sk4 v1.9 (Skin Playback scene generator) COMPLETE (2026-08-21)
+
+**M-Sk4 v1.9 — one-click "content scene" template**, 218/218 EditMode tests still green
+(no new tests; the generator has no runnable logic outside Editor I/O — parity with the
+existing `PMSDKSkinEditorSceneGenerator` which is also test-free).
+
+**`Tools > Projection Mapping > Skins > Generate Skin Playback Scene`** (priority 211,
+right below the editor-scene generator at 210). Writes
+`Assets/PMSDKDemo/SkinPlayback.unity` — a minimal *content* scene mirroring the editor
+scene's projector rig (services + ortho Camera on Display 2 + `PMSDKProjector`) but
+with the editor rig (Controller/Input/Overlay/HUD/CanvasInspector/CanvasList) swapped
+out for the runtime playback rig:
+
+- `PMSDKSkinLoader` child under the projector; `SkinSet` pre-assigned.
+- `PMSDKSkinBindings` sibling for per-`SkinId` runtime overrides (starts empty; each
+  skin falls back to its `defaultContent` from the SkinSet).
+
+**SkinSet auto-detection**: convention path `Assets/PMSDKDemo/Skins/SkinSet.asset`
+first, then `AssetDatabase.FindAssets("t:vxpmsdk.Components.PMSDKSkinSet")` newest-
+modified as fallback. If none exists, the scene is still generated (with a null
+`SkinSet` field) and the user is prompted to author one via the editor scene first.
+
+**Idempotent**: overwrites `Assets/PMSDKDemo/SkinPlayback.unity` in place; creates
+parent folders as needed; prompts the "save unsaved changes?" dialog before wiping
+the open scene.
+
 ## Multi-Skin single projector — M-Sk4 v1.8 (preset catalog +7 more) COMPLETE (2026-08-21)
 
 **M-Sk4 v1.8 polish — seven more presets, 218/218 EditMode tests green** (11 new + 207

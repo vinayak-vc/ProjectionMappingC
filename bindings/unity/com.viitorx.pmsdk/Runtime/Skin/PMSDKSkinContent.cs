@@ -35,6 +35,9 @@ namespace vxpmsdk.Components
         /// <summary>An image file (png/jpg) read from an absolute disk path at runtime.
         /// Works in standalone builds where the file is not a Unity asset.</summary>
         ImageFile = 9,
+        /// <summary>Always the output background colour (PMSDKSkinStore.BackgroundColor). Used by
+        /// "hole" skins so a hole in a photo shape shows exactly what the wall around it shows.</summary>
+        Background = 10,
     }
 
     /// <summary>
@@ -107,6 +110,8 @@ namespace vxpmsdk.Components
         private Texture2D ownedPatternTex;
         private Texture2D ownedImageTex;
         private string loadedImagePath;
+        private Texture2D ownedBackgroundTex;
+        private int backgroundVersion;
 
         /// <summary>Raised (once per source) when a VideoUrl source cannot be played: the video
         /// player reported an error, or the file did not start within 10 s. UI can then offer a
@@ -194,7 +199,37 @@ namespace vxpmsdk.Components
                 case PMSDKSkinContentMode.ImageFile:
                     ApplyImageFileMode();
                     break;
+
+                case PMSDKSkinContentMode.Background:
+                    ApplyBackgroundMode();
+                    break;
             }
+        }
+
+        private void ApplyBackgroundMode()
+        {
+            Color color = PMSDKSkinStore.CurrentBackground;
+            if (ownedBackgroundTex == null)
+            {
+                ownedBackgroundTex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+                ownedBackgroundTex.name = "PMSDKSkin_" + name + "_Background";
+                ownedBackgroundTex.wrapMode = TextureWrapMode.Clamp;
+                backgroundVersion = -1;
+            }
+            if (backgroundVersion != PMSDKSkinStore.BackgroundVersion)
+            {
+                ownedBackgroundTex.SetPixel(0, 0, color);
+                ownedBackgroundTex.Apply(false);
+                backgroundVersion = PMSDKSkinStore.BackgroundVersion;
+            }
+            CurrentTexture = ownedBackgroundTex;
+        }
+
+        private void ReleaseOwnedBackgroundTex()
+        {
+            if (ownedBackgroundTex == null) return;
+            DestroyTexture(ownedBackgroundTex);
+            ownedBackgroundTex = null;
         }
 
         private void ApplyImageFileMode()
@@ -458,6 +493,7 @@ namespace vxpmsdk.Components
             ReleaseOwnedWebcam();
             ReleaseOwnedPatternTex();
             ReleaseOwnedImageTex();
+            ReleaseOwnedBackgroundTex();
             watchedVideoSource = null;
             // Do NOT destroy the VideoPlayer here — TeardownAll runs from OnDisable and
             // during mode switches, and Unity blocks "Destroy while GameObject is being

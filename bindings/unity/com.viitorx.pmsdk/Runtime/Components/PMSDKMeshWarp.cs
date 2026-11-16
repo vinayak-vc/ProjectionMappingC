@@ -141,8 +141,10 @@ namespace vxpmsdk.Components
                 // only then do we pay to compute + upload the per-vertex raster UV (UV1).
                 PMSDKLuminanceGain gain = GetComponent<PMSDKLuminanceGain>();
                 PMSDKBlackLevelLift blackLift = GetComponent<PMSDKBlackLevelLift>();
+                IPMSDKWarpOffsetSource rasterUVConsumer = GetComponent<IPMSDKWarpOffsetSource>();
                 bool writeRasterUV = (gain != null && gain.enabled && gain.HasMap)
-                                  || (blackLift != null && blackLift.enabled && blackLift.HasMap);
+                                  || (blackLift != null && blackLift.enabled && blackLift.HasMap)
+                                  || (rasterUVConsumer != null && rasterUVConsumer.NeedsRasterUV);
 
                 // Reuse cached arrays — allocating fresh each frame is a GC-hitch
                 // source at high grid density / many projectors.
@@ -156,14 +158,25 @@ namespace vxpmsdk.Components
                     unityRasterUVCache = new Vector2[vertexBuffer.Length];
                 }
 
+                // Optional post-warp offsets (Auto Adjust correction grid, D-044), by content UV.
+                IPMSDKWarpOffsetSource offsetSource = GetComponent<IPMSDKWarpOffsetSource>();
+                bool applyOffsets = offsetSource != null && offsetSource.HasWarpOffsets;
+
                 for (int i = 0; i < vertexBuffer.Length; i++)
                 {
-                    unityVertsCache[i] = new Vector3(vertexBuffer[i].position.x, vertexBuffer[i].position.y, vertexBuffer[i].position.z);
+                    Vector3 position = new Vector3(vertexBuffer[i].position.x, vertexBuffer[i].position.y, vertexBuffer[i].position.z);
+                    if (applyOffsets)
+                    {
+                        Vector2 offset = offsetSource.EvaluateWarpOffset(new Vector2(vertexBuffer[i].uv.x, vertexBuffer[i].uv.y));
+                        position.x += offset.x;
+                        position.y += offset.y;
+                    }
+                    unityVertsCache[i] = position;
                     unityColorsCache[i] = new Color(vertexBuffer[i].color.x, vertexBuffer[i].color.y, vertexBuffer[i].color.z, vertexBuffer[i].color.w);
                     // The warped position IS the normalized projector-raster coordinate,
                     // which is exactly where the vignette gain map is indexed.
                     if (writeRasterUV)
-                        unityRasterUVCache[i] = new Vector2(vertexBuffer[i].position.x, vertexBuffer[i].position.y);
+                        unityRasterUVCache[i] = new Vector2(position.x, position.y);
                 }
                 warpedMesh.SetVertices(unityVertsCache);
                 warpedMesh.SetColors(unityColorsCache);

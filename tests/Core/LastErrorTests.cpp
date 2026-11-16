@@ -2,9 +2,12 @@
 
 #include <gtest/gtest.h>
 
+// Stub for older MSVC toolsets only; MSVC 19.50+ declares the real function in <xutility>.
+#if !(defined(_MSC_VER) && _MSC_VER >= 1950)
 extern "C" {
     void __std_rotate() {}
 }
+#endif
 
 #include <thread>
 

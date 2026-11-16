@@ -258,3 +258,18 @@ standard) never decodes with a global threshold. The SDK now matches it:
   (.25,.25)}` exactly. Mean reprojection error sub-pixel.
 - **Not yet verified**: real webcam + physical projector loop (no hardware available).
   Requires the C-API frame-readback addition above, then a physical smoke test.
+
+## 10. Skin Auto Adjust (camera verify-and-refine, D-044)
+
+Per-skin, in the Skin Workspace inspector ("Auto adjust (camera)"), not in the F2 calibration mode. Operator flow:
+fix the OAK-D on a tripod where it sees the whole surface (near the audience spot for viewer-correct results),
+dim the room, place a Rectangle skin by its corner handles, press **Auto adjust**. The skin shows a checker
+(other skins are hidden), the camera measures it, and the inside of the skin is straightened over up to 4
+passes while the corners stay put. The status line shows the residual (RMS / max px); the result is saved and
+one Ctrl+Z restores the previous state. **Clear correction** returns to a plain corner pin.
+More in the same section (D-045..D-047): **Snap corners to facet edges** first floods the projector white and
+black to find the lit facets and moves the corners onto the facet the skin sits on. **Adjust all** runs every
+Rectangle/Ellipse surface in one camera session. **Size mm** turns the score into millimetres. **Build warp
+map** (curved surfaces, ~40 Gray-code frames) measures the whole surface and re-maps the content per projector
+pixel; build it last. **Find surfaces (depth)** uses the OAK-D's depth to find flat surfaces and creates one
+skin per surface the projector reaches, with its measured size. Every action is one Ctrl+Z.

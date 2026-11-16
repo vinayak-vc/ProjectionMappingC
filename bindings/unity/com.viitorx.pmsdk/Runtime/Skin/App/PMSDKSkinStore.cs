@@ -63,20 +63,12 @@ namespace vxpmsdk.Components
         /// Player and stored as RRGGBB in <c>background.txt</c>. Default black.</summary>
         public static Color BackgroundColor {
             get {
-                try {
-                    string file = Path.Combine(Folder, BackgroundFileName);
-                    if (File.Exists(file)) {
-                        Color parsed;
-                        if (TryParseHexColor(File.ReadAllText(file), out parsed)) {
-                            return parsed;
-                        }
-                    }
-                } catch (Exception ex) {
-                    Debug.LogWarning("PMSDKSkinStore: could not read background - " + ex.Message);
-                }
-                return Color.black;
+                return CurrentBackground;
             }
             set {
+                cachedBackground = value;
+                cachedBackgroundValid = true;
+                BackgroundVersion++;
                 try {
                     Directory.CreateDirectory(Folder);
                     File.WriteAllText(Path.Combine(Folder, BackgroundFileName), ColorUtility.ToHtmlStringRGB(value));
@@ -84,6 +76,52 @@ namespace vxpmsdk.Components
                     Debug.LogWarning("PMSDKSkinStore: could not write background - " + ex.Message);
                 }
             }
+        }
+
+        private static Color cachedBackground = Color.black;
+        private static bool cachedBackgroundValid;
+
+        /// <summary>Incremented every time the background colour is set; per-frame users compare it
+        /// instead of reading the file.</summary>
+        public static int BackgroundVersion { get; private set; }
+
+        /// <summary>The output background colour, read from disk once and then cached.</summary>
+        public static Color CurrentBackground {
+            get {
+                if (!cachedBackgroundValid) {
+                    cachedBackground = Color.black;
+                    try {
+                        string file = Path.Combine(Folder, BackgroundFileName);
+                        if (File.Exists(file)) {
+                            Color parsed;
+                            if (TryParseHexColor(File.ReadAllText(file), out parsed)) {
+                                cachedBackground = parsed;
+                            }
+                        }
+                    } catch (Exception ex) {
+                        Debug.LogWarning("PMSDKSkinStore: could not read background - " + ex.Message);
+                    }
+                    cachedBackgroundValid = true;
+                    BackgroundVersion++;
+                }
+                return cachedBackground;
+            }
+        }
+
+        /// <summary>Folder for photo-derived silhouette masks (PNG), shared by all skin sets.</summary>
+        public static string MasksFolder {
+            get {
+                return Path.Combine(Application.persistentDataPath, "SkinMasks");
+            }
+        }
+
+        /// <summary>A bare file name lives in <see cref="MasksFolder"/>; a rooted path is used as is.</summary>
+        public static string ResolveMaskPath(string maskFile)
+        {
+            if (string.IsNullOrEmpty(maskFile)) {
+                return "";
+            }
+            return Path.IsPathRooted(maskFile) ? maskFile : Path.Combine(MasksFolder, maskFile);
         }
 
         /// <summary>Accepts "RRGGBB" or "#RRGGBB" (surrounding whitespace ignored).</summary>

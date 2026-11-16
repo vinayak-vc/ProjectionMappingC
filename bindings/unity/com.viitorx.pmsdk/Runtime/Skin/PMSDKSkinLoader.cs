@@ -226,6 +226,8 @@ namespace vxpmsdk.Components
             skin.Opacity = data.opacity;
             skin.SoftMask = data.softMask;
             skin.ZOrder = data.zOrder;
+            skin.AlphaMaskPath = data.mask != null ? data.mask.maskFile : null;
+            PMSDKSkinSetJson.ApplyAutoAdjust(skin, data);
             skin.Projector = Projector;
 
             bool isQuad = kind == PMSDKSkinShapeKind.Rectangle || kind == PMSDKSkinShapeKind.Ellipse;

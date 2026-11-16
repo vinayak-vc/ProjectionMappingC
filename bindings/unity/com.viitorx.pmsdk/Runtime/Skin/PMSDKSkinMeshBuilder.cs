@@ -74,6 +74,64 @@ namespace vxpmsdk.Components
             return m;
         }
 
+        /// <summary>Default segment count per side of the subdivided quad used by Rectangle/Ellipse skins.</summary>
+        public const int QuadSegments = 16;
+
+        /// <summary>
+        /// Unit quad split into <paramref name="segments"/> x <paramref name="segments"/> cells.
+        /// The native PerspectiveWarp moves every vertex through the homography, so interior
+        /// vertices make the rendered texture follow the perspective (a 4-vertex quad is
+        /// interpolated per triangle and shears along the diagonal on a keystoned quad, D-022)
+        /// and give Auto Adjust's correction grid something to displace (D-044).
+        /// Vertex index = row * (segments + 1) + column, row 0 at v = 0; UV equals position.
+        /// </summary>
+        public static Mesh BuildSubdividedQuadMesh(int segments)
+        {
+            int n = Mathf.Clamp(segments, 1, 64);
+            int side = n + 1;
+            Vector3[] positions = new Vector3[side * side];
+            Vector2[] uvs = new Vector2[side * side];
+            Vector3[] normals = new Vector3[side * side];
+            Color[] colors = new Color[side * side];
+            for (int row = 0; row < side; row++) {
+                for (int column = 0; column < side; column++) {
+                    int index = row * side + column;
+                    float u = (float)column / n;
+                    float v = (float)row / n;
+                    positions[index] = new Vector3(u, v, 0f);
+                    uvs[index] = new Vector2(u, v);
+                    // See BuildUnitQuadMesh: normals are required by PMSDKMeshWarp; colours default white.
+                    normals[index] = new Vector3(0f, 0f, -1f);
+                    colors[index] = Color.white;
+                }
+            }
+            int[] triangles = new int[n * n * 6];
+            int t = 0;
+            for (int row = 0; row < n; row++) {
+                for (int column = 0; column < n; column++) {
+                    int bl = row * side + column;
+                    int br = bl + 1;
+                    int tl = bl + side;
+                    int tr = tl + 1;
+                    // Same winding as BuildUnitQuad (0,1,2 / 0,2,3 over BL,BR,TR,TL).
+                    triangles[t++] = bl;
+                    triangles[t++] = br;
+                    triangles[t++] = tr;
+                    triangles[t++] = bl;
+                    triangles[t++] = tr;
+                    triangles[t++] = tl;
+                }
+            }
+            Mesh mesh = new Mesh { name = "PMSDKSkin_SubdividedQuad" };
+            mesh.SetVertices(positions);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(triangles, 0);
+            mesh.normals = normals;
+            mesh.colors = colors;
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
         /// <summary>
         /// Triangulate a simple polygon in raster space [0..1] using ear-clipping.
         /// Returns positions at z=0, UVs mapped from the polygon's axis-aligned bounding box

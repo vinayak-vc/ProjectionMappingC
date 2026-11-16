@@ -69,6 +69,7 @@ namespace vxpmsdk.Components
         private Slider featherSlider;
         private Text featherValue;
         private PMSDKSkinMediaPanel mediaPanel;
+        private PMSDKAutoAdjustPanel autoAdjustPanel;
 
         private PMSDKSkin boundSkin;
         private int listSignature = int.MinValue;
@@ -95,6 +96,15 @@ namespace vxpmsdk.Components
             }
             PMSDKVideoConvertFlow.VideoReplaced += OnVideoReplaced;
             output.FullscreenChanged += OnFullscreenChanged;
+        }
+
+        private void OnPhotoSkinClicked()
+        {
+            PMSDKPhotoSkinDialog dialog = GetComponent<PMSDKPhotoSkinDialog>();
+            if (dialog == null) {
+                dialog = gameObject.AddComponent<PMSDKPhotoSkinDialog>();
+            }
+            dialog.Begin(controller);
         }
 
         private void OnVideoReplaced(PMSDKSkinContent content)
@@ -337,6 +347,8 @@ namespace vxpmsdk.Components
             PMSDKUi.AddHorizontal(addRow.gameObject, 6, 4f);
             Button add = PMSDKUi.AddButton(addRow, "+ Add shape (N)", delegate { controller.AddDefaultShape(); });
             PMSDKUi.SetLayout(add.gameObject, -1f, 30f, 1f, -1f);
+            Button photo = PMSDKUi.AddButton(addRow, "Skin from photo...", OnPhotoSkinClicked);
+            PMSDKUi.SetLayout(photo.gameObject, -1f, 30f, 1f, -1f);
 
             surfaceListRoot = PMSDKUi.NewRect("Surface List", content);
             PMSDKUi.AddVertical(surfaceListRoot.gameObject, 4, 3f);
@@ -451,6 +463,14 @@ namespace vxpmsdk.Components
             mediaFit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             mediaPanel = new PMSDKSkinMediaPanel(mediaBody, false);
             mediaPanel.ContentChanged += OnMediaChanged;
+
+            PMSDKUi.AddSpacer(content, 4f);
+            PMSDKUi.AddSectionHeader(content, "Auto adjust (camera)");
+            RectTransform adjustBody = PMSDKUi.NewRect("Auto Adjust Body", content);
+            PMSDKUi.AddVertical(adjustBody.gameObject, 10, 6f);
+            ContentSizeFitter adjustFit = adjustBody.gameObject.AddComponent<ContentSizeFitter>();
+            adjustFit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            autoAdjustPanel = new PMSDKAutoAdjustPanel(adjustBody, this, controller, SaveNow);
 
             PMSDKUi.AddSpacer(content, 4f);
             PMSDKUi.AddSectionHeader(content, "Output background");
@@ -685,6 +705,7 @@ namespace vxpmsdk.Components
                 kindLabel.text = "Nothing selected";
                 mediaPanel.Bind(null);
             }
+            autoAdjustPanel.Bind(skin);
             suppress = false;
         }
 

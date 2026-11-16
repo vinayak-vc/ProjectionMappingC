@@ -811,3 +811,52 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
 - [x] Output view (F11, was Fullscreen preview): mouse editing works there too, with a key hint
 - [x] Clicks on panels/drawers no longer draw or select on the canvas underneath
 - [ ] C++ SkinGen first compile: configure failed from memory pressure (parallel compiles killed); rerun with VCPKG_MAX_CONCURRENCY=2 while Unity is closed
+
+## Photo -> skin: verified + wired into Unity (2026-11-16)
+
+- [x] C++ SkinGen built and tested: 22 new tests, 155/155 total (MSVC 19.51 / VS 2026 via Ninja `release` preset; two old-MSVC stubs guarded)
+- [x] New DLL + OpenCV dependency DLLs deployed to the nested repo `Plugins/Mapping` (18 DLLs; old single 7.4 MB DLL backed up outside the repo)
+- [x] Unity: `NativeSkinGen`, `PMSDKPhotoSkin`, `PMSDKPhotoSkinBuilder`, `PMSDKPhotoSkinDialog` + "Skin from photo..." button; `_AlphaMask` in `PMSDK/UnlitWarp`; `PMSDKSkin.AlphaMaskPath` (JSON `mask.maskFile`); `Background` content mode for hole skins; 237/237 EditMode tests
+- [x] Verified in play mode on the statue PNG: mask skin (holes cut) and polygon + background-colour hole skins
+- [ ] Parts do not yet default to their own crop of the photo as content (all parts show the same media stretched over their quad)
+- [ ] Try the dialog by hand with a real mouse; test on a PC without the VS runtime; static OpenCV build to ship one DLL again
+
+## Auto Adjust Phase 0 + 1 - camera verify-and-refine of one planar skin (2026-11-16, D-044)
+
+- [x] Open decisions O1-O5 answered (viewer-perspective; OAK-D only; PNG = design image; manual corners; RMS <= 3 px / max <= 8 px within <= 4 corrections)
+- [x] Baseline before changes: C++ 155/155, Unity EditMode 237/237
+- [x] depthai-core v2.32.0 prebuilt (win64, SHA-256 matches GitHub's published digest) in `build/deps/` (not committed)
+- [x] `PMSDKOakCamera.dll` (`oakcam/`, option `PMSDK_OAKCAM_BUILD`): OAK-D CAM_A luma frames, exposure/focus lock, factory intrinsics; `pmsdk_oakcam_smoke` tool; imports verified against HoloTrack's depthai-core.dll; deployed to `Plugins/HoloTrack`
+- [x] C++ `pmsdk::AutoAdjust` + C API `AutoAdjustAPI.h`: checker layout/render, detection (whole board + per-corner with occlusion), undistortion (perspective + fisheye), Measure, Refine (correction grid), EvaluateWarp
+- [x] C++ tests: 25 new (`tests/AutoAdjust/AutoAdjustTests.cpp`, `tests/C_API/AutoAdjustAPITests.cpp`), 180/180 total. Synthetic non-planar room: RMS 1.93 -> 0.12 px (exact corners) and 1.92 -> 0.17 px (rendered images, detect + refine, 4 iterations)
+- [x] Unity: quad skins use a 16 x 16 subdivided mesh (fixes diagonal shear on keystoned skins); `PMSDKSkin` correction grid (+ JSON `correction`, loader, undo); `PMSDKMeshWarp` applies it via `IPMSDKWarpOffsetSource`
+- [x] Unity: `NativeAutoAdjust`, `PMSDKAutoAdjustNative`, `NativeOakCamera`, `PMSDKOakCalibrationCamera`, `IPMSDKCameraIntrinsicsSource`, `PMSDKAutoAdjust` (coroutine), `PMSDKAutoAdjustPanel` ("Auto adjust (camera)" section in the Workspace inspector)
+- [x] Unity EditMode: 8 new tests (`PMSDKAutoAdjustTests`), 2 updated (quad mesh vertex count), 245/245. Synthetic room through the real coroutine: RMS 1.48 -> 0.46 px after 1 correction (stop threshold 0.5 px)
+- [x] Play mode (scratch skin set, user set restored): 289-vertex quad follows the native corner pin; a correction grid moves the vertices exactly as computed (centre +0.02/-0.01, corners unchanged); no console errors
+- [x] Hardware (from Unity, `PMSDKOakCalibrationCamera`): OAK-D-PRO-W opens in ~2 s, sensor OV9782, 1280x720 luma, factory intrinsics perspective fx ~569 px, 14 coefficients; camera sees the soffit
+- [ ] Run `pmsdk_oakcam_smoke` for a frame-rate figure; decide whether 1280x800 (full OV9782) is worth adding
+- [ ] Workspace "Auto adjust (camera)" section: built and wired, not clicked with a real mouse yet
+- [ ] Phase 0 bench on the real soffit: Gray-code auto-align (`A`) with the OAK as camera needs an OAK path in `PMSDKCalibrationManager` (it only offers the simulated / OpenCV webcam cameras today)
+- [ ] Phase 1 acceptance on a real planar facet: RMS <= 3 px within <= 4 corrections, photo recorded in the docs
+- [x] Ellipse / photo-mask skins (checker corners are cut by the mask) - done in Phase 2 (masks suppressed while measuring)
+## Auto Adjust Phases 2-4 - engineering (2026-11-16, D-045..D-047; hardware testing pending)
+
+- [x] C++ `AutoAdjust/Facets` (white/black facet segmentation, quad fit, corner snap, mm scale), `AutoAdjust/WarpMap` (splat + pull-push), `AutoAdjust/Planes` (RANSAC planes from depth, lens-undistorted rays); C API extended (+ `evaluate_warp_many`)
+- [x] C++ tests: 18 new, 198/198 total (folded 3-facet capture, curved warp map with a hole, folded soffit + wall depth, distorted wide-lens wall)
+- [x] OAK plugin: optional aligned stereo depth (`enableDepth`, `pmoak_copy_latest_depth`), smoke tool `depth` argument; imports re-verified (47, none missing)
+- [x] Unity: `PMSDKCalibrationDisplay` (hide/show/flood with restore), `PMSDKContentGrayCode`, `PMSDKAutoAdjust` (facet snap, Ellipse/mask skins, Adjust all, MeasureSkin, mm score, shape-adapted checker), `PMSDKWarpMapBuilder` + `PMSDKWarpMapFile` + `_WarpMap` shader path, `PMSDKSurfaceFinder`, `IPMSDKDepthSource`, `PMSDKHomography.FitNormalized`, rectangle seam feather, skin facet size + warp map in JSON/loader
+- [x] Workspace "Auto adjust (camera)" section: Auto adjust, Adjust all, Snap toggle, Size mm, Build warp map, Clear, Find surfaces (depth)
+- [x] Unity EditMode: 11 new (`PMSDKAutoAdjustPhasesTests`, synthetic projection room), 256/256. Synthetic results: facet snap corners within 0.02 raster; Ellipse 0.64 -> 0.29 px = 3.0 mm; warp map 1.24 -> 0.22 px; depth: 3 planes -> 2 skins, unlit plane skipped; Phase 1 room 1.01 -> 0.19 px
+- [ ] Hardware (tomorrow): Phase 1 acceptance on one facet; facet snap on the soffit; Adjust all; warp map on a curved/folded skin; Find surfaces with OAK depth (check that aligned depth matches the raw colour image)
+- [ ] Workspace buttons clicked by hand; long-running steps (Gray code ~40 captures) show progress only as status text
+- [ ] Same-physical-size squares across facets (shared canvas cropped per facet) - not implemented, see D-045
+- [ ] Click-to-segment / PNG feature matching - deferred until the user has studied them (plan section P4)
+
+## Auto Adjust sim walkthrough (2026-11-16)
+
+- [x] Explicit sim demo `PMSDKAutoAdjustSimDemo` (images + summary for Phases 1-4)
+- [x] Warp map: discard content UV outside 0..1 in `UnlitWarp.shader` (edge streaks), sim mirrors it
+- [x] Phase 1: measure / correct the outer band between the last checker corners and the skin edges
+      (D-048: `PMSDKSkinEdgeProbe`, border points in the score, keep-corners target from observed corners)
+- [ ] Hardware: check the border probe on real facets (margin contrast, neighbouring lit surfaces)
+

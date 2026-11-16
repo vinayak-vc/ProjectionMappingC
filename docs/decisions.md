@@ -596,3 +596,124 @@ SHA-256 checked, copied to `%LOCALAPPDATA%\PMSDKfmpegin` and added to the USER
 (no shell quoting/injection); the original file is never modified; Cancel kills the process tree.
 **Caveat:** the installer downloads ~110 MB and trusts the checksum published by the same host; winget
 (first choice) verifies its own manifest hash.
+
+## D-043 2026-11-16 - Photo skins in Unity: mask on the quad (primary), background-coloured hole skins (fallback)
+
+**Decision:** A photo part becomes a corner-pin Rectangle skin whose silhouette comes from a grayscale PNG
+mask (`SkinMasks/<skinId>.png`, bare file name in `mask.maskFile`) sampled in `PMSDK/UnlitWarp` (`_AlphaMask`,
+bilinear, discard below ~0.004). Alternative modes: polygon (<=128 pts) with each hole as a separate polygon
+skin using content mode `Background` (the output background colour) at a higher z-order, or outline only.
+**Why:** the mask keeps holes and thin features exactly and reuses corner-pin registration; hole skins are
+the usual mapping-tool fallback (stacked mask shapes) when only polygons are available.
+**Deployment note:** the new DLL links OpenCV dynamically: ship `ProjectionMappingSDK.dll` with the opencv_*/image DLLs.
+
+## D-044 2026-11-16 - Auto Adjust Phase 1: camera verify-and-refine of one planar skin (OAK-D, checker, correction grid)
+
+**Answers to the plan's open decisions (O1-O5):** O1 viewer-perspective - "correct" means the content seen from
+the camera is one exact perspective image of the unit square; by default that homography is the least-squares
+fit to the detected corners, so the skin stays where the user put it and only its inside is straightened
+("keep corners, fix interior"; an explicit camera-space target quad is supported in the C++/C API for later).
+O2 OAK-D only (no RGB webcam available). O3 the PNG is a design image run through SkinGen (Phase 2 concern).
+O4 manual corner handles. O5 success = RMS <= 3 px and max <= 8 px at camera resolution within <= 4 corrections.
+
+**Decisions:**
+1. **Measurement = projected checkerboard, not Gray code.** A 10 x 7 checker (white margin; squaresX+squaresY odd
+   so a 180-degree view is told apart by colour; mirrored orderings rejected by handedness) is found with OpenCV
+   `findChessboardCornersSB`; when the whole board is not visible, each corner is refined around the previous
+   detection and kept only if it shows the checker's saddle pattern (partial occlusion). The camera -> projector
+   relation needed for the update comes from the corners themselves (their projector positions are known from
+   the current warp), so no Gray-code pass is needed in the loop. Gray code stays for coarse placement (Phase 0/2).
+2. **Correction = per-skin offset grid after the corner pin** (`PMSDKSkin.SetCorrection`, 9 x 9 default, bilinear in
+   content UV, raster units), fitted by regularised least squares (second-difference smoothness, pinned corner
+   nodes), damped (0.8) and step-limited. Applied in C# by `PMSDKMeshWarp` through `IPMSDKWarpOffsetSource` after
+   the native warp; persisted as `correction {columns, rows, offsets}` in the skin-set JSON (old files: none).
+3. **Quad skins use a 16 x 16 subdivided mesh** instead of 4 vertices (user-approved). A 4-vertex quad is
+   interpolated per triangle and shears along the diagonal on a keystoned skin (the artefact D-022 meant to
+   remove); the subdivided mesh follows the homography and gives the correction grid vertices to move.
+4. **OAK-D frames come from a separate optional plugin `PMSDKOakCamera.dll`** (target `pmsdk_oakcam`, CMake option
+   `PMSDK_OAKCAM_BUILD`, OFF by default) linked to the prebuilt depthai-core v2.32.0 (same version HoloTrack ships;
+   all 37 imported symbols verified present in HoloTrack's copy) and deployed next to it in `Plugins/HoloTrack`.
+   `ProjectionMappingSDK.dll` stays camera-free. The OAK is not UVC (D-034). The plugin uses the dynamic CRT
+   (`/MD`) because depthai's C++ API passes STL objects across the DLL boundary. Lens distortion is removed with
+   the OAK's factory intrinsics before scoring.
+5. **Loop policy** (`PMSDKAutoAdjust`): measure -> correct up to 4 times -> final measure; stop early below 0.5 px;
+   keep the best state seen; on abort restore the previous correction. The checker is shown through
+   `PMSDKSkin.TestPatternOverride` (content untouched), the photo mask is lifted and other skins hidden while
+   measuring, all restored afterwards. Rectangle skins only in Phase 1. The Workspace records one undo step and saves.
+
+## D-045 2026-11-16 - Auto Adjust Phase 2: facets from a white/black flood, corner snap, shape-adapted checker
+
+**Decisions:**
+1. **Facets come from the projector's own light.** With every skin hidden, the projector background is flooded
+   black then white (all cameras rendering the skin layer, restored afterwards). Facets of a folded surface
+   differ in brightness, so the lit area (white - black > 25) is split where the blurred log-brightness
+   changes faster than 0.035 per pixel; the border band is then regrown into the neighbouring regions.
+   (Thinned Canny edges were tried first and rejected: they leave gaps where an inner fold meets the outline,
+   so regions leaked into each other.) Each facet gets an outline and a fitted quad.
+2. **Snap**: the facet holding most checker corners is the skin's facet; new corner-pin corners come from the
+   camera -> projector homography fitted to the checker corners (exact for a flat facet), the correction grid
+   is cleared, and refinement continues against the facet quad (corners not pinned). Opt-in toggle.
+3. **Checker adapts to the skin shape** (~5 squares across the short side, proportionally more along the long
+   side, sum odd): long thin facets made the fixed 10 x 7 board's squares too elongated to detect.
+4. **Ellipse and photo-mask skins** are measured with masks suppressed at runtime (`PMSDKSkin.SuppressMasks`),
+   not by editing their data. **Rectangle edge feather** for seams is opt-in (Per-edge feather on a Rectangle,
+   `_RectFeather` in `PMSDK/UnlitWarp`; Rectangles ignored it before).
+5. **Surface-metric** is reported, not enforced: with a facet size (mm) the score is also given in mm
+   (mean edge scale of the facet / content quad). Making squares the same physical size ACROSS facets is a
+   content-layout problem (per-facet crop of a shared canvas) and is not implemented.
+6. "Adjust all" runs skins one after another in one camera session (OAK start takes ~2 s).
+
+## D-046 2026-11-16 - Auto Adjust Phase 3: per-skin warp map (raster -> content UV) for curved surfaces
+
+**Decision:** Gray code (robust, with inverses) is projected in the skin's CONTENT space through its current
+warp, so decoding gives camera pixel -> content UV directly. "Correct" stays viewer-perspective (D-044): the
+target UV of a camera pixel is the best-fit perspective (normalised homography) camera -> UV. Each sample's
+projector position comes from the skin's warp (batch native evaluation), samples are splatted onto a map over
+the skin's raster bounds and holes are filled by pull-push, limited to 12 map pixels from data. The map file
+(`<skinId>_warp.pmwm`, small binary format, `PMSDKWarpMapFile`) lives next to the photo masks; the shader samples
+it at the raster position (UV1) and uses the result as the content UV (RG premultiplied by validity so bilinear
+filtering never mixes in invalid texels). Masks keep using the mesh UV. **Why a map, not a finer grid:** it
+follows any smooth shape at map resolution and costs one texture fetch. **Lifecycle:** the map is built last;
+running Auto Adjust (which changes geometry) switches it off and says so.
+
+## D-047 2026-11-16 - Auto Adjust Phase 4: surfaces from OAK-D depth, placed with a full-raster Gray-code map
+
+**Decisions:**
+1. `PMSDKOakCamera.dll` optionally streams stereo depth aligned to the colour camera at the colour output size
+   (StereoDepth DEFAULT preset, LR check, subpixel; per-pixel median of 5 frames in C#), so depth pixels share
+   the colour intrinsics and the Gray-code camera pixels.
+2. Planes: sequential RANSAC on the back-projected cloud (every 4th pixel), least-squares refit, and only the
+   largest image-connected piece per plane (parallel facets elsewhere become separate surfaces). Pixel rays are
+   undistorted with the lens model first: on the wide OAK lens, ignoring distortion bends a flat wall (tested).
+3. Placement: a temporary full-raster skin shows Gray code, giving a dense camera -> projector map; per plane,
+   the decoded pixels inside its outline give an exact camera -> raster homography (after undistortion), which
+   maps the plane's quad to the new skin's corners. Planes not lit by the projector, seen at > 75 degrees, or
+   mapping far outside the image are skipped with a reason. Measured plane size becomes the skin's facet size.
+4. Click-to-segment and PNG-to-scene feature matching stay out (the user wants to study them first).
+**Unverified:** whether OAK's aligned depth is in the raw (distorted) colour geometry, as assumed here.
+
+## D-048 2026-11-16 - Auto Adjust: measure the skin border, keep-corners target from the observed corners
+
+**Problem (found in the sim walkthrough):** the checker's inner corners stop one margin plus one square short
+of the skin border (~18 % per side), so Phase 1 never measured that band; the grid there was only
+extrapolated, and the score (checker corners only) could pass while the edges still bent. On the waved sim wall
+the whole-skin error went 13.3 -> 16.5 px max while the checker score went 1.03 -> 0.18 px.
+**Decisions:**
+1. `PMSDKSkinEdgeProbe` (managed, no native change) reads the camera profile along the edge normal at evenly
+   spaced points on each border (one per checker square along that edge), takes the outermost strong
+   bright-to-dark step (white margin -> dark outside) to sub-pixel precision, undistorts it, and drops samples
+   that disagree with every line through two of their nearest neighbours on the same edge.
+2. Only the distance across the edge is observable, so a border sample is scored as the ideal point moved by
+   that normal distance alone (`AcrossOnly`). Border points join the checker corners in Measure/Refine; the
+   score and status now count both ("N corners, M border points").
+3. The target is fixed before the border points join, as an explicit quad: the facet quad after a snap;
+   with pinned corners ("keep corners", O4) the skin's observed corners, where lines through the two border
+   points nearest each corner meet, so the edges become straight between corners that do not move; otherwise
+   (or if a corner cannot be found) the best fit to the checker corners. Previously the target was the checker
+   best fit, which conflicts with pinned corners as soon as the border is measured.
+4. Rectangle skins only (Ellipse borders are not straight); `PMSDKAutoAdjust.MeasureSkinEdges` (default on)
+   switches it off. `MeasureSkin` (warp-map verification) still scores checker corners only.
+**Sim result:** worst point off the straight quad through the corners 13.0 -> 4.8 px, whole-skin best fit max
+13.3 -> 3.3 px, checker interior 0.24 px RMS. **Unverified on hardware:** real margin contrast and how close the
+OAK sees the border to other lit surfaces.
+

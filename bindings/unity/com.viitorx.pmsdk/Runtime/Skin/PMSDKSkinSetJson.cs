@@ -57,6 +57,25 @@ namespace vxpmsdk.Components
             public float softMask = 0f;
             public int zOrder = 0;
             public DefaultContent defaultContent = new DefaultContent();
+            public CorrectionCfg correction = new CorrectionCfg();
+            public FacetCfg facet = new FacetCfg();
+            public string warpMapFile;     // Auto Adjust warp map (D-046), name inside SkinMasks or absolute
+        }
+
+        /// <summary>Physical size of the surface a skin covers (D-045); 0 = unknown.</summary>
+        [Serializable] public class FacetCfg
+        {
+            public float widthMm;
+            public float heightMm;
+        }
+
+        /// <summary>Auto Adjust correction grid (D-044). columns = rows = 0 means none; older files
+        /// without this field load as "no correction".</summary>
+        [Serializable] public class CorrectionCfg
+        {
+            public int columns;
+            public int rows;
+            public List<Vector2> offsets = new List<Vector2>();
         }
 
         [Serializable] public class MaskCfg
@@ -64,6 +83,7 @@ namespace vxpmsdk.Components
             public string kind = "none";     // "none" | "ellipse" | "customAlpha"
             public float feather = 0f;       // scalar in v1; v1.1 UI can populate perEdgeFeather
             public List<float> perEdgeFeather = new List<float>();
+            public string maskFile;          // customAlpha: photo silhouette PNG (name inside SkinMasks, or absolute)
         }
 
         [Serializable] public class TransformCfg
@@ -131,6 +151,11 @@ namespace vxpmsdk.Components
             var color = s.GetComponent<PMSDKColorCorrection>();
             var transform = s.GetComponent<PMSDKOutputTransform>();
             var mask = new MaskCfg { kind = MaskForShape(s.Kind), feather = s.SoftMask };
+            if (!string.IsNullOrEmpty(s.AlphaMaskPath))
+            {
+                mask.kind = "customAlpha";
+                mask.maskFile = s.AlphaMaskPath;
+            }
             // Per-edge feather (M-Sk4 v1.2): when enabled, store four values in the
             // (top, right, bottom, left) order matching the shader's _MaskFeather4.
             if (s.PerEdgeFeatherEnabled)
@@ -153,7 +178,43 @@ namespace vxpmsdk.Components
                 softMask = s.SoftMask,
                 zOrder = s.ZOrder,
                 defaultContent = CaptureDefaultContent(content),
+                correction = CaptureCorrection(s),
+                facet = new FacetCfg { widthMm = s.FacetWidthMm, heightMm = s.FacetHeightMm },
+                warpMapFile = string.IsNullOrEmpty(s.WarpMapFile) ? null : s.WarpMapFile,
             };
+        }
+
+        /// <summary>Auto Adjust fields (correction grid, facet size, warp map) from a DTO onto a skin.</summary>
+        internal static void ApplyAutoAdjust(PMSDKSkin s, Skin dto)
+        {
+            ApplyCorrection(s, dto.correction);
+            s.FacetWidthMm = dto.facet != null ? dto.facet.widthMm : 0f;
+            s.FacetHeightMm = dto.facet != null ? dto.facet.heightMm : 0f;
+            s.WarpMapFile = string.IsNullOrEmpty(dto.warpMapFile) ? null : dto.warpMapFile;
+        }
+
+        private static CorrectionCfg CaptureCorrection(PMSDKSkin s)
+        {
+            CorrectionCfg cfg = new CorrectionCfg();
+            if (s.HasCorrection) {
+                cfg.columns = s.CorrectionColumns;
+                cfg.rows = s.CorrectionRows;
+                cfg.offsets = s.GetCorrectionOffsets();
+            }
+            return cfg;
+        }
+
+        internal static void ApplyCorrection(PMSDKSkin s, CorrectionCfg cfg)
+        {
+            if (cfg == null || cfg.columns < 2 || cfg.rows < 2 || cfg.columns > 33 || cfg.rows > 33 ||
+                cfg.offsets == null || cfg.offsets.Count != cfg.columns * cfg.rows) {
+                if (cfg != null && (cfg.columns != 0 || cfg.rows != 0)) {
+                    Debug.LogWarning($"PMSDKSkinSetJson: skin '{s.SkinId}' has an invalid correction grid ({cfg.columns} x {cfg.rows}, {cfg.offsets?.Count ?? 0} offsets); ignoring it.");
+                }
+                s.ClearCorrection();
+                return;
+            }
+            s.SetCorrection(cfg.columns, cfg.rows, cfg.offsets);
         }
 
         /// <summary>Apply a captured <see cref="Set"/> back to the controller's scene.
@@ -207,6 +268,7 @@ namespace vxpmsdk.Components
             s.Opacity = dto.opacity;
             s.SoftMask = dto.softMask;
             s.ZOrder = dto.zOrder;
+            s.AlphaMaskPath = dto.mask != null ? dto.mask.maskFile : null;
             // Per-edge feather (M-Sk4 v1.2): only accept exactly 4 values.
             if (dto.mask != null && dto.mask.perEdgeFeather != null && dto.mask.perEdgeFeather.Count == 4)
             {
@@ -219,6 +281,7 @@ namespace vxpmsdk.Components
             {
                 s.PerEdgeFeatherEnabled = false;
             }
+            ApplyAutoAdjust(s, dto);
             ApplyDefaultContent(s, dto.defaultContent);
         }
 

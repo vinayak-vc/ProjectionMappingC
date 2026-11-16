@@ -46,6 +46,11 @@ add_executable(pmsdk_tests
     C_API/DecoderTests.cpp
     SkinGen/SkinGenTests.cpp
     C_API/SkinGenAPITests.cpp
+    AutoAdjust/AutoAdjustTests.cpp
+    AutoAdjust/FacetsTests.cpp
+    AutoAdjust/WarpMapTests.cpp
+    AutoAdjust/PlanesTests.cpp
+    C_API/AutoAdjustAPITests.cpp
     Warp/DeformationFieldEdgeTests.cpp
     Serialization/ErrorHandlingTests.cpp
     # Internal (non-exported) code under test is compiled into the test binary

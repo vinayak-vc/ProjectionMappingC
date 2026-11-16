@@ -38,11 +38,16 @@ target_sources(pmsdk PRIVATE
     Calibration/GrayCode.cpp
     Calibration/GrayCodeDecoder.cpp
     SkinGen/SkinGen.cpp
+    AutoAdjust/AutoAdjust.cpp
+    AutoAdjust/Facets.cpp
+    AutoAdjust/WarpMap.cpp
+    AutoAdjust/Planes.cpp
     C_API/GeometryAPI.cpp
     C_API/WarpAPI.cpp
     C_API/BlendAPI.cpp
     C_API/CalibrationAPI.cpp
-    C_API/SkinGenAPI.cpp)
+    C_API/SkinGenAPI.cpp
+    C_API/AutoAdjustAPI.cpp)
 
 # Internal headers (src/…) are visible to the SDK only, never installed.
 target_include_directories(pmsdk PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

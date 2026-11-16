@@ -32,17 +32,19 @@ namespace vxpmsdk.Tests
         // ---- kind-driven mesh selection ----
 
         [Test]
-        public void Rectangle_ProducesUnitQuadMesh()
+        public void Rectangle_ProducesSubdividedQuadMesh()
         {
             var skin = go.AddComponent<PMSDKSkin>();
             skin.Kind = PMSDKSkinShapeKind.Rectangle;
             // Force OnEnable → OnEnable path by disabling+enabling.
             skin.enabled = false; skin.enabled = true;
 
+            // Subdivided so the projective corner pin is followed inside the quad (D-022/D-044).
+            int side = PMSDKSkinMeshBuilder.QuadSegments + 1;
             var mf = go.GetComponent<MeshFilter>();
             Assert.IsNotNull(mf.sharedMesh);
-            Assert.AreEqual(4, mf.sharedMesh.vertexCount);
-            Assert.AreEqual(6, mf.sharedMesh.triangles.Length);
+            Assert.AreEqual(side * side, mf.sharedMesh.vertexCount);
+            Assert.AreEqual(PMSDKSkinMeshBuilder.QuadSegments * PMSDKSkinMeshBuilder.QuadSegments * 6, mf.sharedMesh.triangles.Length);
         }
 
         [Test]
@@ -83,7 +85,7 @@ namespace vxpmsdk.Tests
             skin.SendMessage("Update", SendMessageOptions.DontRequireReceiver);
 
             int hexVerts = go.GetComponent<MeshFilter>().sharedMesh.vertexCount;
-            Assert.AreEqual(4, quadVerts);
+            Assert.AreEqual((PMSDKSkinMeshBuilder.QuadSegments + 1) * (PMSDKSkinMeshBuilder.QuadSegments + 1), quadVerts);
             Assert.AreEqual(6, hexVerts);
         }
 

@@ -2,6 +2,10 @@
 // Provides symbols that are missing from some versions of the MSVC runtime.
 // Compiled as C to avoid conflicting with <string_view> C++ headers.
 
+// MSVC 19.50+ (Visual Studio 2026) already ships real implementations of these symbols in libcpmt;
+// defining dummies there causes duplicate-symbol link errors, so the stubs are only for older toolsets.
+#if !(defined(_MSC_VER) && _MSC_VER >= 1950)
+
 extern "C" {
 
 unsigned long long __std_find_first_not_of_trivial_pos_1(const char* const a, unsigned long long b, const char* const c, unsigned long long d) {
@@ -20,3 +24,5 @@ const unsigned long long* __std_min_element_8u(const unsigned long long* a, cons
 }
 
 }
+
+#endif // older MSVC only

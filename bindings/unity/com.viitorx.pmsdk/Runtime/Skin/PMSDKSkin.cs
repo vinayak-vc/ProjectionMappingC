@@ -46,7 +46,7 @@ namespace vxpmsdk.Components
     [ExecuteAlways]
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
-    public class PMSDKSkin : MonoBehaviour
+    public class PMSDKSkin : MonoBehaviour, IPMSDKWarpOffsetSource
     {
         /// <summary>Persistent skin identifier used by JSON/loader/bindings (M-Sk2.5).</summary>
         public string SkinId = "skin";
@@ -96,6 +96,157 @@ namespace vxpmsdk.Components
         /// texture instead of the content source. Owned externally (usually by <see cref="PMSDKSkinContent"/>).</summary>
         [HideInInspector] public Texture TestPatternOverride;
 
+        /// <summary>Optional silhouette mask (grayscale PNG, cropped to this skin's quad) made
+        /// from a photo. A bare file name is resolved inside <see cref="PMSDKSkinStore.MasksFolder"/>;
+        /// an absolute path is used as is. Quad kinds only.</summary>
+        public string AlphaMaskPath;
+
+        // Auto Adjust correction (D-044): raster offsets added after the corner pin, bilinear over a
+        // columns x rows grid in content UV (row-major, row 0 at v = 0). Quad kinds only.
+        [SerializeField, HideInInspector] private int correctionColumns;
+        [SerializeField, HideInInspector] private int correctionRows;
+        [SerializeField, HideInInspector] private List<Vector2> correctionOffsets = new List<Vector2>();
+
+        /// <summary>Columns of the Auto Adjust correction grid (0 when none).</summary>
+        public int CorrectionColumns
+        {
+            get { return HasCorrection ? correctionColumns : 0; }
+        }
+
+        /// <summary>Rows of the Auto Adjust correction grid (0 when none).</summary>
+        public int CorrectionRows
+        {
+            get { return HasCorrection ? correctionRows : 0; }
+        }
+
+        /// <summary>True when a valid Auto Adjust correction grid is stored.</summary>
+        public bool HasCorrection
+        {
+            get {
+                return correctionColumns >= 2 && correctionRows >= 2 && correctionOffsets != null &&
+                       correctionOffsets.Count == correctionColumns * correctionRows;
+            }
+        }
+
+        /// <summary>Copy of the correction offsets (empty when none).</summary>
+        public List<Vector2> GetCorrectionOffsets()
+        {
+            return HasCorrection ? new List<Vector2>(correctionOffsets) : new List<Vector2>();
+        }
+
+        /// <summary>Stores an Auto Adjust correction grid. Throws on inconsistent sizes.</summary>
+        public void SetCorrection(int columns, int rows, IList<Vector2> offsets)
+        {
+            if (columns < 2 || rows < 2 || columns > 33 || rows > 33) {
+                throw new System.ArgumentOutOfRangeException(nameof(columns), "Correction grid must be 2..33 x 2..33.");
+            }
+            if (offsets == null || offsets.Count != columns * rows) {
+                throw new System.ArgumentException("Correction offsets must hold columns * rows values.", nameof(offsets));
+            }
+            correctionColumns = columns;
+            correctionRows = rows;
+            correctionOffsets = new List<Vector2>(offsets);
+        }
+
+        /// <summary>Removes the Auto Adjust correction (the skin is a plain corner pin again).</summary>
+        public void ClearCorrection()
+        {
+            correctionColumns = 0;
+            correctionRows = 0;
+            correctionOffsets = new List<Vector2>();
+        }
+
+        bool IPMSDKWarpOffsetSource.HasWarpOffsets
+        {
+            get { return IsQuadKind && HasCorrection; }
+        }
+
+        bool IPMSDKWarpOffsetSource.NeedsRasterUV
+        {
+            get { return IsQuadKind && !string.IsNullOrEmpty(WarpMapFile) && !suppressWarpMap; }
+        }
+
+        // ---- Auto Adjust Phase 2: facet size (SURFACE-METRIC scores), D-045 ----
+
+        [SerializeField, HideInInspector] private float facetWidthMm;
+        [SerializeField, HideInInspector] private float facetHeightMm;
+
+        /// <summary>Physical width of the surface this skin covers (mm, 0 = unknown).</summary>
+        public float FacetWidthMm
+        {
+            get { return facetWidthMm; }
+            set { facetWidthMm = Mathf.Max(0f, value); }
+        }
+
+        /// <summary>Physical height of the surface this skin covers (mm, 0 = unknown).</summary>
+        public float FacetHeightMm
+        {
+            get { return facetHeightMm; }
+            set { facetHeightMm = Mathf.Max(0f, value); }
+        }
+
+        /// <summary>True when both facet dimensions are known.</summary>
+        public bool HasFacetSize
+        {
+            get { return facetWidthMm > 0f && facetHeightMm > 0f; }
+        }
+
+        // ---- Auto Adjust Phase 3: warp map (curved surfaces), D-046 ----
+
+        /// <summary>Optional warp map file (raster -> content UV, <see cref="PMSDKWarpMapFile"/>). A bare
+        /// file name is resolved inside <see cref="PMSDKSkinStore.MasksFolder"/>. Quad kinds only.</summary>
+        public string WarpMapFile;
+
+        private Texture2D warpMapTex;
+        private Rect warpMapRect = new Rect(0f, 0f, 1f, 1f);
+        private string loadedWarpMapFile;
+        private bool suppressMasks;
+        private bool suppressWarpMap;
+
+        /// <summary>Runtime only: while true the ellipse shape, photo alpha mask and rectangle feather are
+        /// not applied (Auto Adjust shows a whole-quad checker). Not saved.</summary>
+        public bool SuppressMasks
+        {
+            get { return suppressMasks; }
+            set { suppressMasks = value; }
+        }
+
+        /// <summary>Runtime only: while true the warp map is not applied (Auto Adjust measures the plain
+        /// warp). Not saved.</summary>
+        public bool SuppressWarpMap
+        {
+            get { return suppressWarpMap; }
+            set { suppressWarpMap = value; }
+        }
+
+        /// <summary>True when a warp map is loaded and applied.</summary>
+        public bool HasWarpMap
+        {
+            get {
+                EnsureWarpMap();
+                return warpMapTex != null;
+            }
+        }
+
+        /// <summary>Bilinear correction offset at content UV (zero when no correction is stored).</summary>
+        public Vector2 EvaluateWarpOffset(Vector2 uv)
+        {
+            if (!HasCorrection) {
+                return Vector2.zero;
+            }
+            float fx = Mathf.Clamp01(uv.x) * (correctionColumns - 1);
+            float fy = Mathf.Clamp01(uv.y) * (correctionRows - 1);
+            int x0 = Mathf.Min(Mathf.FloorToInt(fx), correctionColumns - 2);
+            int y0 = Mathf.Min(Mathf.FloorToInt(fy), correctionRows - 2);
+            float tx = fx - x0;
+            float ty = fy - y0;
+            Vector2 a = correctionOffsets[y0 * correctionColumns + x0];
+            Vector2 b = correctionOffsets[y0 * correctionColumns + x0 + 1];
+            Vector2 c = correctionOffsets[(y0 + 1) * correctionColumns + x0];
+            Vector2 d = correctionOffsets[(y0 + 1) * correctionColumns + x0 + 1];
+            return a * ((1f - tx) * (1f - ty)) + b * (tx * (1f - ty)) + c * ((1f - tx) * ty) + d * (tx * ty);
+        }
+
         // ---- runtime state ----
 
         private MeshFilter meshFilter;
@@ -109,12 +260,20 @@ namespace vxpmsdk.Components
         private int lastVerticesHash;
         private PMSDKSkinShapeKind lastAppliedKind = (PMSDKSkinShapeKind)(-1);
         private Mesh ownedMesh;
+        private Texture2D alphaMaskTex;
+        private string loadedAlphaMaskPath;
 
         private static readonly int ID_ShapeMask    = Shader.PropertyToID("_ShapeMask");
         private static readonly int ID_MaskFeather  = Shader.PropertyToID("_MaskFeather");
         private static readonly int ID_MaskFeather4 = Shader.PropertyToID("_MaskFeather4");
         private static readonly int ID_Opacity      = Shader.PropertyToID("_Opacity");
         private static readonly int ID_MainTex      = Shader.PropertyToID("_MainTex");
+        private static readonly int ID_AlphaMask    = Shader.PropertyToID("_AlphaMask");
+        private static readonly int ID_UseAlphaMask = Shader.PropertyToID("_UseAlphaMask");
+        private static readonly int ID_WarpMap      = Shader.PropertyToID("_WarpMap");
+        private static readonly int ID_UseWarpMap   = Shader.PropertyToID("_UseWarpMap");
+        private static readonly int ID_WarpMapRect  = Shader.PropertyToID("_WarpMapRect");
+        private static readonly int ID_RectFeather  = Shader.PropertyToID("_RectFeather");
 
         private void OnEnable()
         {
@@ -127,6 +286,8 @@ namespace vxpmsdk.Components
 
         private void OnDisable()
         {
+            ReleaseAlphaMask();
+            ReleaseWarpMap();
             // The owned mesh is a per-instance clone; destroy it to avoid leaks when the
             // skin GameObject is removed. If we're the assigned sharedMesh, clear the slot.
             if (ownedMesh != null)
@@ -207,7 +368,7 @@ namespace vxpmsdk.Components
             {
                 if (kindChanged || ownedMesh == null)
                 {
-                    ReplaceOwnedMesh(PMSDKSkinMeshBuilder.BuildUnitQuadMesh());
+                    ReplaceOwnedMesh(PMSDKSkinMeshBuilder.BuildSubdividedQuadMesh(PMSDKSkinMeshBuilder.QuadSegments));
                     lastAppliedKind = Kind;
                     lastVerticesHash = currentHash;
                 }
@@ -272,7 +433,8 @@ namespace vxpmsdk.Components
             if (meshRenderer == null) return;
             if (mpb == null) mpb = new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(mpb);
-            mpb.SetFloat(ID_ShapeMask,   Kind == PMSDKSkinShapeKind.Ellipse ? 1f : 0f);
+            mpb.SetFloat(ID_ShapeMask,   Kind == PMSDKSkinShapeKind.Ellipse && !suppressMasks ? 1f : 0f);
+            mpb.SetFloat(ID_RectFeather, Kind == PMSDKSkinShapeKind.Rectangle && PerEdgeFeatherEnabled && !suppressMasks ? 1f : 0f);
             mpb.SetFloat(ID_MaskFeather, Mathf.Max(SoftMask, 0f));
             // M-Sk4 polish v1.2: push per-edge feather. Default (PerEdgeFeatherEnabled
             // = false) tiles the scalar SoftMask across all four channels so the shader
@@ -284,6 +446,21 @@ namespace vxpmsdk.Components
             mpb.SetVector(ID_MaskFeather4, f4);
             mpb.SetFloat(ID_Opacity,     Mathf.Clamp01(Opacity));
 
+            // Photo silhouette mask (quad kinds). Loaded lazily and re-loaded when the path changes.
+            EnsureAlphaMask();
+            bool useMask = IsQuadKind && alphaMaskTex != null && !suppressMasks;
+            mpb.SetFloat(ID_UseAlphaMask, useMask ? 1f : 0f);
+            if (useMask) mpb.SetTexture(ID_AlphaMask, alphaMaskTex);
+
+            // Auto Adjust warp map (curved surfaces).
+            EnsureWarpMap();
+            bool useWarpMap = IsQuadKind && warpMapTex != null && !suppressWarpMap;
+            mpb.SetFloat(ID_UseWarpMap, useWarpMap ? 1f : 0f);
+            if (useWarpMap) {
+                mpb.SetTexture(ID_WarpMap, warpMapTex);
+                mpb.SetVector(ID_WarpMapRect, new Vector4(warpMapRect.x, warpMapRect.y, warpMapRect.width, warpMapRect.height));
+            }
+
             // Content texture: test-pattern override > PMSDKSkinContent.CurrentTexture > leave
             // whatever the material already has (typically "white" default from shader).
             Texture tex = TestPatternOverride;
@@ -291,6 +468,93 @@ namespace vxpmsdk.Components
             if (tex != null) mpb.SetTexture(ID_MainTex, tex);
 
             meshRenderer.SetPropertyBlock(mpb);
+        }
+
+        private void EnsureAlphaMask()
+        {
+            if (loadedAlphaMaskPath == AlphaMaskPath) return;
+            ReleaseAlphaMask();
+            loadedAlphaMaskPath = AlphaMaskPath;
+            if (string.IsNullOrEmpty(AlphaMaskPath)) return;
+
+            string full = PMSDKSkinStore.ResolveMaskPath(AlphaMaskPath);
+            if (!System.IO.File.Exists(full))
+            {
+                Debug.LogWarning("PMSDKSkin '" + name + "': mask file not found: " + full, this);
+                return;
+            }
+            try
+            {
+                var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
+                if (!tex.LoadImage(System.IO.File.ReadAllBytes(full), false))
+                {
+                    Debug.LogWarning("PMSDKSkin '" + name + "': could not decode mask: " + full, this);
+                    if (Application.isEditor && !Application.isPlaying) DestroyImmediate(tex); else Destroy(tex);
+                    return;
+                }
+                tex.name = "PMSDKSkin_" + name + "_AlphaMask";
+                tex.wrapMode = TextureWrapMode.Clamp;
+                tex.filterMode = FilterMode.Bilinear;
+                alphaMaskTex = tex;
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("PMSDKSkin '" + name + "': mask load failed (" + ex.Message + ")", this);
+            }
+        }
+
+        private void EnsureWarpMap()
+        {
+            if (loadedWarpMapFile == WarpMapFile) {
+                return;
+            }
+            ReleaseWarpMap();
+            loadedWarpMapFile = WarpMapFile;
+            if (string.IsNullOrEmpty(WarpMapFile)) {
+                return;
+            }
+            int width;
+            int height;
+            Rect rect;
+            float[] rgba;
+            string error;
+            if (!PMSDKWarpMapFile.TryLoad(PMSDKSkinStore.ResolveMaskPath(WarpMapFile), out width, out height, out rect, out rgba, out error)) {
+                Debug.LogWarning("PMSDKSkin '" + name + "': " + error, this);
+                return;
+            }
+            warpMapTex = PMSDKWarpMapFile.CreateTexture(width, height, rgba);
+            warpMapTex.name = "PMSDKSkin_" + name + "_WarpMap";
+            warpMapRect = rect;
+        }
+
+        /// <summary>Forgets the loaded warp map so the file is read again (after it was rewritten).</summary>
+        public void ReloadWarpMap()
+        {
+            ReleaseWarpMap();
+        }
+
+        private void ReleaseWarpMap()
+        {
+            if (warpMapTex != null) {
+                if (Application.isEditor && !Application.isPlaying) {
+                    DestroyImmediate(warpMapTex);
+                } else {
+                    Destroy(warpMapTex);
+                }
+                warpMapTex = null;
+            }
+            loadedWarpMapFile = null;
+        }
+
+        private void ReleaseAlphaMask()
+        {
+            if (alphaMaskTex != null)
+            {
+                if (Application.isEditor && !Application.isPlaying) DestroyImmediate(alphaMaskTex);
+                else Destroy(alphaMaskTex);
+                alphaMaskTex = null;
+            }
+            loadedAlphaMaskPath = null;
         }
 
         private int ComputeVerticesHash()

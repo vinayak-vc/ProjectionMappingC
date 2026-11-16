@@ -22,6 +22,17 @@ namespace vxpmsdk.Components
 
         private void Update()
         {
+            ApplyToNative();
+        }
+
+        /// <summary>
+        /// Push this corner pin into the projector's native warp node. Called from
+        /// <see cref="Update"/> and, because several surfaces (multi-skin) share ONE native
+        /// warp node, also by <see cref="PMSDKMeshWarp"/> immediately before it processes its
+        /// mesh so every mesh is warped with its own corners regardless of Update order.
+        /// </summary>
+        public void ApplyToNative()
+        {
             if (warp == null || warp.Projector == null || warp.Projector.NativeWarpNode == IntPtr.Zero)
                 return;
 

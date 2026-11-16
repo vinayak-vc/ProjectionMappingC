@@ -89,6 +89,7 @@ namespace vxpmsdk.Components
             public string path;              // Texture / RenderTexture / VideoClip asset path
             public string url;               // VideoUrl streaming URL
             public string webcamDeviceName;  // Webcam device — empty = default
+            public string filePath;          // ImageFile absolute disk path
             public bool loop = true;
             public bool mute;
             public double startTime;
@@ -298,7 +299,7 @@ namespace vxpmsdk.Components
             };
         }
 
-        private static DefaultContent CaptureDefaultContent(PMSDKSkinContent content)
+        public static DefaultContent CaptureDefaultContent(PMSDKSkinContent content)
         {
             var dc = new DefaultContent();
             if (content == null) return dc;
@@ -325,6 +326,9 @@ namespace vxpmsdk.Components
                     break;
                 case PMSDKSkinContentMode.Webcam:
                     dc.webcamDeviceName = content.WebcamDeviceName;
+                    break;
+                case PMSDKSkinContentMode.ImageFile:
+                    dc.filePath = content.ImagePath;
                     break;
                 case PMSDKSkinContentMode.Camera:
                 case PMSDKSkinContentMode.ExternalTexture:
@@ -392,6 +396,9 @@ namespace vxpmsdk.Components
                     break;
                 case PMSDKSkinContentMode.Webcam:
                     content.WebcamDeviceName = dc.webcamDeviceName ?? "";
+                    break;
+                case PMSDKSkinContentMode.ImageFile:
+                    content.ImagePath = dc.filePath;
                     break;
                 case PMSDKSkinContentMode.Camera:
                 case PMSDKSkinContentMode.ExternalTexture:

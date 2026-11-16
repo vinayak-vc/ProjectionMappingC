@@ -769,3 +769,45 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
 - [ ] Milestone 19: Plugin SDK
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Code coverage job in CI
+
+## Skin App (single EXE, artist UX) — 2026-11-06
+
+- [x] Image-from-disk content mode (`ImageFile`), JSON round-trip
+- [x] Native Windows open-file dialog wrapper (`PMSDKFileDialog`)
+- [x] Media picker UI (Video/Image/Pattern/Webcam/None, path, Browse, loop/mute)
+- [x] Skin Workspace (editor UX) + Skin Player UI, preview via RT, output camera for Display 2
+- [x] Scene switch Player <-> Editor (F10), shader refs for builds, build menu item
+- [x] Fix shared-warp-node corner-pin ordering bug (D-038); 219/219 EditMode tests
+- [ ] Build the EXE and verify on target PC (videos, 2nd display, first-run seeding)
+- [ ] OS file drag-drop, canvas zoom/pan, numeric vertex entry, webcam device picker
+- [x] Named skin sets: dropdown in Editor and Player, "My skins" list in the Shape Library, New/Copy (2026-11-06)
+- [x] Fix: polygon/freeform skins rendered white (PMSDKSkin never re-cached PMSDKSkinContent) — 2026-11-06
+- [x] Output background colour (swatches + hex) in Editor inspector and Player, shared via background.txt
+
+## SkinGen — photo to skin (2026-11-06)
+
+- [x] Design + D-041 (decisions.md), architecture note
+- [x] `pmsdk::SkinGen` C++ module: load/decode, segmentation (Alpha / ColorKey / GrabCut / ProvidedMask / Auto), speck + hole cleanup, part split + merge, outlines with holes, mask, bounding quad
+- [x] C API `SkinGenAPI.h` (options, extract from file/pixels/memory, accessors, last error)
+- [x] Tests: `tests/SkinGen/SkinGenTests.cpp`, `tests/C_API/SkinGenAPITests.cpp`, fixtures `tests/data/skingen_*.png`
+- [ ] **Build + run the new tests (needs the vcpkg/OpenCV build; not yet compiled on this machine)**
+- [ ] Unity binding: P/Invoke in NativeBindings.cs, `PMSDKSkinFromPhoto` + "Skin from photo" button in the Workspace
+- [ ] Unity mask skin (customAlpha mask in `PMSDK/UnlitWarp`) for quad + mask skins
+- [ ] Optional: camera-calibrated placement (Gray-code mapping) of the photo outline onto the projector
+
+## Skin App: polygon bug + unsupported video flow (2026-11-16)
+
+- [x] Fix: Polygon tool kept adding points to the previous polygon after switching tools / selecting another skin (PickTool and AppendPolygonVertex now finish the old polygon)
+- [x] `PMSDKSkinContent.VideoProblem` event (player error or no start within 10 s)
+- [x] `PMSDKVideoConvertFlow`: prompt -> locate FFmpeg -> (install with progress) -> convert to H.264 MP4 -> switch the skin to the converted copy and save
+- [x] `PMSDKFfmpeg` / `PMSDKFfmpegJob`; installer bat+ps1 (winget first, else checksum-verified download, user PATH only); `--dry-run` mode
+- [x] mkv/flv/mpg/ts/3gp/ogv accepted as video so the converter can fix them; 10 new EditMode tests (229 total)
+- [ ] Real install path (no FFmpeg on a machine) verified only by dry-run + URL/checksum checks, not by a full install
+
+## Skin Editor: Focus view for single-screen mapping (2026-11-16)
+
+- [x] Focus view (F3 / button): viewport fills the window; Surfaces and Inspector become overlay drawers; default when only one display
+- [x] Surfaces / Inspector toggles also collapse the docked panels in the normal layout
+- [x] Output view (F11, was Fullscreen preview): mouse editing works there too, with a key hint
+- [x] Clicks on panels/drawers no longer draw or select on the canvas underneath
+- [ ] C++ SkinGen first compile: configure failed from memory pressure (parallel compiles killed); rerun with VCPKG_MAX_CONCURRENCY=2 while Unity is closed

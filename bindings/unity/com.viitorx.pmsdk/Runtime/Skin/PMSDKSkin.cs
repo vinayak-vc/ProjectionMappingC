@@ -168,7 +168,10 @@ namespace vxpmsdk.Components
             // (e.g. PMSDKSkinLoader in earlier versions) that add PMSDKSkin BEFORE
             // adding PMSDKCornerPin — OnEnable's cache lands null, and without this
             // check SyncQuadDeformation would never push corners.
-            if (meshFilter == null || (IsQuadKind && cornerPin == null)) CacheRefs();
+            // PMSDKSkinContent is usually added AFTER PMSDKSkin, so also re-cache while it is
+            // missing — otherwise polygon/freeform skins never push their content texture
+            // (they render white) because they have no corner pin to trigger the re-cache.
+            if (meshFilter == null || content == null || (IsQuadKind && cornerPin == null)) CacheRefs();
             EnsureMeshForKind(force: false);
             ApplyZOrder();
             SyncQuadDeformation();

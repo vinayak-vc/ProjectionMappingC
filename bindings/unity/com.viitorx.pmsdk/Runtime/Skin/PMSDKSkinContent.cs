@@ -32,6 +32,9 @@ namespace vxpmsdk.Components
         /// <c>PMSDKSkinSpoutIn</c> / <c>PMSDKSkinNdiIn</c> in the Interop asmdefs (available
         /// when Klak Spout / NDI packages are installed), or user code. No owned lifetime.</summary>
         ExternalTexture = 8,
+        /// <summary>An image file (png/jpg) read from an absolute disk path at runtime.
+        /// Works in standalone builds where the file is not a Unity asset.</summary>
+        ImageFile = 9,
     }
 
     /// <summary>
@@ -66,6 +69,8 @@ namespace vxpmsdk.Components
         public string WebcamDeviceName;
         [Tooltip("Arbitrary texture assigned by an adapter (Spout/NDI/etc) or user code.")]
         public Texture ExternalTexture;
+        [Tooltip("Absolute disk path to a png/jpg for ImageFile mode.")]
+        public string ImagePath;
         public PMSDKTestPatternType TestPatternType = PMSDKTestPatternType.Checkerboard;
         [Tooltip("Test-pattern texture resolution (square). Rebuilt when Kind or Size changes.")]
         public int TestPatternSize = 512;
@@ -100,6 +105,17 @@ namespace vxpmsdk.Components
         private RenderTexture ownedCameraRT;
         private WebCamTexture ownedWebcam;
         private Texture2D ownedPatternTex;
+        private Texture2D ownedImageTex;
+        private string loadedImagePath;
+
+        /// <summary>Raised (once per source) when a VideoUrl source cannot be played: the video
+        /// player reported an error, or the file did not start within 10 s. UI can then offer a
+        /// conversion. Arguments: the content and a short reason.</summary>
+        public static event System.Action<PMSDKSkinContent, string> VideoProblem;
+
+        private string reportedVideoSource;
+        private string watchedVideoSource;
+        private float watchedVideoStart;
         // Camera targetTexture restore snapshot — remembered on mode enter, replayed on exit.
         private Camera trackedCamera;
         private RenderTexture prevCameraTarget;
@@ -174,6 +190,67 @@ namespace vxpmsdk.Components
                 case PMSDKSkinContentMode.TestPattern:
                     ApplyTestPatternMode();
                     break;
+
+                case PMSDKSkinContentMode.ImageFile:
+                    ApplyImageFileMode();
+                    break;
+            }
+        }
+
+        private void ApplyImageFileMode()
+        {
+            if (string.IsNullOrEmpty(ImagePath)) {
+                ReleaseOwnedImageTex();
+                CurrentTexture = null;
+                return;
+            }
+            if (ownedImageTex != null && loadedImagePath == ImagePath) {
+                CurrentTexture = ownedImageTex;
+                return;
+            }
+
+            ReleaseOwnedImageTex();
+            loadedImagePath = ImagePath;
+            if (!System.IO.File.Exists(ImagePath)) {
+                Debug.LogWarning("PMSDKSkinContent: image file not found: " + ImagePath, this);
+                CurrentTexture = null;
+                return;
+            }
+            try {
+                byte[] bytes = System.IO.File.ReadAllBytes(ImagePath);
+                Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                if (!tex.LoadImage(bytes, false)) {
+                    Debug.LogWarning("PMSDKSkinContent: could not decode image: " + ImagePath, this);
+                    DestroyTexture(tex);
+                    CurrentTexture = null;
+                    return;
+                }
+                tex.name = "PMSDKSkin_" + name + "_Image";
+                tex.wrapMode = TextureWrapMode.Clamp;
+                tex.filterMode = FilterMode.Bilinear;
+                ownedImageTex = tex;
+                CurrentTexture = ownedImageTex;
+            } catch (System.Exception ex) {
+                Debug.LogWarning("PMSDKSkinContent: image load failed (" + ex.Message + "): " + ImagePath, this);
+                CurrentTexture = null;
+            }
+        }
+
+        private void ReleaseOwnedImageTex()
+        {
+            if (ownedImageTex != null) {
+                DestroyTexture(ownedImageTex);
+                ownedImageTex = null;
+            }
+            loadedImagePath = null;
+        }
+
+        private static void DestroyTexture(Texture2D tex)
+        {
+            if (Application.isEditor && !Application.isPlaying) {
+                DestroyImmediate(tex);
+            } else {
+                Destroy(tex);
             }
         }
 
@@ -205,6 +282,7 @@ namespace vxpmsdk.Components
                 videoPlayer.waitForFirstFrame = true;
                 videoPlayer.skipOnDrop = true;
                 videoPlayer.hideFlags = HideFlags.HideInInspector;
+                videoPlayer.errorReceived += OnVideoPlayerError;
             }
             if (useUrl)
             {
@@ -234,7 +312,42 @@ namespace vxpmsdk.Components
                 videoPlayer.Pause();
             }
 
+            if (useUrl) WatchVideoStart();
             CurrentTexture = ownedVideoRT;
+        }
+
+        private void OnVideoPlayerError(VideoPlayer source, string message)
+        {
+            ReportVideoProblem(string.IsNullOrEmpty(message) ? "The video player reported an error." : message);
+        }
+
+        private void ReportVideoProblem(string message)
+        {
+            string current = Mode == PMSDKSkinContentMode.VideoUrl ? VideoUrl : null;
+            if (string.IsNullOrEmpty(current) || reportedVideoSource == current) return;
+            reportedVideoSource = current;
+            Debug.LogWarning("PMSDKSkinContent: video cannot be played (" + message + "): " + current, this);
+            System.Action<PMSDKSkinContent, string> handler = VideoProblem;
+            if (handler != null) handler(this, message);
+        }
+
+        // A file the platform cannot decode sometimes never errors, it just never prepares.
+        private void WatchVideoStart()
+        {
+            if (!Application.isPlaying || videoPlayer == null) return;
+            if (watchedVideoSource != VideoUrl)
+            {
+                watchedVideoSource = VideoUrl;
+                watchedVideoStart = Time.realtimeSinceStartup;
+                reportedVideoSource = null;
+                return;
+            }
+            if (Play && !videoPlayer.isPrepared && reportedVideoSource != VideoUrl
+                && Time.realtimeSinceStartup - watchedVideoStart > 10f
+                && System.IO.File.Exists(VideoUrl))
+            {
+                ReportVideoProblem("The video did not start within 10 seconds.");
+            }
         }
 
         private static void SetMuted(VideoPlayer vp, bool mute)
@@ -344,6 +457,8 @@ namespace vxpmsdk.Components
             ReleaseOwnedCameraRT();
             ReleaseOwnedWebcam();
             ReleaseOwnedPatternTex();
+            ReleaseOwnedImageTex();
+            watchedVideoSource = null;
             // Do NOT destroy the VideoPlayer here — TeardownAll runs from OnDisable and
             // during mode switches, and Unity blocks "Destroy while GameObject is being
             // activated or deactivated." Leave the component attached and detach its

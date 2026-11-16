@@ -534,3 +534,65 @@ slice editor vs composition) separates them.
 never touch geometry unless they want to. The skin set is a portable artifact — copy the
 JSON to another machine and it works if the physical setup matches. The Skin Editor scene
 becomes the canonical mapping surface. Design: `docs/multi-skin-design.md`.
+
+## D-038 2026-11-06 — Skin App: one EXE, shared JSON, per-surface corner-pin applied before mesh processing
+
+**Decision:** (a) The EXE contains the existing `SkinPlayback` (boot scene) and `SkinEditor`
+scenes; a new code-built UGUI workspace/player replaces the IMGUI HUD. (b) Both modes share
+`persistentDataPath/pmsdk_skinset_default.json`; the Player only rewrites `defaultContent`.
+(c) Media lives outside the project as absolute paths: new `ImageFile` content mode + existing
+`VideoUrl`; file picking via an own comdlg32 wrapper (no third-party package, Windows only).
+(d) `PMSDKMeshWarp.Update` now calls `PMSDKCornerPin.ApplyToNative()` right before processing.
+
+**Why (d):** every skin on a projector shares ONE native warp node. With Unity's interleaved
+Update order each mesh was warped with the previous skin's corners, so the Box (3 faces)
+preset rendered its textures on the wrong faces (reproduced and verified fixed in play mode).
+**How to apply:** any new per-surface native deformation component must push its state
+immediately before its own `process_mesh` call. GridWarp still has the same latent issue.
+
+## D-039 2026-11-06 — Skin sets are named JSON files in persistentDataPath/SkinSets
+**Decision:** The Editor and Player share a library of named sets (`SkinSets/<name>.json`, `active.txt`
+= current). Names are sanitised to letters/digits/space/-/_ (no path escapes). The controller's
+Save/Load now target the active set. The old single `pmsdk_skinset_default.json` is no longer read.
+**Why:** artists need several skin layouts per install and a way to pick one for show.
+**How to apply:** Player switching re-spawns via `PMSDKSkinLoader.SpawnAll` with `OverrideJsonPath`.
+Delete/rename of sets is not built (files can be removed in the folder).
+
+## D-040 2026-11-06 — Output background colour is an app-level setting; Editor never autosaves on quit
+**Decision:** `PMSDKSkinStore.BackgroundColor` (`background.txt`, RRGGBB) drives both the preview and
+the output camera clear colour. The Workspace's save-on-quit is compiled out in the Unity Editor.
+**Why:** a grey wall needs a matching background instead of black; and leaving Play mode in the
+Editor raises OnApplicationQuit, which overwrote the saved set shared with the built EXE.
+**Bug fixed with it:** `PMSDKSkin.Update` now re-caches while `content == null`; polygon/freeform
+skins have no corner pin to trigger the old re-cache, so their video/image was never pushed (white).
+
+## D-041 2026-11-06 — Photo -> skin extraction lives in the C++ SDK (SkinGen module)
+
+**Decision:** New module `pmsdk::SkinGen` (`include/PMSDK/SkinGen/SkinGen.h`, C API
+`PMSDK/C_API/SkinGenAPI.h`). Input: a photo, ideally a PNG with a transparent background (also
+colour-key and GrabCut for ordinary photos, or a caller mask). Output per detected PART of the
+object: pixel mask (cropped), simplified outline polygons with holes, bounding quad. Hosts build
+either a "quad + mask" (corner pin) skin or a polygon skin from it. OpenCV use is allowed in SkinGen
+as well as Calibration (it is already a pmsdk link dependency).
+**Parts:** thick body vs thin appendage via morphological opening (width = `thinPartFraction` of the
+object's short side), then touching small pieces merge (statue + trident -> 2 parts); analysis runs at
+<= 640 px, final masks at full resolution with every pixel in exactly one part.
+**Why:** one implementation for every engine binding; pixel-accurate silhouettes keep holes/thin
+features that a 128-point polygon cannot. **Limits:** a photo only registers with the projector if taken
+from the projector's viewpoint (or after camera->projector mapping); holes need the mask path.
+**Verification note:** algorithm parameters were tuned and cross-checked in Python/OpenCV on the two
+fixture PNGs (`tests/data`); the C++ build + gtest run is tracked in tasks.md.
+
+## D-042 2026-11-16 — Unsupported videos: offer an FFmpeg conversion instead of failing silently
+
+**Decision:** A video the player cannot decode raises `PMSDKSkinContent.VideoProblem`; a modal flow offers
+to convert it to H.264 MP4 (HD <=1920 wide, or Light <=1280) next to the original (`name_pmsdk.mp4`,
+never overwriting; fallback `persistentDataPath/Converted`). FFmpeg is found on PATH, in the registry
+PATH (so a fresh install works without restarting), winget and app-local folders. If missing, the user
+is asked before an installer runs: `winget install Gyan.FFmpeg`, else a download from gyan.dev that is
+SHA-256 checked, copied to `%LOCALAPPDATA%\PMSDKfmpegin` and added to the USER PATH only (no admin).
+**Why:** artists hit mkv/HEVC/ProRes files the platform decoder rejects; converting once is the fix.
+**Safety:** both the conversion and the install need an explicit click; arguments are passed as a list
+(no shell quoting/injection); the original file is never modified; Cancel kills the process tree.
+**Caveat:** the installer downloads ~110 MB and trusts the checksum published by the same host; winget
+(first choice) verifies its own manifest hash.

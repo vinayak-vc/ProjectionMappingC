@@ -43,7 +43,7 @@ namespace vxpmsdk.Components
         /// <summary>Where <see cref="SaveDefault"/> writes; <see cref="LoadDefault"/>
         /// reads. Sits under <see cref="Application.persistentDataPath"/>.</summary>
         public string DefaultSavePath =>
-            Path.Combine(Application.persistentDataPath, "pmsdk_skinset_default.json");
+            PMSDKSkinStore.DefaultPath;
 
         // -------- Phase B: polygon click-to-draw --------
 
@@ -56,6 +56,13 @@ namespace vxpmsdk.Components
         public void AppendPolygonVertex(Vector2 raster)
         {
             raster = PMSDKSkinEditorGeometry.ClampToRaster(raster);
+            // A polygon is only "in progress" while it is the selected skin and nothing else
+            // is being dragged. If the user selected another skin or moved points in between,
+            // finish it so this click starts a NEW polygon.
+            if (drawingPolygonSkin != null && (Selected != drawingPolygonSkin || State != DragState.Idle))
+            {
+                ClosePolygon();
+            }
             if (drawingPolygonSkin == null)
             {
                 Undo.Record(this, "poly-start");

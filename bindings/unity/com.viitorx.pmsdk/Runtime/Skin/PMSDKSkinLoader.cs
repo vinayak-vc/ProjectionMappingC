@@ -278,6 +278,9 @@ namespace vxpmsdk.Components
                 case PMSDKSkinContentMode.Webcam:
                     content.WebcamDeviceName = dc.webcamDeviceName ?? "";
                     break;
+                case PMSDKSkinContentMode.ImageFile:
+                    content.ImagePath = dc.filePath;
+                    break;
                 case PMSDKSkinContentMode.Camera:
                 case PMSDKSkinContentMode.ExternalTexture:
                     // Scene-ref modes — user or a scene-side script provides the ref.

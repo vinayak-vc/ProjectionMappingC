@@ -1,5 +1,74 @@
 # AI Agent Handoff Document
 
+## Skin App: polygon-tool fix + "unsupported video -> convert with FFmpeg" flow (2026-11-16)
+
+**Done, 229/229 EditMode tests, verified in Unity play mode**: (1) Polygon tool no longer extends the
+previous polygon (`PMSDKSkinEditorController.PickTool` closes the polygon in progress when leaving the
+tool; `AppendPolygonVertex` closes a stale one). (2) Unsupported video flow: a test MKV (HEVC 10-bit)
+raised the prompt, converted with the installed FFmpeg, switched the skin to `*_pmsdk.mp4` and saved;
+it played. **New files** (`Runtime/Skin/App/`): `PMSDKFfmpeg.cs`, `PMSDKFfmpegJob.cs`,
+`PMSDKVideoConvertFlow.cs`; test file `Tests/Editor/PMSDKSkinAppTests.cs`. **Changed**:
+`PMSDKSkinContent` (VideoProblem event + 10 s start watchdog), `PMSDKSkinMedia`/`PMSDKFileDialog`
+(more video extensions), Workspace/Player (add the flow, save after a replacement).
+**Not verified**: a real FFmpeg install from scratch (only `--dry-run`, script syntax, and that the
+download/checksum URLs respond). Testing note: Editor play sessions share the EXE's data folder; use a
+scratch skin set (never the user's) when testing.
+**Reminder**: the C++ SkinGen module still needs its first compile (the earlier `cmake --preset vs2022`
+configure failed with exit 4 and has not been investigated yet).
+
+## SkinGen: photo -> skin in the C++ SDK — CODE WRITTEN, NOT YET COMPILED (2026-11-06)
+
+**What**: engine-agnostic extraction of skins from a photo (user's "head start" flow: provide a PNG,
+take the non-transparent pixels, auto-split into parts, produce quad+mask and polygon skins). See D-041.
+**New files**: `include/PMSDK/SkinGen/SkinGen.h`, `src/SkinGen/SkinGen.cpp`,
+`include/PMSDK/C_API/SkinGenAPI.h`, `src/C_API/SkinGenAPI.cpp`, `tests/SkinGen/SkinGenTests.cpp`,
+`tests/C_API/SkinGenAPITests.cpp`, `tests/data/skingen_bronze_statue.png` + `skingen_checker_statue.png`
+(the user's statue renders, downscaled to 1024 px). CMake: `src/CMakeLists.txt`, `tests/CMakeLists.txt`
+(+ `PMSDK_TEST_DATA_DIR`).
+**Verified**: algorithm prototyped/replicated in Python OpenCV on both fixtures: 2 parts each
+(statue body ~0.36-0.50 of image with 3 holes, trident ~0.017-0.029). `thinPartFraction` default 0.05
+(0.04 over-fragments the trident). **NOT verified**: C++ compile and gtest run (no OpenCV C++ build
+on the dev machine; `cmake --preset vs2022` first build is slow). First action for the next agent:
+build and run `pmsdk_tests --gtest_filter=SkinGen*`, fix any compile errors.
+**Next**: Unity binding + Workspace "Skin from photo" button (polygon skins work with today's skin
+system; quad+mask needs a mask path in `PMSDK/UnlitWarp`).
+
+## Skin App (single EXE: Player + Editor, artist UX) — IMPLEMENTED, EXE NOT YET BUILT (2026-11-06)
+
+**Goal**: one standalone EXE that boots into `SkinPlayback` (play the saved skin set; swap
+video/image per skin; no geometry editing) with an "Edit skins" button into `SkinEditor`
+(MadMapper-style workspace). UX only — editing logic untouched. 219/219 EditMode tests green;
+play-mode verified in both scenes (screenshots), **not yet verified in a real built EXE**.
+
+**New files** (`bindings/unity/com.viitorx.pmsdk/Runtime/Skin/App/`): `PMSDKSkinWorkspace`
+(editor UI: top tool bar, left surface list + 18-shape library, centre live preview, right
+inspector + media), `PMSDKSkinPlayerUI` (cards with media pickers, preview, Pause all,
+Fullscreen output F11, Edit F10), `PMSDKSkinMediaPanel` (shared Video/Image/Pattern/Webcam/None
++ path field + Browse + loop/mute), `PMSDKSkinMedia`, `PMSDKSkinStore`, `PMSDKFileDialog`
+(own comdlg32 P/Invoke, Windows only), `PMSDKUi` (code-built UGUI kit/theme),
+`PMSDKSkinOutput` (projector cam -> 16:9 RT preview; clean clone camera -> Display 2;
+fullscreen-preview fallback), `PMSDKSkinApp` (scene switch), `PMSDKShaderRefs` (keeps
+`Shader.Find` shaders in builds). Editor: `Editor/PMSDKSkinAppBuilder.cs` (menu
+`Tools > Projection Mapping > Skins > Build Skin App (Windows EXE)`, scenes passed explicitly:
+Player first, Editor second; does NOT touch EditorBuildSettings/PlayerSettings).
+
+**Modified existing files**: `PMSDKSkinContent` (+`ImageFile` mode, `ImagePath`),
+`PMSDKSkinSetJson` (+`DefaultContent.filePath`; `CaptureDefaultContent` now public),
+`PMSDKSkinLoader` (ImageFile in `ApplyDefaultContent`), `PMSDKSkinEditorInput` (optional
+`ViewportRect` pointer mapping; hotkeys suppressed while typing in a UI field),
+`PMSDKCornerPin`/`PMSDKMeshWarp` (**bug fix**: see D-038).
+
+**Scenes** (nested game repo `Skins/`): `SkinEditor.unity` got `PMSDKSkinWorkspace` +
+`PMSDKShaderRefs` (legacy HUD/Canvas panels auto-disabled); `SkinPlayback.unity` got a
+"PMSDK Skin Player" object (`PMSDKSkinPlayerUI` + `PMSDKShaderRefs`); `PMSDKCalibrationManager`
+disabled in both (auto-enter-on-first-run would hijack the app). Skin set shared via
+`persistentDataPath/pmsdk_skinset_default.json`; Player seeds it from the baked SkinSet on
+first run. Media = absolute paths (not Unity assets).
+
+**Next**: (1) choose output folder and build the EXE; test on the target PC (video codecs, 2nd
+display, `persistentDataPath`). (2) Known gaps: no OS file drag-drop onto the window; canvas
+zoom/pan and numeric vertex entry not built; Webcam device picker is default-device only.
+
 ## Multi-Skin single projector — M-Sk4 v1.9.1 (loader corner-pin sync bugfix) COMPLETE (2026-08-21)
 
 **Fix + regression test, 219/219 EditMode tests green** (218 baseline + 1 new). Live-

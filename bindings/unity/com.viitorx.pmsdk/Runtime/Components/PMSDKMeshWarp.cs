@@ -113,6 +113,14 @@ namespace vxpmsdk.Components
             if (Projector.NativeWarpNode == IntPtr.Zero || nativeInputMesh == IntPtr.Zero)
                 return;
 
+            // The native warp node is shared by every surface on this projector, so apply
+            // THIS surface's corner pin right before processing (see PMSDKCornerPin.ApplyToNative).
+            PMSDKCornerPin ownCornerPin = GetComponent<PMSDKCornerPin>();
+            if (ownCornerPin != null && ownCornerPin.enabled)
+            {
+                ownCornerPin.ApplyToNative();
+            }
+
             // Process warp using native C++ multithreaded backend
             pmsdk_status_t status = NativeBindings.pmsdk_warpnode_process_mesh(
                 Projector.NativeWarpNode, nativeInputMesh, nativeOutputMesh);

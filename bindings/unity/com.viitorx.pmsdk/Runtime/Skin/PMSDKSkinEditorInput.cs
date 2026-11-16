@@ -40,6 +40,13 @@ namespace vxpmsdk.Components
         [Tooltip("When true, all input handling is disabled. Useful for automated tests / demos.")]
         public bool InputEnabled = true;
 
+        [Tooltip("Optional UI rect (a RawImage showing the projector preview). When set, the " +
+                 "pointer is mapped through this rect instead of the projector camera/display.")]
+        public RectTransform ViewportRect;
+
+        [Tooltip("True while a modal UI (dialog / dropdown) covers the viewport.")]
+        public bool PointerBlocked;
+
         private PMSDKSkinEditorController controller;
         private bool pointerHeld;
         private bool freeformStrokeActive;
@@ -49,7 +56,8 @@ namespace vxpmsdk.Components
         private void Update()
         {
             if (!InputEnabled || controller == null) return;
-            HandleKeyboard();
+            // Typing in a UI text field must not trigger single-key hotkeys.
+            if (!PMSDKUi.IsTextFieldFocused()) HandleKeyboard();
             HandleMouse();
         }
 
@@ -193,6 +201,32 @@ namespace vxpmsdk.Components
             }
         }
 
+        /// <summary>Pointer to raster [0..1] (y up) through <see cref="ViewportRect"/>.
+        /// Only while a button is held or the pointer is inside the rect, so a drag that
+        /// leaves the viewport keeps tracking but a click on a side panel never draws.</summary>
+        private bool TryGetPointerRasterFromViewport(out Vector2 raster)
+        {
+            raster = default;
+            if (PointerBlocked) return false;
+            // A click on a panel / drawer / button that overlaps the viewport must not also
+            // draw or select on the canvas underneath (the viewport image itself is not a
+            // raycast target, so only real UI controls count here).
+            UnityEngine.EventSystems.EventSystem es = UnityEngine.EventSystems.EventSystem.current;
+            if (!pointerHeld && es != null && es.IsPointerOverGameObject()) return false;
+            Canvas canvas = ViewportRect.GetComponentInParent<Canvas>();
+            Camera uiCamera = (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                ? canvas.worldCamera : null;
+            Vector2 local;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    ViewportRect, Input.mousePosition, uiCamera, out local)) return false;
+            Rect r = ViewportRect.rect;
+            if (r.width <= 0f || r.height <= 0f) return false;
+            raster = new Vector2((local.x - r.xMin) / r.width, (local.y - r.yMin) / r.height);
+            bool inside = raster.x >= 0f && raster.x <= 1f && raster.y >= 0f && raster.y <= 1f;
+            if (!inside && !pointerHeld) return false;
+            return true;
+        }
+
         /// <summary>
         /// Convert the current mouse position to normalized raster coords [0..1] on the
         /// projector's viewport, y-UP. Returns false if the pointer isn't over the
@@ -202,6 +236,7 @@ namespace vxpmsdk.Components
         private bool TryGetPointerRaster(out Vector2 raster)
         {
             raster = default;
+            if (ViewportRect != null) return TryGetPointerRasterFromViewport(out raster);
             if (controller.Projector == null) return false;
             var cam = controller.Projector.GetComponent<Camera>();
             if (cam == null) return false;

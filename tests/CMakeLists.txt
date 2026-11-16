@@ -44,6 +44,8 @@ add_executable(pmsdk_tests
     C_API/WarpAPITests.cpp
     C_API/CalibrationAPITests.cpp
     C_API/DecoderTests.cpp
+    SkinGen/SkinGenTests.cpp
+    C_API/SkinGenAPITests.cpp
     Warp/DeformationFieldEdgeTests.cpp
     Serialization/ErrorHandlingTests.cpp
     # Internal (non-exported) code under test is compiled into the test binary
@@ -63,6 +65,9 @@ target_link_libraries(pmsdk_tests
         GTest::gtest_main
         ${OpenCV_LIBS}
 )
+
+# Photo -> skin fixtures (SkinGen tests).
+target_compile_definitions(pmsdk_tests PRIVATE PMSDK_TEST_DATA_DIR="${PROJECT_SOURCE_DIR}/tests/data")
 
 target_compile_features(pmsdk_tests PRIVATE cxx_std_20)
 if(MSVC)

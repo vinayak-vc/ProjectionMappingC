@@ -94,6 +94,9 @@ namespace vxpmsdk.Components
 
         public void PickTool(Tool t)
         {
+            // Leaving the Polygon tool finishes the polygon being drawn. Otherwise coming
+            // back to the tool would keep adding points to that old polygon.
+            if (t != Tool.Polygon) ClosePolygon();
             CurrentTool = t;
             UpdateStatus();
         }

@@ -53,6 +53,13 @@ if(HOLOTRACK_BUILD)
     add_subdirectory(holotrack)
 endif()
 
+# PMSDKOakCamera — optional OAK-D colour-frame plugin for camera calibration (D-044). OFF by default:
+# it needs an external depthai-core v2.x package (pass CMAKE_PREFIX_PATH), see oakcam/CMakeLists.txt.
+option(PMSDK_OAKCAM_BUILD "Build the PMSDKOakCamera plugin (requires DepthAI)" OFF)
+if(PMSDK_OAKCAM_BUILD)
+    add_subdirectory(oakcam)
+endif()
+
 find_package(Python COMPONENTS Interpreter REQUIRED)
 add_custom_target(package_sdk
     COMMAND ${Python_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/package_release.py

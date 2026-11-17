@@ -57,6 +57,84 @@ namespace vxpmsdk.Components
             return h;
         }
 
+        /// <summary>
+        /// Like <see cref="Fit"/> but with Hartley normalisation (both point sets moved to their
+        /// centroid and scaled to a mean distance of sqrt 2 before fitting), which keeps the normal
+        /// equations well conditioned when the two sets have very different scales (camera pixels
+        /// against UV / raster units).
+        /// </summary>
+        public static PMSDKHomography FitNormalized(IReadOnlyList<Vector2> src, IReadOnlyList<Vector2> dst)
+        {
+            int n = Mathf.Min(src.Count, dst.Count);
+            PMSDKHomography result = new PMSDKHomography();
+            if (n < 4) {
+                result.Valid = false;
+                return result;
+            }
+            double[] ts = NormalizationOf(src, n);
+            double[] td = NormalizationOf(dst, n);
+            List<Vector2> ns = new List<Vector2>(n);
+            List<Vector2> nd = new List<Vector2>(n);
+            for (int i = 0; i < n; i++) {
+                ns.Add(new Vector2((float)((src[i].x - ts[0]) * ts[2]), (float)((src[i].y - ts[1]) * ts[2])));
+                nd.Add(new Vector2((float)((dst[i].x - td[0]) * td[2]), (float)((dst[i].y - td[1]) * td[2])));
+            }
+            PMSDKHomography normalized = Fit(ns, nd);
+            if (!normalized.Valid) {
+                result.Valid = false;
+                return result;
+            }
+            // H = Td^-1 * Hn * Ts with Ts = [s 0 -s*cx; 0 s -s*cy; 0 0 1], Td^-1 = [1/s' 0 cx'; 0 1/s' cy'; 0 0 1].
+            double[] hn = { normalized.H[0], normalized.H[1], normalized.H[2], normalized.H[3], normalized.H[4], normalized.H[5],
+                            normalized.H[6], normalized.H[7], 1.0 };
+            double s = ts[2];
+            double[] tsm = { s, 0.0, -s * ts[0], 0.0, s, -s * ts[1], 0.0, 0.0, 1.0 };
+            double[] tdi = { 1.0 / td[2], 0.0, td[0], 0.0, 1.0 / td[2], td[1], 0.0, 0.0, 1.0 };
+            double[] full = Multiply3(tdi, Multiply3(hn, tsm));
+            if (System.Math.Abs(full[8]) < 1e-15) {
+                result.Valid = false;
+                return result;
+            }
+            for (int i = 0; i < 8; i++) {
+                result.H[i] = full[i] / full[8];
+            }
+            result.Valid = true;
+            return result;
+        }
+
+        // centroid x, centroid y, scale (so the mean distance from the centroid becomes sqrt 2)
+        private static double[] NormalizationOf(IReadOnlyList<Vector2> points, int n)
+        {
+            double cx = 0.0;
+            double cy = 0.0;
+            for (int i = 0; i < n; i++) {
+                cx += points[i].x;
+                cy += points[i].y;
+            }
+            cx /= n;
+            cy /= n;
+            double meanDistance = 0.0;
+            for (int i = 0; i < n; i++) {
+                double dx = points[i].x - cx;
+                double dy = points[i].y - cy;
+                meanDistance += System.Math.Sqrt(dx * dx + dy * dy);
+            }
+            meanDistance /= n;
+            double scale = meanDistance > 1e-12 ? System.Math.Sqrt(2.0) / meanDistance : 1.0;
+            return new double[] { cx, cy, scale };
+        }
+
+        private static double[] Multiply3(double[] a, double[] b)
+        {
+            double[] r = new double[9];
+            for (int row = 0; row < 3; row++) {
+                for (int col = 0; col < 3; col++) {
+                    r[row * 3 + col] = a[row * 3] * b[col] + a[row * 3 + 1] * b[3 + col] + a[row * 3 + 2] * b[6 + col];
+                }
+            }
+            return r;
+        }
+
         public Vector2 Apply(Vector2 p)
         {
             double w = H[6] * p.x + H[7] * p.y + 1.0;

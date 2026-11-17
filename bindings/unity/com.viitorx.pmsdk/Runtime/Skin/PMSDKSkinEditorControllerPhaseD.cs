@@ -1,0 +1,281 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace vxpmsdk.Components
+{
+    /// <summary>
+    /// M-Sk4 polish additions to <see cref="PMSDKSkinEditorController"/>: multi-select,
+    /// group nudge, snap-to-grid + alignment guides, visibility toggle. Split into a
+    /// partial file for the same reason as Phase B/C — keeps the older state machine
+    /// files reviewable in isolation.
+    /// </summary>
+    public partial class PMSDKSkinEditorController
+    {
+        // ---- Snap config ----
+
+        [Header("M-Sk4 — snap + multi-select")]
+        [Tooltip("Snap corner drags to this raster-space grid step. 0 = off.")]
+        public float SnapGridStep = 0f;
+        [Tooltip("Raster-space tolerance for snapping to a grid line.")]
+        public float SnapGridTolerance = 0.01f;
+        [Tooltip("Also snap to other skins' vertex X/Y coords (alignment). 0 = off.")]
+        public float SnapAlignTolerance = 0.008f;
+
+        /// <summary>Latest snap-guide state — read by the overlay to render dashed lines
+        /// while a corner drag is snapping. Cleared on pointer-up.</summary>
+        public PMSDKSkinEditorSnapGuides SnapGuides;
+
+        // ---- Multi-select ----
+
+        /// <summary>Additional selected skin indices (beyond <see cref="SelectedSkinIndex"/>).
+        /// A skin is "in the group" if it's either the primary or is in this set.</summary>
+        public readonly HashSet<int> MultiSelectedIndices = new HashSet<int>();
+
+        public bool IsInSelectionGroup(int index) =>
+            index == SelectedSkinIndex || MultiSelectedIndices.Contains(index);
+
+        public int SelectionGroupCount =>
+            (SelectedSkinIndex >= 0 ? 1 : 0) + MultiSelectedIndices.Count;
+
+        /// <summary>Add a skin to the multi-select group. If it's already the primary,
+        /// no-op. Callers guarantee <paramref name="index"/> is valid.</summary>
+        public void AddToSelection(int index)
+        {
+            if (index < 0 || index >= Skins.Count) return;
+            if (index == SelectedSkinIndex) return;
+            MultiSelectedIndices.Add(index);
+        }
+
+        public void RemoveFromSelection(int index)
+        {
+            MultiSelectedIndices.Remove(index);
+        }
+
+        /// <summary>Toggle <paramref name="index"/> in the multi-select set (used by
+        /// Ctrl+click). Does not touch <see cref="SelectedSkinIndex"/>.</summary>
+        public void ToggleInSelection(int index)
+        {
+            if (index < 0 || index >= Skins.Count) return;
+            if (index == SelectedSkinIndex)
+            {
+                // Ctrl+click on the primary removes it from the group entirely — promote
+                // any remaining multi-select to primary, or clear.
+                if (MultiSelectedIndices.Count > 0)
+                {
+                    var iter = MultiSelectedIndices.GetEnumerator();
+                    iter.MoveNext();
+                    int newPrimary = iter.Current;
+                    MultiSelectedIndices.Remove(newPrimary);
+                    SelectedSkinIndex = newPrimary;
+                }
+                else
+                {
+                    SelectedSkinIndex = -1;
+                }
+                UpdateStatus();
+                return;
+            }
+            if (!MultiSelectedIndices.Add(index)) MultiSelectedIndices.Remove(index);
+            UpdateStatus();
+        }
+
+        public void ClearMultiSelection()
+        {
+            MultiSelectedIndices.Clear();
+            UpdateStatus();
+        }
+
+        /// <summary>Group nudge: move the same-index corner across every selected skin
+        /// (primary + multi-select) by <paramref name="delta"/>. Falls back to single-corner
+        /// nudge when the group is empty.</summary>
+        public void NudgeSelectedGroup(Vector2 delta)
+        {
+            if (MultiSelectedIndices.Count == 0)
+            {
+                NudgeSelectedCorner(delta);
+                return;
+            }
+
+            Undo.Record(this, "nudge");
+            if (SelectedSkinIndex >= 0) NudgeSkinCorner(Skins[SelectedSkinIndex], delta);
+            foreach (var i in MultiSelectedIndices)
+            {
+                if (i >= 0 && i < Skins.Count) NudgeSkinCorner(Skins[i], delta);
+            }
+        }
+
+        private void NudgeSkinCorner(PMSDKSkin s, Vector2 delta)
+        {
+            if (s == null || s.Vertices == null) return;
+            int idx = Mathf.Clamp(SelectedCornerIndex, 0, s.Vertices.Count - 1);
+            if (idx < 0 || idx >= s.Vertices.Count) return;
+            s.Vertices[idx] = PMSDKSkinEditorGeometry.ClampToRaster(s.Vertices[idx] + delta);
+        }
+
+        // ---- Presets (M-Sk4 v1.6) ----
+
+        /// <summary>
+        /// Apply a <see cref="PMSDKSkinPresets.Preset"/> — spawn one skin per
+        /// <see cref="PMSDKSkinPresets.SkinDef"/>. When <paramref name="replaceExisting"/>
+        /// is true (default), all existing skins under this controller are destroyed
+        /// first, matching the "start from a fresh template" workflow users expect
+        /// when picking a new preset. Records a single "preset" undo entry.
+        /// </summary>
+        public void ApplyPreset(PMSDKSkinPresets.Preset preset, bool replaceExisting = true)
+        {
+            Undo.Record(this, "preset");
+
+            if (replaceExisting)
+            {
+                RefreshSkinList();
+                for (int i = Skins.Count - 1; i >= 0; i--)
+                {
+                    var s = Skins[i];
+                    if (s == null) continue;
+                    if (Application.isEditor && !Application.isPlaying) DestroyImmediate(s.gameObject);
+                    else Destroy(s.gameObject);
+                }
+                RefreshSkinList();
+            }
+
+            if (preset.Skins == null) return;
+
+            // Spawn in order: index 0 first (bottom of stack), last on top. ZOrder
+            // scales so the FIRST spawned ends up rendered BEHIND the LAST. Match
+            // the RefreshSkinList ZOrder-descending sort: last skin needs highest ZOrder.
+            var spawnedInOrder = new List<PMSDKSkin>();
+            for (int i = 0; i < preset.Skins.Length; i++)
+            {
+                var def = preset.Skins[i];
+                var skin = SpawnSkinFromSnapshot(
+                    def.Kind,
+                    def.Vertices != null ? new List<Vector2>(def.Vertices) : new List<Vector2>(),
+                    System.Guid.NewGuid().ToString("N").Substring(0, 8),
+                    string.IsNullOrEmpty(def.Name) ? $"{preset.Id}_{i}" : def.Name);
+                if (skin != null)
+                {
+                    skin.ZOrder = i; // last spawned = highest z = top of visual stack
+                    spawnedInOrder.Add(skin);
+                }
+            }
+
+            RefreshSkinList();
+            if (spawnedInOrder.Count > 0)
+            {
+                // Select the topmost (last spawned) so the inspector points at
+                // something visible.
+                SelectedSkinIndex = Skins.IndexOf(spawnedInOrder[spawnedInOrder.Count - 1]);
+                SelectedCornerIndex = 0;
+            }
+            UpdateStatus();
+        }
+
+        /// <summary>Convenience: look up + apply by <see cref="PMSDKSkinPresets.Preset.Id"/>.</summary>
+        public bool ApplyPresetById(string id, bool replaceExisting = true)
+        {
+            if (!PMSDKSkinPresets.TryFind(id, out var preset)) return false;
+            ApplyPreset(preset, replaceExisting);
+            return true;
+        }
+
+        // ---- Reorder (M-Sk4 v1.5) ----
+
+        /// <summary>
+        /// Move <paramref name="skin"/> to a specific slot in the skin list, rewriting
+        /// every skin's z-order so the resulting sort places it at
+        /// <paramref name="targetIndex"/>. Index 0 is the top of the stack (highest
+        /// ZOrder, drawn in front). Used by the UGUI skin list's drag-reorder.
+        /// </summary>
+        public void MoveSkinToIndex(PMSDKSkin skin, int targetIndex)
+        {
+            if (skin == null) return;
+            RefreshSkinList();
+            int currentIndex = Skins.IndexOf(skin);
+            if (currentIndex < 0) return;
+            targetIndex = Mathf.Clamp(targetIndex, 0, Skins.Count - 1);
+            if (currentIndex == targetIndex) return;
+
+            Undo.Record(this, "reorder");
+            var reordered = new List<PMSDKSkin>(Skins);
+            reordered.RemoveAt(currentIndex);
+            reordered.Insert(targetIndex, skin);
+            // Skins[0] is topmost after ZOrder desc sort — assign so higher list index
+            // maps to lower ZOrder.
+            for (int i = 0; i < reordered.Count; i++)
+            {
+                if (reordered[i] != null) reordered[i].ZOrder = reordered.Count - i;
+            }
+            RefreshSkinList();
+            SelectedSkinIndex = Skins.IndexOf(skin);
+            UpdateStatus();
+        }
+
+        // ---- Visibility toggle ----
+
+        /// <summary>Toggle a skin's <see cref="MeshRenderer"/> — hide/show without touching
+        /// solo/mute state. HUD calls this from the eyeball button in each list row.</summary>
+        public void ToggleVisibilitySelected()
+        {
+            var s = Selected;
+            if (s == null) return;
+            var mr = s.GetComponent<MeshRenderer>();
+            if (mr == null) return;
+            Undo.Record(this, "visibility");
+            mr.enabled = !mr.enabled;
+        }
+
+        public void SetSkinVisibility(PMSDKSkin s, bool visible)
+        {
+            if (s == null) return;
+            var mr = s.GetComponent<MeshRenderer>();
+            if (mr != null && mr.enabled != visible)
+            {
+                Undo.Record(this, "visibility");
+                mr.enabled = visible;
+            }
+        }
+
+        public bool IsVisible(PMSDKSkin s)
+        {
+            if (s == null) return false;
+            var mr = s.GetComponent<MeshRenderer>();
+            return mr != null && mr.enabled;
+        }
+
+        // ---- Snap application (called from Phase A's OnPointerDrag corner-drag branch) ----
+
+        /// <summary>Apply grid + alignment snap to a raster-space target during a corner
+        /// drag. Updates <see cref="SnapGuides"/> so the overlay can draw dashed lines.</summary>
+        internal Vector2 ApplySnaps(Vector2 target, PMSDKSkin dragged)
+        {
+            SnapGuides.Clear();
+            Vector2 v = PMSDKSkinEditorGeometry.ClampToRaster(target);
+
+            // Grid snap first (independent of other skins).
+            if (SnapGridStep > 0f)
+            {
+                v = PMSDKSkinEditorSnap.SnapToGrid(v, SnapGridStep, SnapGridTolerance);
+            }
+
+            // Then vertex-alignment snap (only if snap radius > 0).
+            if (SnapAlignTolerance > 0f)
+            {
+                var candidates = PMSDKSkinEditorSnap.CollectVertices(Skins, dragged);
+                var snapped = PMSDKSkinEditorSnap.SnapToVertices(
+                    v, candidates, SnapAlignTolerance,
+                    out bool sx, out bool sy, out float lx, out float ly);
+                if (sx) { SnapGuides.XActive = true; SnapGuides.XLine = lx; }
+                if (sy) { SnapGuides.YActive = true; SnapGuides.YLine = ly; }
+                v = snapped;
+            }
+
+            return v;
+        }
+
+        /// <summary>Called from Phase A's OnPointerUp so the overlay stops drawing guides.</summary>
+        internal void ClearSnapGuides()
+        {
+            SnapGuides.Clear();
+        }
+    }
+}

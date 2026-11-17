@@ -103,3 +103,18 @@ DepthAI note (2026-07-22, D-033): the pinned vcpkg baseline does not contain a `
 `HOLOTRACK_WITH_DEPTHAI=ON` now resolves Luxonis DepthAI through `find_package(depthai CONFIG)`
 from an external install by default; vcpkg resolution is opt-in with
 `HOLOTRACK_DEPTHAI_USE_VCPKG=ON` for machines that provide a custom/updated port.
+
+## Post-1.0 — Multi-Skin single projector (started 2026-08-20)
+
+One projector, N independent content regions ("skins"). Design:
+`docs/multi-skin-design.md`; decisions D-036, D-037. Native SDK unchanged for v1 —
+Unity-side extension of the raster-space rig with `PMSDKSkin` per region; authored in a
+dedicated Skin Editor scene; played back via `PMSDKSkinLoader` in any scene.
+
+| Phase | Scope | Status |
+|---|---|---|
+| M-Sk1 | Foundation — components, shape primitives, shader mask, v1 content sources | pending |
+| M-Sk2 | Skin Editor scene + drawing tools + save/export | pending |
+| M-Sk2.5 | `PMSDKSkinSet` persistence + `PMSDKSkinLoader` playback | pending |
+| M-Sk3 | Content sources v1.1 (Camera, VideoUrl, Spout, NDI, Webcam) | pending |
+| M-Sk4 | Polish (duplicate/reorder, drag-drop files, per-edge mask, snap/guides) | pending |

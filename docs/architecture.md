@@ -8,7 +8,7 @@
             +---------------------------+
             |       Serialization       |  project files (JSON/binary)
             +---------------------------+
-            | Projection | Warp | Blend | Calibration
+            | Projection | Warp | Blend | Calibration | SkinGen
             +---------------------------+
             |         Geometry          |  mesh, spatial structures, curves
             +---------------------------+
@@ -25,7 +25,7 @@ Rules:
 - Feature modules (Projection/Warp/Blend/Calibration) may use Geometry, Math, Core,
   Utilities — never each other (coordination happens above, in Serialization/CAPI layer
   or the host app).
-- OpenCV is confined to Calibration. GLM/spdlog/nlohmann-json usage stays internal —
+- OpenCV is confined to Calibration and SkinGen (photo -> skin, D-041). GLM/spdlog/nlohmann-json usage stays internal —
   never in public headers (headers expose only std types and PMSDK types).
 
 ## ABI / API strategy

@@ -581,6 +581,185 @@ plain 2D webcam our existing path opens (gains nothing over the C270 — depth u
 "auto-align onto true 3D geometry via native stereo triangulation" — this supersedes and
 scopes it, with the OAK-D as the reference sensor.
 
+## Multi-Skin single projector (PLANNED — 2026-08-20)
+
+Design: `docs/multi-skin-design.md`; decisions D-036 (multi-skin architecture) + D-037 (skin
+editor scene + `PMSDKSkinSet` asset). Skin = one content region on one projector; a
+projector may host many skins; each has its own shape (rect/ellipse/polygon/freeform),
+geometry, mask, color, opacity, and content source. Authoring in a dedicated Skin Editor
+scene; playback via `PMSDKSkinLoader` in any content scene. Native SDK unchanged for v1
+(quad skins reuse `PerspectiveWarp`; polygon skins are regenerated Unity meshes).
+
+### M-Sk1 — Foundation
+- [x] `PMSDKSkin` + `PMSDKSkinContent` components (SkinShape folded into `PMSDKSkin` as
+      `Kind`/`Vertices`/`SoftMask` fields — no separate MonoBehaviour, less inspector noise).
+- [x] Rectangle + Ellipse (quad + shader mask) using existing `PMSDKCornerPin`.
+- [x] Polygon (Unity mesh regen, ear-clip triangulation, bounding-box UVs;
+      `PMSDKSkinMeshBuilder`; caps 32 polygon / 128 freeform).
+- [x] `PMSDK/UnlitWarp` extensions (`_ShapeMask`, `_MaskFeather`, `_Opacity`). Ellipse mask
+      uses raw mesh UV so `PMSDKOutputTransform` doesn't rotate it.
+- [x] Content sources: `Texture`, `RenderTexture`, `VideoClip`, `TestPattern`.
+- [x] Editor menu (`Tools > Projection Mapping > Skins > Add Skin > {Rectangle, Ellipse,
+      Polygon, Freeform}`). "Convert Projector to Multi-Skin" is a stub in v1 (a projector
+      already tolerates sibling skins; M-Sk2 strips the classic split-slice material).
+- [x] Unit tests written and **passing**: `PMSDKSkinMeshBuilderTests` (13) +
+      `PMSDKSkinTests` (12) = **25/25 green**; pre-existing suites still **38/38** (no
+      regressions). Total EditMode 63/63. Test discovery unblocked by dropping the
+      redundant `UNITY_INCLUDE_TESTS` define constraint from
+      `Tests/Editor/vxpmsdk.Tests.Editor.asmdef` — `includePlatforms: ["Editor"]` already
+      keeps tests Editor-only.
+
+### M-Sk2 — Skin Editor scene
+
+Phase A (drawing engine, done 2026-08-20; 24/24 new tests green, 87/87 total EditMode):
+- [x] `PMSDKSkinEditorController` — pointer state machine + tool + selection + skin list.
+- [x] `PMSDKSkinEditorInput` — keyboard + mouse polling, multi-display routing via
+      `Display.RelativeMouseAt`.
+- [x] `PMSDKSkinEditorOverlay` — GL immediate-mode outlines + corner handles on the
+      projector camera in `OnRenderObject`.
+- [x] `PMSDKSkinEditorGeometry` — pure static helpers (pick corner/edge, point-in-polygon
+      / -ellipse, build-rect-from-drag).
+- [x] `PMSDKSkinEditorHUD` — IMGUI status line + F1 help.
+- [x] `SkinEditorOverlay.shader` — trivial vertex-color line/quad shader for GL.
+- [x] Draw new rectangle/ellipse via mouse-drag on canvas with `R`/`E` tools.
+- [x] Drag corner / drag edge midpoint (both adjacent verts move together) on any skin.
+- [x] Arrow-key nudge (Shift=fine, Ctrl=coarse); PgUp/PgDn cycle skins; Tab cycle corners.
+- [x] Add default shape (`N`); Delete (`Del`/`Backspace`).
+- [x] `Tools > Projection Mapping > Skins > Generate Skin Editor Scene` — writes
+      `Assets/PMSDKDemo/SkinEditor.unity` with the full editor rig.
+- [x] Bug fix: `PMSDKSkinMeshBuilder` was omitting mesh normals; `PMSDKMeshWarp` reads
+      `normals[i]` unconditionally and would crash any Rectangle/Ellipse skin at runtime.
+      Now explicit -Z normals per vertex.
+
+Phase B (drawing polish + editor UI, done 2026-08-20; 24 new tests green):
+- [x] Polygon click-to-draw (`P` tool; click adds vertex, Enter or near-start click closes).
+- [x] Freeform stroke-to-draw (`F` tool; drag traces points at `FreeformSampleSpacing`,
+      release closes; <3 verts cancels).
+- [x] Insert / remove polygon vertex (`+` / `-` on selected corner's edge / at that corner;
+      respects min-3-verts floor; rectangle/ellipse no-op).
+- [x] `Ctrl+D` duplicate (offsets by +0.02, new SkinId); `[` / `]` z-order back / forward.
+- [x] `X` solo (mutes every other MeshRenderer); `Shift+X` unmute all.
+- [x] `Y` / `Shift+Y` cycles the selected skin's test pattern via `PMSDKSkinContent`.
+- [x] Extended IMGUI HUD: tool toolbar with active-highlight, skin list (click to select,
+      muted glyph), skin inspector (name field, opacity/feather sliders, z-order
+      back/fwd + duplicate + solo + pattern-cycle + delete). Canvas-based polish is a
+      later refinement, not blocking.
+
+Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
+- [x] Undo/redo with coalesced groups (0.7s window, depth cap 100). Every mutating op
+      records before mutating: draw-rect / corner-drag / edge-drag / add-default / delete /
+      duplicate / poly-start / freeform-start / vertex-insert / vertex-remove / zorder /
+      solo / unmute / pattern-cycle / nudge / load.
+- [x] `Ctrl+S` save / `Ctrl+L` load — atomic write via `<path>.tmp` + move; default path
+      `Application.persistentDataPath/pmsdk_skinset_default.json`.
+- [x] `PMSDKSkinSetJson` — JsonUtility-based round-trip. Reconciles on `SkinId` (in-place
+      update, spawn missing, destroy removed).
+- [ ] UPM `Samples~/SkinEditor/` — deferred. Local generator already provides the scene;
+      the UPM sample would be redundant. Revisit if a UPM-first distribution becomes
+      relevant.
+
+### M-Sk2.5 — Persistence + playback (done 2026-08-20; 12 new tests + 123/123 total green)
+- [x] `PMSDKSkinSet` ScriptableObject wrapping `PMSDKSkinSetJson.Set`. Methods: capture from
+      controller, JSON round-trip, atomic save-to-file (.tmp + move), load-from-file,
+      sidecar reload.
+- [x] `PMSDKSkinLoader` + `PMSDKSkinBindings` runtime path. Loader precedence: CLI
+      `-skinset <path>` > `OverrideJsonPath` > SkinSet sidecar > SkinSet in-memory `Data`.
+      Loader is idempotent (safe re-invoke) with `DespawnAll` for cleanup.
+- [x] `defaultContent` auto-binding fallback. Bindings ALWAYS beat defaults, per-skin by
+      SkinId. Modes covered: Texture / RenderTexture / VideoClip (+ Loop/Mute/StartTime/Rate).
+- [x] Extended JSON schema with `warp`, `mask`, `transform`, `color`, `defaultContent` per
+      design doc. Version field present for future canonical-tuple migration.
+- [x] Editor menus: `Tools > Projection Mapping > Skins > Save Skin Set…` (writes .asset +
+      .json sidecar), `Load Skin Set…` (accepts either), `New Empty Skin Set Asset…`.
+- Content authors' workflow now works end-to-end (author once, load in any scene).
+
+### M-Sk3 — Content sources v1.1 (done 2026-08-20; 13 new tests + 136/136 total green)
+- [x] `Camera` source — per-skin Unity camera → owned RT, restores camera's prior
+      `targetTexture` on mode switch / disable.
+- [x] `VideoUrl` streaming source — VideoPlayer.source = Url + reuses owned video RT
+      + Loop/Mute/StartTime/PlaybackRate.
+- [x] `Webcam` source — owns a `WebCamTexture`; EditMode allocates without calling
+      `.Play()` to avoid keeping the device open across domain reloads.
+- [x] `ExternalTexture` mode + per-skin adapters `PMSDKSkinSpoutIn` (Interop/Spout,
+      Klak.Spout receiver) and `PMSDKSkinNdiIn` (Interop/Ndi, Klak.Ndi receiver). Both
+      auto-configure their receiver on enable, force ExternalTexture mode, and restore
+      prior Mode on disable.
+- [x] JSON schema extended: `defaultContent.url` (VideoUrl) and
+      `defaultContent.webcamDeviceName` (Webcam) survive round-trip. Camera and
+      ExternalTexture preserve mode only (scene refs re-wired at load time).
+- [x] `PMSDKSkinBindings.Binding` + `Apply` switch cover all four new modes.
+
+### M-Sk4 — Polish (done 2026-08-20; 16 new tests + 152/152 total green)
+- [x] Duplicate (Ctrl+D, already in M-Sk2 B); reorder via up/down arrows in each skin
+      list row + `[` / `]` shortcut (M-Sk2 B). Row also gets a visibility toggle (o/-).
+- [x] Snap-to-grid: toolbar cycles OFF → 0.05 → 0.10 → OFF; applied inside the corner
+      drag path. Snap-to-other-vertices (alignment guides): dashed magenta lines span
+      the canvas while a drag is snapping to another skin's vertex X/Y.
+- [x] Multi-select (Ctrl or Shift + click on the projector canvas toggles the hit skin
+      in `MultiSelectedIndices`); group nudge (arrow keys move the same-index corner
+      across every selected skin at once). Multi-selected skins render in cyan in the
+      overlay.
+- [x] Per-skin visibility toggle (`SetSkinVisibility` + `ToggleVisibilitySelected`;
+      row button in HUD). Independent of solo/mute.
+- [x] Per-edge soft mask UI + shader (M-Sk4 v1.2, done 2026-08-20; 6 new tests + 158/158
+      total green). Shader gains `_MaskFeather4 (T,R,B,L)` with a per-pixel weighted
+      formula. `PMSDKSkin.PerEdgeFeatherEnabled` + `EdgeFeather` (Vector4). Scalar
+      fallback tiled across all four channels keeps back-compat. Ellipse-only in the HUD
+      (the only shape whose shader has a mask). JSON populates `mask.perEdgeFeather`
+      when enabled; absent otherwise — legacy files load as scalar.
+- [x] Drag-and-drop file assignment (M-Sk4 v1.3, done 2026-08-20; 10 new tests + 168/168
+      total green). Editor-only (guarded by `#if UNITY_EDITOR`). Skin list rows +
+      inspector drop zone accept OS file drops (image → Texture via `LoadImage`, video
+      → VideoUrl file:// URI, .json → controller `LoadFrom`) and Project-window asset
+      drops (Texture/RT/VideoClip/PMSDKSkinSet). Utility `PMSDKSkinDragDrop` with pure
+      `KindForPath` / `ApplyPath` (runtime-safe) + Editor-only `ApplyObject`.
+      Standalone play-mode file drops still need a native plugin — deferred.
+- [x] Canvas-based inspector (M-Sk4 v1.4, done 2026-08-20; 11 new tests + 179/179 total
+      green). New `PMSDKSkinEditorCanvasInspector` component builds a full UGUI Canvas
+      + right-aligned panel on Display 1 (Text/InputField/Slider/Toggle/Button; legacy
+      UGUI — no TMP). Auto-hides the sibling IMGUI HUD's inspector while active
+      (`PMSDKSkinEditorHUD.DrawInspector`). Attached by default in the generated Skin
+      Editor scene.
+- [x] UGUI Canvas skin list + drag-reorder (M-Sk4 v1.5, done 2026-08-20; 8 new tests +
+      187/187 total green). New `PMSDKSkinEditorCanvasList` component builds a left-side
+      Canvas panel with a `VerticalLayoutGroup` of rows. Each row implements
+      `IBeginDrag/IDrag/IEndDrag` — drag reorders the hierarchy live, drop commits via
+      `PMSDKSkinEditorController.MoveSkinToIndex(skin, targetIndex)` (rewrites every
+      skin's z-order so the sort matches the drop position, records an Undo entry).
+      Auto-hides the sibling IMGUI list (`PMSDKSkinEditorHUD.DrawList`). Attached by
+      default in the generated Skin Editor scene.
+- [x] Preset catalog — 10 iconic projection-mapping targets (M-Sk4 v1.6, done
+      2026-08-20; 18 new tests + 205/205 total green). `PMSDKSkinPresets.All` +
+      `PMSDKSkinEditorController.ApplyPreset` / `ApplyPresetById`. Menu items under
+      `Tools > Projection Mapping > Skins > Presets`. Shipping presets: Single
+      Rectangle, **Box: 3 Faces Isometric ★**, Box: 2 Faces, Column/Cylinder (3
+      strips), Triangular Prism, Facade Grid 3×2, Arch/Tunnel, Dome/Sphere, Star
+      (5-point), Diorama Stage. Each preset spawns configured skins with correct
+      z-order stack; records a single Undo entry; Replace / Add-alongside / Cancel
+      prompt in the Editor menu path.
+- [x] Preset catalog — Hexagon (M-Sk4 v1.7, done 2026-08-21; 2 new tests + 207/207
+      total green). First regular n-gon; adds a general-purpose
+      `RegularNGon(cx, cy, r, n, startAngleDeg)` factory. Menu item "11. Hexagon" at
+      priority 360.
+- [x] Preset catalog — 7 more shapes (M-Sk4 v1.8, done 2026-08-21; 11 new tests +
+      218/218 total green). Honeycomb (7 cells), Human Silhouette, Double Arch,
+      Staircase/Ziggurat, Building Corner, Column-N (parametric via EditorWindow
+      dialog), Logo Wordmark. New `PMSDKSkinPresets.MakeColumnN(n)` factory and
+      `PMSDKSkinPresetsColumnDialog` EditorWindow. Menu items 12-18 at priorities
+      361-391.
+- [x] Loader corner-pin sync bugfix (M-Sk4 v1.9.1, done 2026-08-21). Widened the
+      `PMSDKSkin.Update` re-cache guard to also recover when `cornerPin == null` on
+      a quad-kind skin — the loader adds `PMSDKSkin` before `PMSDKCornerPin`, so
+      OnEnable's initial cache was landing null and `SyncQuadDeformation` silently
+      no-op'd. New EditMode test `Loader_Rectangle_CornerPinReceivesWarpedVertices`.
+      219/219 total green. Live-verified in the generated `SkinPlayback.unity` scene.
+- [x] Skin Playback scene generator (M-Sk4 v1.9, done 2026-08-21).
+      `Tools > Projection Mapping > Skins > Generate Skin Playback Scene` writes
+      `Assets/PMSDKDemo/SkinPlayback.unity` with the projector rig + `PMSDKSkinLoader`
+      + `PMSDKSkinBindings`. Auto-detects a SkinSet at `Assets/PMSDKDemo/Skins/SkinSet.asset`
+      or falls back to the newest-modified `PMSDKSkinSet` in the project. 218/218
+      tests still green (generator is Editor-only I/O, no runtime logic to unit-test).
+
 ## Next Items / Backlog
 - [x] Camera-measured luminance compensation (implemented 2026-07-21 — see milestone above, D-027)
 - [ ] Install KlakSpout in a host project and loopback-verify the PMSDKSpoutIn adapter
@@ -590,3 +769,94 @@ scopes it, with the OAK-D as the reference sensor.
 - [ ] Milestone 19: Plugin SDK
 - [ ] Version header generation via `configure_file` if hand-sync becomes annoying (static_assert guards it for now)
 - [ ] Code coverage job in CI
+
+## Skin App (single EXE, artist UX) — 2026-11-06
+
+- [x] Image-from-disk content mode (`ImageFile`), JSON round-trip
+- [x] Native Windows open-file dialog wrapper (`PMSDKFileDialog`)
+- [x] Media picker UI (Video/Image/Pattern/Webcam/None, path, Browse, loop/mute)
+- [x] Skin Workspace (editor UX) + Skin Player UI, preview via RT, output camera for Display 2
+- [x] Scene switch Player <-> Editor (F10), shader refs for builds, build menu item
+- [x] Fix shared-warp-node corner-pin ordering bug (D-038); 219/219 EditMode tests
+- [ ] Build the EXE and verify on target PC (videos, 2nd display, first-run seeding)
+- [ ] OS file drag-drop, canvas zoom/pan, numeric vertex entry, webcam device picker
+- [x] Named skin sets: dropdown in Editor and Player, "My skins" list in the Shape Library, New/Copy (2026-11-06)
+- [x] Fix: polygon/freeform skins rendered white (PMSDKSkin never re-cached PMSDKSkinContent) — 2026-11-06
+- [x] Output background colour (swatches + hex) in Editor inspector and Player, shared via background.txt
+
+## SkinGen — photo to skin (2026-11-06)
+
+- [x] Design + D-041 (decisions.md), architecture note
+- [x] `pmsdk::SkinGen` C++ module: load/decode, segmentation (Alpha / ColorKey / GrabCut / ProvidedMask / Auto), speck + hole cleanup, part split + merge, outlines with holes, mask, bounding quad
+- [x] C API `SkinGenAPI.h` (options, extract from file/pixels/memory, accessors, last error)
+- [x] Tests: `tests/SkinGen/SkinGenTests.cpp`, `tests/C_API/SkinGenAPITests.cpp`, fixtures `tests/data/skingen_*.png`
+- [ ] **Build + run the new tests (needs the vcpkg/OpenCV build; not yet compiled on this machine)**
+- [ ] Unity binding: P/Invoke in NativeBindings.cs, `PMSDKSkinFromPhoto` + "Skin from photo" button in the Workspace
+- [ ] Unity mask skin (customAlpha mask in `PMSDK/UnlitWarp`) for quad + mask skins
+- [ ] Optional: camera-calibrated placement (Gray-code mapping) of the photo outline onto the projector
+
+## Skin App: polygon bug + unsupported video flow (2026-11-16)
+
+- [x] Fix: Polygon tool kept adding points to the previous polygon after switching tools / selecting another skin (PickTool and AppendPolygonVertex now finish the old polygon)
+- [x] `PMSDKSkinContent.VideoProblem` event (player error or no start within 10 s)
+- [x] `PMSDKVideoConvertFlow`: prompt -> locate FFmpeg -> (install with progress) -> convert to H.264 MP4 -> switch the skin to the converted copy and save
+- [x] `PMSDKFfmpeg` / `PMSDKFfmpegJob`; installer bat+ps1 (winget first, else checksum-verified download, user PATH only); `--dry-run` mode
+- [x] mkv/flv/mpg/ts/3gp/ogv accepted as video so the converter can fix them; 10 new EditMode tests (229 total)
+- [ ] Real install path (no FFmpeg on a machine) verified only by dry-run + URL/checksum checks, not by a full install
+
+## Skin Editor: Focus view for single-screen mapping (2026-11-16)
+
+- [x] Focus view (F3 / button): viewport fills the window; Surfaces and Inspector become overlay drawers; default when only one display
+- [x] Surfaces / Inspector toggles also collapse the docked panels in the normal layout
+- [x] Output view (F11, was Fullscreen preview): mouse editing works there too, with a key hint
+- [x] Clicks on panels/drawers no longer draw or select on the canvas underneath
+- [ ] C++ SkinGen first compile: configure failed from memory pressure (parallel compiles killed); rerun with VCPKG_MAX_CONCURRENCY=2 while Unity is closed
+
+## Photo -> skin: verified + wired into Unity (2026-11-16)
+
+- [x] C++ SkinGen built and tested: 22 new tests, 155/155 total (MSVC 19.51 / VS 2026 via Ninja `release` preset; two old-MSVC stubs guarded)
+- [x] New DLL + OpenCV dependency DLLs deployed to the nested repo `Plugins/Mapping` (18 DLLs; old single 7.4 MB DLL backed up outside the repo)
+- [x] Unity: `NativeSkinGen`, `PMSDKPhotoSkin`, `PMSDKPhotoSkinBuilder`, `PMSDKPhotoSkinDialog` + "Skin from photo..." button; `_AlphaMask` in `PMSDK/UnlitWarp`; `PMSDKSkin.AlphaMaskPath` (JSON `mask.maskFile`); `Background` content mode for hole skins; 237/237 EditMode tests
+- [x] Verified in play mode on the statue PNG: mask skin (holes cut) and polygon + background-colour hole skins
+- [ ] Parts do not yet default to their own crop of the photo as content (all parts show the same media stretched over their quad)
+- [ ] Try the dialog by hand with a real mouse; test on a PC without the VS runtime; static OpenCV build to ship one DLL again
+
+## Auto Adjust Phase 0 + 1 - camera verify-and-refine of one planar skin (2026-11-16, D-044)
+
+- [x] Open decisions O1-O5 answered (viewer-perspective; OAK-D only; PNG = design image; manual corners; RMS <= 3 px / max <= 8 px within <= 4 corrections)
+- [x] Baseline before changes: C++ 155/155, Unity EditMode 237/237
+- [x] depthai-core v2.32.0 prebuilt (win64, SHA-256 matches GitHub's published digest) in `build/deps/` (not committed)
+- [x] `PMSDKOakCamera.dll` (`oakcam/`, option `PMSDK_OAKCAM_BUILD`): OAK-D CAM_A luma frames, exposure/focus lock, factory intrinsics; `pmsdk_oakcam_smoke` tool; imports verified against HoloTrack's depthai-core.dll; deployed to `Plugins/HoloTrack`
+- [x] C++ `pmsdk::AutoAdjust` + C API `AutoAdjustAPI.h`: checker layout/render, detection (whole board + per-corner with occlusion), undistortion (perspective + fisheye), Measure, Refine (correction grid), EvaluateWarp
+- [x] C++ tests: 25 new (`tests/AutoAdjust/AutoAdjustTests.cpp`, `tests/C_API/AutoAdjustAPITests.cpp`), 180/180 total. Synthetic non-planar room: RMS 1.93 -> 0.12 px (exact corners) and 1.92 -> 0.17 px (rendered images, detect + refine, 4 iterations)
+- [x] Unity: quad skins use a 16 x 16 subdivided mesh (fixes diagonal shear on keystoned skins); `PMSDKSkin` correction grid (+ JSON `correction`, loader, undo); `PMSDKMeshWarp` applies it via `IPMSDKWarpOffsetSource`
+- [x] Unity: `NativeAutoAdjust`, `PMSDKAutoAdjustNative`, `NativeOakCamera`, `PMSDKOakCalibrationCamera`, `IPMSDKCameraIntrinsicsSource`, `PMSDKAutoAdjust` (coroutine), `PMSDKAutoAdjustPanel` ("Auto adjust (camera)" section in the Workspace inspector)
+- [x] Unity EditMode: 8 new tests (`PMSDKAutoAdjustTests`), 2 updated (quad mesh vertex count), 245/245. Synthetic room through the real coroutine: RMS 1.48 -> 0.46 px after 1 correction (stop threshold 0.5 px)
+- [x] Play mode (scratch skin set, user set restored): 289-vertex quad follows the native corner pin; a correction grid moves the vertices exactly as computed (centre +0.02/-0.01, corners unchanged); no console errors
+- [x] Hardware (from Unity, `PMSDKOakCalibrationCamera`): OAK-D-PRO-W opens in ~2 s, sensor OV9782, 1280x720 luma, factory intrinsics perspective fx ~569 px, 14 coefficients; camera sees the soffit
+- [ ] Run `pmsdk_oakcam_smoke` for a frame-rate figure; decide whether 1280x800 (full OV9782) is worth adding
+- [ ] Workspace "Auto adjust (camera)" section: built and wired, not clicked with a real mouse yet
+- [ ] Phase 0 bench on the real soffit: Gray-code auto-align (`A`) with the OAK as camera needs an OAK path in `PMSDKCalibrationManager` (it only offers the simulated / OpenCV webcam cameras today)
+- [ ] Phase 1 acceptance on a real planar facet: RMS <= 3 px within <= 4 corrections, photo recorded in the docs
+- [x] Ellipse / photo-mask skins (checker corners are cut by the mask) - done in Phase 2 (masks suppressed while measuring)
+## Auto Adjust Phases 2-4 - engineering (2026-11-16, D-045..D-047; hardware testing pending)
+
+- [x] C++ `AutoAdjust/Facets` (white/black facet segmentation, quad fit, corner snap, mm scale), `AutoAdjust/WarpMap` (splat + pull-push), `AutoAdjust/Planes` (RANSAC planes from depth, lens-undistorted rays); C API extended (+ `evaluate_warp_many`)
+- [x] C++ tests: 18 new, 198/198 total (folded 3-facet capture, curved warp map with a hole, folded soffit + wall depth, distorted wide-lens wall)
+- [x] OAK plugin: optional aligned stereo depth (`enableDepth`, `pmoak_copy_latest_depth`), smoke tool `depth` argument; imports re-verified (47, none missing)
+- [x] Unity: `PMSDKCalibrationDisplay` (hide/show/flood with restore), `PMSDKContentGrayCode`, `PMSDKAutoAdjust` (facet snap, Ellipse/mask skins, Adjust all, MeasureSkin, mm score, shape-adapted checker), `PMSDKWarpMapBuilder` + `PMSDKWarpMapFile` + `_WarpMap` shader path, `PMSDKSurfaceFinder`, `IPMSDKDepthSource`, `PMSDKHomography.FitNormalized`, rectangle seam feather, skin facet size + warp map in JSON/loader
+- [x] Workspace "Auto adjust (camera)" section: Auto adjust, Adjust all, Snap toggle, Size mm, Build warp map, Clear, Find surfaces (depth)
+- [x] Unity EditMode: 11 new (`PMSDKAutoAdjustPhasesTests`, synthetic projection room), 256/256. Synthetic results: facet snap corners within 0.02 raster; Ellipse 0.64 -> 0.29 px = 3.0 mm; warp map 1.24 -> 0.22 px; depth: 3 planes -> 2 skins, unlit plane skipped; Phase 1 room 1.01 -> 0.19 px
+- [ ] Hardware (tomorrow): Phase 1 acceptance on one facet; facet snap on the soffit; Adjust all; warp map on a curved/folded skin; Find surfaces with OAK depth (check that aligned depth matches the raw colour image)
+- [ ] Workspace buttons clicked by hand; long-running steps (Gray code ~40 captures) show progress only as status text
+- [ ] Same-physical-size squares across facets (shared canvas cropped per facet) - not implemented, see D-045
+- [ ] Click-to-segment / PNG feature matching - deferred until the user has studied them (plan section P4)
+
+## Auto Adjust sim walkthrough (2026-11-16)
+
+- [x] Explicit sim demo `PMSDKAutoAdjustSimDemo` (images + summary for Phases 1-4)
+- [x] Warp map: discard content UV outside 0..1 in `UnlitWarp.shader` (edge streaks), sim mirrors it
+- [x] Phase 1: measure / correct the outer band between the last checker corners and the skin edges
+      (D-048: `PMSDKSkinEdgeProbe`, border points in the score, keep-corners target from observed corners)
+- [ ] Hardware: check the border probe on real facets (margin contrast, neighbouring lit surfaces)
+

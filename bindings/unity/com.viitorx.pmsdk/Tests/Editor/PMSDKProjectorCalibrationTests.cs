@@ -81,32 +81,36 @@ namespace vxpmsdk.Tests
         }
 
         [Test]
-        public void PreviousLensIsReusedAndAWrongOneFallsBackToSelfCalibration()
+        public void LensIsLearnedFromSeveralCameraPositions()
         {
+            // D-059: every calibration keeps what it measured about the lens; later ones solve it from all positions.
             RequireNative();
             List<Vector2> camera;
             List<Vector2> raster;
             ushort[] depth;
-            Build(false, out camera, out raster, out depth);
             string error;
+            Build(false, ProjectorCentre, ProjectorYawDeg, out camera, out raster, out depth);
+            PMSDKProjectorCalibration first;
+            Assert.IsTrue(PMSDKProjectorCalibration.TrySolve(camera, raster, Intrinsics(), CamW, CamH, depth, null, false, null, out first, out error), error);
+            Assert.IsNotNull(first.Observation);
+            Assert.IsTrue(first.Observation.IsValid());
 
-            // Camera moved, projector unchanged: the earlier lens is reused and the depth stays right.
-            PMSDKProjectorCalibration previous = new PMSDKProjectorCalibration { FocalPx = ProjectorFocal, PrincipalX = 960f, PrincipalY = ProjectorCy };
-            PMSDKProjectorCalibration reused;
-            Assert.IsTrue(PMSDKProjectorCalibration.TrySolve(camera, raster, Intrinsics(), CamW, CamH, depth, previous, out reused, out error), error);
-            TestContext.WriteLine("reused: " + reused.Describe());
-            Assert.IsTrue(reused.LensReused);
-            Assert.AreEqual(ProjectorFocal, reused.FocalPx, 0.01f);
-            Assert.AreEqual(ProjectorCentre.magnitude, reused.BaselineMm, ProjectorCentre.magnitude * 0.03f, "baseline");
-            Assert.Less(MedianDepthError(reused, depth), 6f, "median depth error (mm)");
+            // The camera moved (projector now 600 mm left, 250 mm lower, turned less, as seen from the camera).
+            Build(false, new Vector3(-600f, 250f, 300f), -15f, out camera, out raster, out depth);
+            List<PMSDKProjectorCalibration.LensObservation> history = new List<PMSDKProjectorCalibration.LensObservation> { first.Observation };
+            PMSDKProjectorCalibration second;
+            Assert.IsTrue(PMSDKProjectorCalibration.TrySolve(camera, raster, Intrinsics(), CamW, CamH, depth, null, false, history, out second, out error), error);
+            TestContext.WriteLine("joint: " + second.Describe());
+            Assert.AreEqual(2, second.LensPositions);
+            Assert.AreEqual(ProjectorFocal, second.FocalPx, ProjectorFocal * 0.03f, "focal");
+            Assert.AreEqual(ProjectorCy, second.PrincipalY, 1080f * 0.04f, "lens centre y");
+            Assert.Less(MedianDepthError(second, depth), 6f, "median depth error (mm)");
 
-            // Zoom changed: the old lens no longer fits, self-calibration takes over.
-            PMSDKProjectorCalibration zoomed = new PMSDKProjectorCalibration { FocalPx = ProjectorFocal * 1.4f, PrincipalX = 960f, PrincipalY = ProjectorCy * 0.7f };
-            PMSDKProjectorCalibration solved;
-            Assert.IsTrue(PMSDKProjectorCalibration.TrySolve(camera, raster, Intrinsics(), CamW, CamH, depth, zoomed, out solved, out error), error);
-            TestContext.WriteLine("fallback: " + solved.Describe());
-            Assert.IsFalse(solved.LensReused);
-            Assert.AreEqual(ProjectorFocal, solved.FocalPx, ProjectorFocal * 0.03f);
+            // A calibration saved before the history existed seeds it through its pose: same lens.
+            history = new List<PMSDKProjectorCalibration.LensObservation> { first.ObservationFromPose(Intrinsics()) };
+            PMSDKProjectorCalibration seeded;
+            Assert.IsTrue(PMSDKProjectorCalibration.TrySolve(camera, raster, Intrinsics(), CamW, CamH, depth, null, false, history, out seeded, out error), error);
+            Assert.AreEqual(ProjectorFocal, seeded.FocalPx, ProjectorFocal * 0.03f, "focal from a pose-seeded history");
         }
 
         [Test]
@@ -219,13 +223,18 @@ namespace vxpmsdk.Tests
             return new PMSDKCameraIntrinsics { Fx = CameraFocal, Fy = CameraFocal, Cx = CamW * 0.5f, Cy = CamH * 0.5f };
         }
 
-        /// <summary>Casts projector rays (every 4th projector pixel) into the room and records what the camera sees.</summary>
         private static void Build(bool wallOnly, out List<Vector2> camera, out List<Vector2> raster, out ushort[] depth)
+        {
+            Build(wallOnly, ProjectorCentre, ProjectorYawDeg, out camera, out raster, out depth);
+        }
+
+        /// <summary>Casts projector rays (every 4th projector pixel) into the room and records what the camera sees.</summary>
+        private static void Build(bool wallOnly, Vector3 projectorCentre, float projectorYawDeg, out List<Vector2> camera, out List<Vector2> raster, out ushort[] depth)
         {
             camera = new List<Vector2>();
             raster = new List<Vector2>();
             depth = new ushort[CamW * CamH];
-            Quaternion toProjector = Quaternion.Euler(0f, ProjectorYawDeg, 0f);
+            Quaternion toProjector = Quaternion.Euler(0f, projectorYawDeg, 0f);
             Quaternion toCamera = Quaternion.Inverse(toProjector);
             HashSet<int> used = new HashSet<int>();
             for (float py = 0f; py < 1080f; py += 4f) {
@@ -236,7 +245,7 @@ namespace vxpmsdk.Tests
                     Vector3 rayProjector = new Vector3((px - 960f) / ProjectorFocal, (py - ProjectorCy) / ProjectorFocal, 1f);
                     Vector3 ray = toCamera * rayProjector;
                     Vector3 hit;
-                    if (!Hit(ProjectorCentre, ray, wallOnly, out hit)) {
+                    if (!Hit(projectorCentre, ray, wallOnly, out hit)) {
                         continue;
                     }
                     float cx = hit.x / hit.z * CameraFocal + CamW * 0.5f;

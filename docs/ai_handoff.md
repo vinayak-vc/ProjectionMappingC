@@ -1,5 +1,13 @@
 # AI Agent Handoff Document
 
+## Learned projector lens, hole filling, probe fix (2026-11-18, D-059)
+
+User recalibrated twice without entering a lens: 884 px / 1.10 H, equal cells, but enclosed black patches. Added the
+lens history (`lens_history.json`, joint self-calibration across camera positions, seeded from the saved calibration),
+"Forget projector lens (zoom changed)" in Advanced, `FillEnclosedHoles`, and the probe deactivation fix. The manual lens
+fields stay as an optional override. Next: user runs Calibrate projector then Calibrate selected skin and sends photo +
+status; if the margin waviness matters, restrict content to the measured area instead of extrapolating. Nothing committed.
+
 ## Fixed projector lens + simplified inspector (2026-11-18, D-058)
 
 Second recalibration self-calibrated a wrong lens again (674 px). Added a user-set fixed lens (`lens.json`, Advanced >

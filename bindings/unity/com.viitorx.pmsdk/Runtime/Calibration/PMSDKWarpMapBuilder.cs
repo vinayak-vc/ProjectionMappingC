@@ -92,6 +92,8 @@ namespace vxpmsdk.Components
         private const int MinDespeckleNeighbours = 5;
         private const int EnclosedHoleNeighbours = 6;
         private const int DespecklePasses = 4;
+        private const int MinHoleFillNeighbours = 3;
+        private const int HoleRelaxIterations = 200;
         private PMSDKSurfaceTolerance tolerance = PMSDKSurfaceTolerance.Default();
 
         public bool IsRunning { get; private set; }
@@ -428,6 +430,7 @@ namespace vxpmsdk.Components
             Vector2[] offSurfaceRaster = offSurfaceUv.Length > 0 ? ContentToRaster(skin, offSurfaceUv) : new Vector2[0];
             BlankOffSurface(rgba, mapSize, rect, raster, offSurfaceRaster);
             DespeckleMap(rgba, mapSize, DespeckleToleranceUv);
+            FillEnclosedHoles(rgba, mapSize);
             string fileName;
             if (!TrySaveMap(skin, rect, rgba, out fileName, out error)) {
                 return false;
@@ -474,6 +477,7 @@ namespace vxpmsdk.Components
                 }
                 BlankOffSurface(rgba, mapSize, best.Rect, best.Raster, best.OffSurfaceRaster);
                 DespeckleMap(rgba, mapSize, DespeckleToleranceUv);
+                FillEnclosedHoles(rgba, mapSize);
                 string fileName;
                 if (!TrySaveMap(skin, best.Rect, rgba, out fileName, out error)) {
                     break;
@@ -899,6 +903,126 @@ namespace vxpmsdk.Components
                 }
             }
             return total;
+        }
+
+        /// <summary>
+        /// Fills invalid regions the map's outside cannot reach (4-connected through invalid texels): holes inside the
+        /// surface, e.g. samples near a fold judged off-surface (hardware 2026-11-18: black patches in the middle of
+        /// the skin). Blanked side faces and the area outside the skin touch the map border and stay dark. Holes are
+        /// filled inward, each texel with the mean of its valid 8-neighbours. Returns the number of texels filled.
+        /// </summary>
+        public static int FillEnclosedHoles(float[] rgba, int size)
+        {
+            bool[] outside = new bool[size * size];
+            Queue<int> queue = new Queue<int>();
+            for (int i = 0; i < size; i++) {
+                SeedOutside(rgba, outside, queue, i, 0, size);
+                SeedOutside(rgba, outside, queue, i, size - 1, size);
+                SeedOutside(rgba, outside, queue, 0, i, size);
+                SeedOutside(rgba, outside, queue, size - 1, i, size);
+            }
+            while (queue.Count > 0) {
+                int index = queue.Dequeue();
+                int x = index % size;
+                int y = index / size;
+                if (x > 0) {
+                    SeedOutside(rgba, outside, queue, x - 1, y, size);
+                }
+                if (x < size - 1) {
+                    SeedOutside(rgba, outside, queue, x + 1, y, size);
+                }
+                if (y > 0) {
+                    SeedOutside(rgba, outside, queue, x, y - 1, size);
+                }
+                if (y < size - 1) {
+                    SeedOutside(rgba, outside, queue, x, y + 1, size);
+                }
+            }
+            int filled = 0;
+            List<int> filledTexels = new List<int>();
+            bool progress = true;
+            while (progress) {
+                progress = false;
+                float[] source = (float[])rgba.Clone();
+                for (int y = 0; y < size; y++) {
+                    for (int x = 0; x < size; x++) {
+                        int index = y * size + x;
+                        if (outside[index] || source[index * 4 + 3] > 0.5f) {
+                            continue;
+                        }
+                        float u = 0f;
+                        float v = 0f;
+                        int n = 0;
+                        for (int dy = -1; dy <= 1; dy++) {
+                            for (int dx = -1; dx <= 1; dx++) {
+                                int nx = x + dx;
+                                int ny = y + dy;
+                                if ((dx == 0 && dy == 0) || nx < 0 || ny < 0 || nx >= size || ny >= size) {
+                                    continue;
+                                }
+                                int k = (ny * size + nx) * 4;
+                                if (source[k + 3] > 0.5f) {
+                                    u += source[k] / source[k + 3];
+                                    v += source[k + 1] / source[k + 3];
+                                    n++;
+                                }
+                            }
+                        }
+                        if (n >= MinHoleFillNeighbours) {
+                            rgba[index * 4] = u / n;
+                            rgba[index * 4 + 1] = v / n;
+                            rgba[index * 4 + 2] = 0f;
+                            rgba[index * 4 + 3] = 1f;
+                            filled++;
+                            filledTexels.Add(index);
+                            progress = true;
+                        }
+                    }
+                }
+            }
+            // The inward fill copies the hole's rim; relaxing the filled texels toward the mean of their 4-neighbours
+            // (measured texels fixed) blends them smoothly - exact for a linear map.
+            for (int iteration = 0; iteration < HoleRelaxIterations && filledTexels.Count > 0; iteration++) {
+                foreach (int index in filledTexels) {
+                    int x = index % size;
+                    int y = index / size;
+                    float u = 0f;
+                    float v = 0f;
+                    int n = 0;
+                    AddIfValid(rgba, size, x - 1, y, ref u, ref v, ref n);
+                    AddIfValid(rgba, size, x + 1, y, ref u, ref v, ref n);
+                    AddIfValid(rgba, size, x, y - 1, ref u, ref v, ref n);
+                    AddIfValid(rgba, size, x, y + 1, ref u, ref v, ref n);
+                    if (n > 0) {
+                        rgba[index * 4] = u / n;
+                        rgba[index * 4 + 1] = v / n;
+                    }
+                }
+            }
+            return filled;
+        }
+
+        private static void AddIfValid(float[] rgba, int size, int x, int y, ref float u, ref float v, ref int n)
+        {
+            if (x < 0 || y < 0 || x >= size || y >= size) {
+                return;
+            }
+            int k = (y * size + x) * 4;
+            if (rgba[k + 3] > 0.5f) {
+                u += rgba[k] / rgba[k + 3];
+                v += rgba[k + 1] / rgba[k + 3];
+                n++;
+            }
+        }
+
+        private static void SeedOutside(float[] rgba, bool[] outside, Queue<int> queue, int x, int y, int size)
+        {
+            int index = y * size + x;
+            if (outside[index] || rgba[index * 4 + 3] > 0.5f) {
+                return;
+            }
+            outside[index] = true;
+            queue.Enqueue(index);
         }
 
         private static int DespecklePass(float[] rgba, int size, float toleranceUv)

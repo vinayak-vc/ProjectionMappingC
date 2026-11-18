@@ -16,10 +16,10 @@ lines, equal cells, no stretching). Background and decisions: D-049 .. D-055 in 
 The inspector section **Auto adjust (camera)** shows only: Calibrate all skins / Calibrate selected skin, Calibrate
 projector / Clear selected skin, Show calibration grid. Everything else is under **Show advanced settings** (D-058).
 
-0. **Once per projector (D-058):** under **Show advanced settings > Projector lens**, enter the projector's focal and
-   centre y (office projector: **923** and **1103**). Then every projector calibration only finds where the camera is,
-   which is reliable from any camera position. Leave both empty only to let the software measure the lens (needs a
-   camera ~1 m to the side and a pattern that hits several surfaces; it failed from the 2026-11-18 positions).
+0. **Projector lens (D-059): nothing to type.** Every **Calibrate projector** remembers what it measured; the lens is
+   solved from all camera positions so far, so it gets more reliable each time the camera moves. Only if the
+   projector's **zoom** changes: **Show advanced settings > Forget projector lens (zoom changed)**. The **Projector
+   lens** fields are an optional override (empty = learned automatically).
 1. Unity: open the `SkinEditor` scene, press **Play**, then **Tools > Projection Mapping > Fullscreen Previews >
    Open On Primary** (projector shows only the output; stays on top; close with **Ctrl+Shift+-** or the same menu
    **> Close**).

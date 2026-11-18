@@ -953,3 +953,23 @@ lens (focal 674 px, centre y 0.68 H vs ~900-923 px / ~1.02-1.05 H); the map had 
 **Verification:** simulation (fixed lens used / wrong fixed lens refused / lens file round trip). Office lens values
 (923 / 1103) come from the 10:22 calibration and agree with the four earlier ones within ~3 %; not yet confirmed from
 the new camera position on hardware.
+
+## D-059 2026-11-18 - Projector lens learned from all camera positions; enclosed map holes filled; probe listing fix
+
+**Hardware finding:** single-position self-calibration gave 249, 674 and 884 px for the same lens from three camera
+positions. After two recalibrations (884 px, centre 1.10 H) the cells were equal-sized again, but black patches stayed
+inside the skin (enclosed holes where samples near folds were judged off-surface) and the temporary probe skin stayed
+in the skin list ("2/2: Surface probe").
+**Decisions:**
+1. Each projector calibration stores what it measured about the lens (fundamental matrix + camera K) in
+   `ProjectorCalibration/lens_history.json` (newest 12). The lens is solved from the current and all stored positions
+   together (sum of essential-matrix costs), inside the plausible range; a calibration saved before the history
+   seeds it through its pose (`ObservationFromPose`). Order: fixed lens (Advanced) > learned lens > previous lens >
+   error. "Forget projector lens (zoom changed)" clears the fixed lens and the history.
+2. `PMSDKWarpMapBuilder.FillEnclosedHoles` after the despeckle: invalid texels not connected to the map border are
+   filled inward from their valid neighbours; edge-connected blanks (side faces, outside) stay dark. Real map: 353
+   texels filled.
+3. `PMSDKSurfaceFinder.RemoveProbe` deactivates the probe before Destroy, so the skin-list refresh in the same frame
+   no longer lists or selects it.
+**Limits:** an enclosed side face inside a skin would now be filled with content; the outermost margin (no camera
+samples, extrapolated) can still look wavy. Joint lens estimation verified in simulation only.

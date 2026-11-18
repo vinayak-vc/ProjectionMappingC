@@ -936,5 +936,7 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
 - [x] Hardware: recalibrated at the new camera position - self-calibration wrong again (674 px)
 - [x] D-058: fixed projector lens (Advanced) + simplified inspector (sim tests)
 - [ ] Hardware: enter lens 923 / 1103, Calibrate projector (check baseline vs tape), Calibrate selected skin
-- [ ] Black edge patches: extend content into unmeasured edge gaps instead of leaving them dark (keep real side faces dark)
+- [x] D-059: lens learned automatically from all camera positions (no typing); enclosed black patches filled; probe no longer left in the skin list
+- [ ] Hardware: Calibrate projector + Calibrate selected skin with D-059; check baseline vs tape and the grid photo
+- [ ] Outer margin of a skin (no camera samples) is extrapolated and can look wavy - decide: keep, or clip to the measured area
 - [ ] Idea from user: two cameras (left / right, overlapping centre) - not designed yet

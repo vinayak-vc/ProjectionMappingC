@@ -53,6 +53,10 @@ namespace vxpmsdk.Components
         public string CreatedUtc = "";
         /// <summary>True when the lens (focal, principal point) came from the previous calibration and only the pose was solved.</summary>
         public bool LensReused;
+        /// <summary>Camera positions the lens was solved from (this one plus the earlier ones), 0 when reused / fixed.</summary>
+        public int LensPositions;
+        /// <summary>What this capture measured about the lens; appended to the lens history after a successful solve.</summary>
+        public LensObservation Observation;
 
         /// <summary>Triangulated distance (z, mm) per camera pixel, 0 = none. Not serialised to JSON (saved next to it).</summary>
         [NonSerialized] public ushort[] Depth;
@@ -62,7 +66,8 @@ namespace vxpmsdk.Components
             return "projector focal " + FocalPx.ToString("0") + " px (throw ratio " + (FocalPx / RasterWidth).ToString("0.00") + "), lens centre y " +
                    (PrincipalY / RasterHeight).ToString("0.00") + " H, baseline " + BaselineMm.ToString("0") + (Metric ? " mm" : " units") +
                    ", reprojection " + MedianReprojectionPx.ToString("0.00") + " px, " + (InlierFraction * 100f).ToString("0") + " % inliers" +
-                   (LensReused ? ", lens from the previous calibration" : "");
+                   (LensReused ? ", lens fixed / from the previous calibration" : "") +
+                   (LensPositions > 1 ? ", lens learned from " + LensPositions + " camera positions" : "");
         }
 
         // ------------------------------------------------------------------ solve
@@ -96,6 +101,18 @@ namespace vxpmsdk.Components
         /// </param>
         public static bool TrySolve(IList<Vector2> cameraPixels, IList<Vector2> raster, PMSDKCameraIntrinsics intrinsics, int cameraWidth, int cameraHeight,
             ushort[] cameraDepthMm, PMSDKProjectorCalibration previous, bool lockLens, out PMSDKProjectorCalibration calibration, out string error)
+        {
+            return TrySolve(cameraPixels, raster, intrinsics, cameraWidth, cameraHeight, cameraDepthMm, previous, lockLens, null, out calibration, out error);
+        }
+
+        /// <param name="earlierPositions">
+        /// What earlier calibrations from other camera positions measured (D-059). The projector lens is solved from
+        /// this capture and all of them together; one position alone can leave the lens ambiguous (2026-11-18: 249,
+        /// 674 and 884 px from three positions for a ~900 px lens).
+        /// </param>
+        public static bool TrySolve(IList<Vector2> cameraPixels, IList<Vector2> raster, PMSDKCameraIntrinsics intrinsics, int cameraWidth, int cameraHeight,
+            ushort[] cameraDepthMm, PMSDKProjectorCalibration previous, bool lockLens, IList<LensObservation> earlierPositions,
+            out PMSDKProjectorCalibration calibration, out string error)
         {
             calibration = null;
             if (lockLens && (previous == null || !IsPlausibleLens(previous.FocalPx, previous.PrincipalY))) {
@@ -144,35 +161,107 @@ namespace vxpmsdk.Components
                 return false;
             }
 
-            // 2. Projector lens: the earlier one when plausible, else self-calibration.
+            // 2. Projector lens: the user's fixed lens; else learned jointly from this and earlier camera positions;
+            //    else (that failing) the previous calibration's lens.
             double[] kc = { intrinsics.Fx, 0, intrinsics.Cx, 0, intrinsics.Fy, intrinsics.Cy, 0, 0, 1 };
             double cx = RasterWidth * 0.5;
+            LensObservation observation = new LensObservation { Fundamental = (double[])f.Clone(), CameraK = (double[])kc.Clone(), CreatedUtc = DateTime.UtcNow.ToString("o") };
+            if (lockLens) {
+                string fixedError;
+                if (TryFinish(cameraPixels, undistorted, projector, intrinsics, cameraWidth, cameraHeight, cameraDepthMm, f, kc, cx,
+                    previous.FocalPx, previous.PrincipalY, inliers, inlierFraction, out calibration, out fixedError)) {
+                    calibration.LensReused = true;
+                    calibration.Observation = observation;
+                    error = "";
+                    return true;
+                }
+                error = "The fixed projector lens (focal " + previous.FocalPx.ToString("0") + " px, lens centre y " +
+                        (previous.PrincipalY / RasterHeight).ToString("0.00") + " H) does not fit this capture: " + fixedError +
+                        " Check the Projector lens fields under Advanced, or clear them if the projector zoom changed.";
+                return false;
+            }
+            List<double[]> fs = new List<double[]> { f };
+            List<double[]> kcs = new List<double[]> { kc };
+            if (earlierPositions != null) {
+                foreach (LensObservation earlier in earlierPositions) {
+                    if (earlier != null && earlier.IsValid()) {
+                        fs.Add(earlier.Fundamental);
+                        kcs.Add(earlier.CameraK);
+                    }
+                }
+            }
+            double focal;
+            double principalY;
+            SelfCalibrate(fs, kcs, cx, out focal, out principalY);
+            string solveError = "";
+            if (IsPlausibleLens(focal, principalY) && !IsAtSearchLimit(focal, principalY) &&
+                TryFinish(cameraPixels, undistorted, projector, intrinsics, cameraWidth, cameraHeight, cameraDepthMm, f, kc, cx,
+                    focal, principalY, inliers, inlierFraction, out calibration, out solveError)) {
+                calibration.LensPositions = fs.Count;
+                calibration.Observation = observation;
+                error = "";
+                return true;
+            }
             if (previous != null && IsPlausibleLens(previous.FocalPx, previous.PrincipalY)) {
                 string reusedError;
                 if (TryFinish(cameraPixels, undistorted, projector, intrinsics, cameraWidth, cameraHeight, cameraDepthMm, f, kc, cx,
                     previous.FocalPx, previous.PrincipalY, inliers, inlierFraction, out calibration, out reusedError)) {
                     calibration.LensReused = true;
+                    calibration.Observation = observation;
                     error = "";
                     return true;
                 }
-                if (lockLens) {
-                    error = "The fixed projector lens (focal " + previous.FocalPx.ToString("0") + " px, lens centre y " +
-                            (previous.PrincipalY / RasterHeight).ToString("0.00") + " H) does not fit this capture: " + reusedError +
-                            " Check the Projector lens fields under Advanced, or clear them if the projector zoom changed.";
-                    return false;
-                }
             }
-            double focal;
-            double principalY;
-            SelfCalibrate(f, kc, cx, out focal, out principalY);
-            if (!IsPlausibleLens(focal, principalY)) {
-                error = "Could not determine the projector lens from this camera position (solved focal " + focal.ToString("0") +
-                        " px, lens centre y " + (principalY / RasterHeight).ToString("0.00") + " H are not a real projector). Let the " +
-                        "full-screen pattern hit more surfaces at different distances, or move the camera further to the side of the projector.";
-                return false;
+            error = "Could not determine the projector lens from " + fs.Count + " camera position(s) (solved focal " + focal.ToString("0") +
+                    " px, lens centre y " + (principalY / RasterHeight).ToString("0.00") + " H" +
+                    (string.IsNullOrEmpty(solveError) ? "" : "; " + solveError) + "). Let the full-screen pattern hit more surfaces at " +
+                    "different distances, calibrate once more from another camera position, or enter the lens under Advanced.";
+            return false;
+        }
+
+        /// <summary>An optimum on the edge of the search range is the search running away, not a lens.</summary>
+        private static bool IsAtSearchLimit(double focal, double principalY)
+        {
+            double minFocal = MinThrowRatio * RasterWidth;
+            double maxFocal = MaxThrowRatio * RasterWidth;
+            return focal <= minFocal * 1.01 || focal >= maxFocal * 0.99 ||
+                   principalY <= -0.5 * RasterHeight + 1.0 || principalY >= 1.5 * RasterHeight - 1.0;
+        }
+
+        /// <summary>
+        /// What one projector calibration measured about the (unknown) projector lens: the fundamental matrix between
+        /// the camera (intrinsics <see cref="CameraK"/>) and the projector at that camera position. Every position
+        /// is kept (D-059) and the lens is solved from all of them together.
+        /// </summary>
+        [Serializable]
+        public sealed class LensObservation
+        {
+            public double[] Fundamental = new double[0];
+            public double[] CameraK = new double[0];
+            public string CreatedUtc = "";
+
+            public bool IsValid()
+            {
+                return Fundamental != null && Fundamental.Length == 9 && CameraK != null && CameraK.Length == 9;
             }
-            return TryFinish(cameraPixels, undistorted, projector, intrinsics, cameraWidth, cameraHeight, cameraDepthMm, f, kc, cx,
-                focal, principalY, inliers, inlierFraction, out calibration, out error);
+        }
+
+        /// <summary>
+        /// The observation implied by a finished calibration (its pose and lens give the fundamental matrix it fitted):
+        /// lets calibrations saved before D-059 seed the lens history.
+        /// </summary>
+        public LensObservation ObservationFromPose(PMSDKCameraIntrinsics intrinsics)
+        {
+            double[] r = new double[9];
+            for (int k = 0; k < 9; k++) {
+                r[k] = Rotation[k];
+            }
+            double[] tx = { 0, -Translation.z, Translation.y, Translation.z, 0, -Translation.x, -Translation.y, Translation.x, 0 };
+            double[] e = Multiply(tx, r);
+            double[] kcInverse = { 1.0 / intrinsics.Fx, 0, -intrinsics.Cx / intrinsics.Fx, 0, 1.0 / intrinsics.Fy, -intrinsics.Cy / intrinsics.Fy, 0, 0, 1 };
+            double[] kpInverse = { 1.0 / FocalPx, 0, -PrincipalX / FocalPx, 0, 1.0 / FocalPx, -PrincipalY / FocalPx, 0, 0, 1 };
+            double[] kc = { intrinsics.Fx, 0, intrinsics.Cx, 0, intrinsics.Fy, intrinsics.Cy, 0, 0, 1 };
+            return new LensObservation { Fundamental = Multiply(Multiply(Transpose(kpInverse), e), kcInverse), CameraK = kc, CreatedUtc = CreatedUtc };
         }
 
         /// <summary>Real projectors: throw ratio (focal / raster width) 0.3 .. 4, lens centre y within -0.5 .. 1.5 H.</summary>
@@ -373,6 +462,64 @@ namespace vxpmsdk.Components
             Directory.CreateDirectory(folder);
             LensData data = new LensData { FocalPx = focalPx, PrincipalY = principalY };
             File.WriteAllText(Path.Combine(folder, LensFileName), JsonUtility.ToJson(data, true));
+        }
+
+        [Serializable]
+        private sealed class LensHistoryData
+        {
+            public List<LensObservation> Positions = new List<LensObservation>();
+        }
+
+        private const string LensHistoryFileName = "lens_history.json";
+        private const int MaxLensHistory = 12;
+
+        /// <summary>Lens observations of earlier calibrations (D-059), oldest first; empty when none.</summary>
+        public static List<LensObservation> LoadLensHistory(string folder)
+        {
+            string path = Path.Combine(folder, LensHistoryFileName);
+            if (!File.Exists(path)) {
+                return new List<LensObservation>();
+            }
+            try {
+                LensHistoryData data = JsonUtility.FromJson<LensHistoryData>(File.ReadAllText(path));
+                List<LensObservation> valid = new List<LensObservation>();
+                if (data != null && data.Positions != null) {
+                    foreach (LensObservation observation in data.Positions) {
+                        if (observation != null && observation.IsValid()) {
+                            valid.Add(observation);
+                        }
+                    }
+                }
+                return valid;
+            } catch (Exception ex) {
+                Debug.LogWarning("[PMSDK] Could not read the projector lens history: " + ex.Message);
+                return new List<LensObservation>();
+            }
+        }
+
+        /// <summary>Appends one observation, keeping the newest <see cref="MaxLensHistory"/>.</summary>
+        public static void AddToLensHistory(string folder, LensObservation observation)
+        {
+            if (observation == null || !observation.IsValid()) {
+                return;
+            }
+            List<LensObservation> positions = LoadLensHistory(folder);
+            positions.Add(observation);
+            while (positions.Count > MaxLensHistory) {
+                positions.RemoveAt(0);
+            }
+            Directory.CreateDirectory(folder);
+            LensHistoryData data = new LensHistoryData { Positions = positions };
+            File.WriteAllText(Path.Combine(folder, LensHistoryFileName), JsonUtility.ToJson(data, true));
+        }
+
+        /// <summary>Forgets everything learned about the lens (projector zoom changed or projector replaced).</summary>
+        public static void ClearLensHistory(string folder)
+        {
+            string path = Path.Combine(folder, LensHistoryFileName);
+            if (File.Exists(path)) {
+                File.Delete(path);
+            }
         }
 
         /// <summary>Removes the fixed lens: the next calibration self-calibrates (projector zoom changed).</summary>
@@ -649,14 +796,30 @@ namespace vxpmsdk.Components
             return s[0] > 1e-18 ? (s[0] - s[1]) / s[0] : 1.0;
         }
 
-        private static void SelfCalibrate(double[] f, double[] kc, double cx, out double focal, out double principalY)
+        /// <summary>Sum of the essential-matrix costs of every camera position: one shared projector lens must make
+        /// all of them proper essential matrices, which pins it down far better than one position alone.</summary>
+        private static double JointCost(List<double[]> fs, List<double[]> kcs, double cx, double focal, double principalY)
         {
+            double cost = 0.0;
+            for (int i = 0; i < fs.Count; i++) {
+                cost += EssentialCost(fs[i], kcs[i], cx, focal, principalY);
+            }
+            return cost;
+        }
+
+        /// <summary>Lens search kept inside the plausible range (a degenerate optimum outside it is not a projector).</summary>
+        private static void SelfCalibrate(List<double[]> fs, List<double[]> kcs, double cx, out double focal, out double principalY)
+        {
+            double minFocal = MinThrowRatio * RasterWidth;
+            double maxFocal = MaxThrowRatio * RasterWidth;
+            double minCy = -0.5 * RasterHeight;
+            double maxCy = 1.5 * RasterHeight;
             double bestCost = double.MaxValue;
             focal = RasterWidth;
             principalY = RasterHeight * 0.5;
-            for (double fc = 0.2 * RasterWidth; fc <= 4.0 * RasterWidth; fc *= 1.02) {
-                for (double cy = -0.5 * RasterHeight; cy <= 1.5 * RasterHeight; cy += RasterHeight / 50.0) {
-                    double cost = EssentialCost(f, kc, cx, fc, cy);
+            for (double fc = minFocal; fc <= maxFocal; fc *= 1.02) {
+                for (double cy = minCy; cy <= maxCy; cy += RasterHeight / 50.0) {
+                    double cost = JointCost(fs, kcs, cx, fc, cy);
                     if (cost < bestCost) {
                         bestCost = cost;
                         focal = fc;
@@ -670,11 +833,13 @@ namespace vxpmsdk.Components
                 bool moved = false;
                 for (int a = -1; a <= 1; a++) {
                     for (int b = -1; b <= 1; b++) {
-                        double cost = EssentialCost(f, kc, cx, focal + a * stepF, principalY + b * stepC);
+                        double candidateFocal = Math.Min(maxFocal, Math.Max(minFocal, focal + a * stepF));
+                        double candidateCy = Math.Min(maxCy, Math.Max(minCy, principalY + b * stepC));
+                        double cost = JointCost(fs, kcs, cx, candidateFocal, candidateCy);
                         if (cost < bestCost - 1e-15) {
                             bestCost = cost;
-                            focal += a * stepF;
-                            principalY += b * stepC;
+                            focal = candidateFocal;
+                            principalY = candidateCy;
                             moved = true;
                         }
                     }

@@ -321,12 +321,25 @@ namespace vxpmsdk.Components
                     } else if (!string.IsNullOrEmpty(folder) && !PMSDKProjectorCalibration.TryLoad(folder, out previous, out loadError) && !string.IsNullOrEmpty(loadError)) {
                         Debug.LogWarning("[PMSDK] Previous projector calibration not used: " + loadError);
                     }
+                    // Everything earlier camera positions measured about the lens (D-059); a calibration saved before
+                    // the history existed seeds it through its own pose.
+                    List<PMSDKProjectorCalibration.LensObservation> history = string.IsNullOrEmpty(folder)
+                        ? new List<PMSDKProjectorCalibration.LensObservation>()
+                        : PMSDKProjectorCalibration.LoadLensHistory(folder);
+                    if (history.Count == 0 && !lockLens && previous != null && previous.Rotation != null && previous.Rotation.Length == 9 &&
+                        PMSDKProjectorCalibration.IsPlausibleLens(previous.FocalPx, previous.PrincipalY)) {
+                        history.Add(previous.ObservationFromPose(intrinsics));
+                    }
                     if (!PMSDKProjectorCalibration.TrySolve(map.CameraPixels, map.ContentUvs, intrinsics, camera.Width, camera.Height, depth,
-                        previous, lockLens, out calibration, out error)) {
+                        previous, lockLens, history, out calibration, out error)) {
                         message = error;
                         break;
                     }
                     if (!string.IsNullOrEmpty(folder)) {
+                        if (history.Count > 0 && PMSDKProjectorCalibration.LoadLensHistory(folder).Count == 0) {
+                            PMSDKProjectorCalibration.AddToLensHistory(folder, history[0]);
+                        }
+                        PMSDKProjectorCalibration.AddToLensHistory(folder, calibration.Observation);
                         calibration.Save(folder);
                     }
                     int regions = UpdateCameraRegions(controller.Skins, map);
@@ -886,6 +899,9 @@ namespace vxpmsdk.Components
             if (probe == null) {
                 return;
             }
+            // Destroy is deferred to the end of the frame; inactive objects are not listed, so the refresh below
+            // no longer picks up (and selects) the dying probe.
+            probe.gameObject.SetActive(false);
             if (Application.isPlaying) {
                 Destroy(probe.gameObject);
             } else {

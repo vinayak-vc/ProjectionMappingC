@@ -321,6 +321,41 @@ namespace vxpmsdk.Tests
             Assert.AreEqual(truth[smooth + 1], rgba[smooth + 1], 1e-6f);
         }
 
+        [Test]
+        public void EnclosedHolesAreFilledButEdgeConnectedBlanksStayDark()
+        {
+            int size = 32;
+            float[] rgba = new float[size * size * 4];
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    int i = (y * size + x) * 4;
+                    rgba[i] = 0.3f + x / 128f;
+                    rgba[i + 1] = 0.3f + y / 128f;
+                    rgba[i + 3] = 1f;
+                }
+            }
+            float[] truth = (float[])rgba.Clone();
+            // 5 x 4 hole inside the surface (off-surface samples near a fold).
+            for (int y = 12; y < 16; y++) {
+                for (int x = 10; x < 15; x++) {
+                    rgba[(y * size + x) * 4 + 3] = 0f;
+                }
+            }
+            // Side face reaching the map border.
+            for (int y = 24; y < size; y++) {
+                for (int x = 20; x < 26; x++) {
+                    rgba[(y * size + x) * 4 + 3] = 0f;
+                }
+            }
+            int filled = PMSDKWarpMapBuilder.FillEnclosedHoles(rgba, size);
+            Assert.AreEqual(20, filled);
+            int centre = (14 * size + 12) * 4;
+            Assert.AreEqual(1f, rgba[centre + 3], "hole filled");
+            Assert.AreEqual(truth[centre], rgba[centre], 0.01f);
+            Assert.AreEqual(truth[centre + 1], rgba[centre + 1], 0.01f);
+            Assert.AreEqual(0f, rgba[(28 * size + 22) * 4 + 3], "edge-connected side face stays dark");
+        }
+
         // ------------------------------------------------------------------ metrics
 
         [Test]

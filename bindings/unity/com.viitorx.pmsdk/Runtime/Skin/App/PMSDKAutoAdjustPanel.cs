@@ -54,6 +54,7 @@ namespace vxpmsdk.Components
         private readonly RectTransform advancedRoot;
         private readonly InputField lensFocalField;
         private readonly InputField lensCentreField;
+        private readonly Button forgetLensButton;
         private Texture2D gridTexture;
         private PMSDKSkin gridSkin;
         private readonly Toggle snapToggle;
@@ -134,6 +135,8 @@ namespace vxpmsdk.Components
             PMSDKUi.AddDimLabel(lensRow, "Focal / centre y px");
             lensFocalField = PMSDKUi.AddInputField(lensRow, hasLens ? lensFocal.ToString("0.#", CultureInfo.InvariantCulture) : "", "focal", OnLensEdited);
             lensCentreField = PMSDKUi.AddInputField(lensRow, hasLens ? lensCentreY.ToString("0.#", CultureInfo.InvariantCulture) : "", "centre y", OnLensEdited);
+            RectTransform forgetRow = NewRow(advancedRoot, "Forget Lens Row");
+            forgetLensButton = AddRowButton(forgetRow, "Forget projector lens (zoom changed)", OnForgetLensClicked);
 
             RectTransform aspectRow = NewRow(advancedRoot, "Content Aspect Row");
             PMSDKUi.AddDimLabel(aspectRow, "Content aspect (0 = fill)");
@@ -181,6 +184,7 @@ namespace vxpmsdk.Components
             warpButton.interactable = (quad || polygon) && !busy;
             measureButton.interactable = (quad || polygon) && !busy;
             calibrateButton.interactable = !busy;
+            forgetLensButton.interactable = !busy;
             calibrateAllButton.interactable = !busy && controller.Skins.Count > 0;
             calibrateSelectedButton.interactable = !busy && skin != null;
             allButton.interactable = !busy && QuadSkins().Count > 0;
@@ -602,6 +606,25 @@ namespace vxpmsdk.Components
             advancedRoot.gameObject.SetActive(on);
         }
 
+        /// <summary>Projector zoom changed: drop the fixed lens and everything learned about it (D-059).</summary>
+        private void OnForgetLensClicked()
+        {
+            if (Busy) {
+                return;
+            }
+            try {
+                PMSDKProjectorCalibration.ClearLens(PMSDKProjectorCalibration.Folder);
+                PMSDKProjectorCalibration.ClearLensHistory(PMSDKProjectorCalibration.Folder);
+                suppress = true;
+                lensFocalField.SetTextWithoutNotify("");
+                lensCentreField.SetTextWithoutNotify("");
+                suppress = false;
+                statusLabel.text = "Projector lens forgotten: the next Calibrate projector learns it again.";
+            } catch (Exception ex) {
+                statusLabel.text = "Could not forget the projector lens: " + ex.Message;
+            }
+        }
+
         /// <summary>Both lens fields valid and plausible: the lens is fixed for every projector calibration; both
         /// empty: it is measured (self-calibration). Anything else is rejected with a message.</summary>
         private void OnLensEdited(string value)
@@ -691,6 +714,7 @@ namespace vxpmsdk.Components
             markedButton.interactable = enabled;
             measureButton.interactable = enabled;
             calibrateButton.interactable = enabled;
+            forgetLensButton.interactable = enabled;
             calibrateAllButton.interactable = enabled;
             calibrateSelectedButton.interactable = enabled;
         }

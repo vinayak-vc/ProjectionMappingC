@@ -352,6 +352,7 @@ namespace vxpmsdk.Components
         }
 
         private bool IsQuadKind => Kind == PMSDKSkinShapeKind.Rectangle || Kind == PMSDKSkinShapeKind.Ellipse;
+        private bool IsPolygonKind => Kind == PMSDKSkinShapeKind.Polygon || Kind == PMSDKSkinShapeKind.Freeform;
 
         /// <summary>Rebuild the MeshFilter's mesh when Kind or Vertices change. For quad kinds
         /// the mesh is a fixed unit-quad (only rebuilt on kind change); for polygon kinds the
@@ -454,7 +455,8 @@ namespace vxpmsdk.Components
 
             // Auto Adjust warp map (curved surfaces).
             EnsureWarpMap();
-            bool useWarpMap = IsQuadKind && warpMapTex != null && !suppressWarpMap;
+            // Polygon/Freeform meshes carry their raster position in UV1 too (D-055).
+            bool useWarpMap = (IsQuadKind || IsPolygonKind) && warpMapTex != null && !suppressWarpMap;
             mpb.SetFloat(ID_UseWarpMap, useWarpMap ? 1f : 0f);
             if (useWarpMap) {
                 mpb.SetTexture(ID_WarpMap, warpMapTex);

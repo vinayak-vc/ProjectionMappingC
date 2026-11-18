@@ -860,3 +860,71 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
       (D-048: `PMSDKSkinEdgeProbe`, border points in the score, keep-corners target from observed corners)
 - [ ] Hardware: check the border probe on real facets (margin contrast, neighbouring lit surfaces)
 
+## Auto Adjust hardware run 1: map a marked surface (2026-11-17, D-049)
+
+- [x] OAK-D smoke: 15.0 fps at 1280x720, depth 1280x720 (84 % valid); the tool needs depthai-core.dll on PATH
+- [x] User marks the surface on a raw OAK frame (red outline) -> camera mask (`HardwareTest~/mark.json`, `mark_mask.png`)
+- [x] `PMSDKSurfaceFinder.MapMarkedSurface` / `PlaceMarkedSkin`: mask -> Gray code -> masked Rectangle skin; stray islands dropped
+- [x] `PMSDKWarpMapBuilder.SetCameraRegion`: warp map limited to the marked camera region (glass reflection)
+- [x] Fix: probe skin ZOrder stayed outside the projector camera clip range (Find surfaces projected nothing)
+- [x] Editor: `Tools/Projection Mapping/Fullscreen Previews/Open On Primary` (borderless Display 1 on the primary monitor, for a duplicated projector)
+- [x] Hardware: skin follows the marked band across the folds; warp map makes the grid straight across the fold (photos in `HardwareTest~/`)
+- [x] Unity EditMode: 3 new tests (marked L-shape, stray samples, wrong mask size); PMSDKAutoAdjustPhasesTests 16 tests, last full class run before the tolerance change had 15 passing, the changed test + Phase 4 re-run 4/4
+- [ ] **AI cutout step**: produce the camera mask from an AI segmentation of the object instead of a hand mark (input = raw OAK frame, output = same mask format); then a Workspace button "Map marked surface"
+- [x] Workspace: "Camera photo" + "Map marked surface" buttons; camera region kept per skin (`<skinId>_camera.png`) and reused by "Build warp map" (D-050)
+- [x] Panel locks OAK exposure (field "Exposure ms", default 3, 0 = auto) (D-050)
+- [ ] Lock the auto-exposure value in place instead of a fixed time (needs a native `pmoak` call + DLL redeploy)
+- [ ] Warp-map check (`MeasureSkin` checker) fails on masked skins (checker spans the whole rectangle) - score through the mask or use the decoded samples instead
+- [x] Warp map at the default 512 with the camera region: clean grid on hardware (button path, 29,276 samples)
+- [ ] Rebuild the EXE and repeat in fullscreen there (the editor run maps the editor's Display 1)
+- [ ] Phase 1 (checker Auto adjust) on a single flat facet, border probe on hardware (still open from 2026-11-16)
+- [x] Hardware, button path (2026-11-17): Camera photo -> user red mark (2560 x 1440 upscale) -> Map marked surface (116,988 px, 142 stray dropped) -> Build warp map 512 -> grid straight across the fold
+- [x] Unity EditMode: 3 more tests (red outline on an upscaled photo, black-and-white mask + bad input, region round trip); PMSDKAutoAdjustPhasesTests 19/19
+- [ ] Buttons clicked with a real mouse (run triggered the buttons from code); the Workspace section was hidden (no selection) during the run
+
+## Physical grid spacing on the POP surface (2026-11-17, D-051)
+
+- [x] Investigation: no UV islands; lens already undistorted (reference photo is raw - undistorted copy in `HardwareTest~/`); root cause = camera-perspective warp target (O1)
+- [x] `PMSDKSurfaceGeometry` (facet labelling + unfolding), `PMSDKSurfaceMetrics` (per-facet mm report, PASS/FAIL), `PMSDKSurfaceDiagnostics` (PNG), `PMSDKCalibrationGrid` (labelled grid)
+- [x] `PMSDKWarpMapBuilder`: `Target` (CameraPerspective default / PhysicalSpacing), `ContentAspect`, `RefinePasses` closed loop, `MeasureSurface`, decode-error neighbour filter; `PMSDKContentGrayCode.Capture(... throughWarpMap ...)`
+- [x] Panel: Physical spacing toggle, Content aspect, Show calibration grid, Measure on surface (depth)
+- [x] Sim tests `PMSDKSurfaceMetricsTests` (8): unfolding distances, flat tilted plane, folded facets, lens distortion, physical vs perspective map, closed loop, labelled grid, coverage guard
+- [x] Hardware: depth cannot resolve the soffit facets at 1.6-2.9 m (see D-051); guard refuses with a clear message
+- [ ] Geometry source that works on POP: metric projector-camera calibration + native triangulation (multi-day; see "Depth-camera 3D" milestone)
+- [ ] Alternative: OAK IR dot projector + 800p mono depth (native plugin change, DLL redeploy with Unity closed) and re-measure depth quality
+- [ ] Once geometry is available: hardware before/after report on the soffit (`SurfaceReports/`), then tune tolerances
+
+## Projector-camera geometry: feasibility (2026-11-17, started)
+
+- [x] Editor fullscreen preview kept on top (Win32 topmost): the chat window had covered the projection during a capture
+- [x] Full-raster Gray code at 1024 cells on the soffit: 566,368 correspondences (`HardwareTest~/selfcal_feasibility.py` analysis)
+- [x] Projector self-calibration from the essential-matrix constraint (camera intrinsics known; projector f and cy unknown, square pixels, cx = W/2): f = 885 px at 1920 width (throw ratio ~0.46, UST), cy = 1.02 H (bottom lens offset), median reprojection 0.86 px. Note: 2 unknowns / 2 constraints - exact, no redundancy check yet
+- [x] Triangulation precision: camera-projector baseline ~1/25 of the distance -> ~5 % depth per Gray step (~100 mm at 1.9 m), moire-dominated residual (`HardwareTest~/triangulation_residual.png`); facets not resolvable with this rig geometry
+- [x] User moved the OAK ~1 m right of the projector
+- [x] `PMSDKProjectorCalibration` (self-calibration, pose, triangulated depth, save/load), `PMSDKSurfaceFinder.CalibrateProjector` (+ camera regions of marked skins re-derived), builder uses the triangulated depth, panel "Calibrate projector" (D-052)
+- [x] Sim tests `PMSDKProjectorCalibrationTests` (3): f / cy / baseline recovered within 1 %, depth 3 mm median, single wall refused, triangulated depth gives the room's planes
+- [x] Hardware: f 901 px, cy 1.04 H, baseline 913 mm, 0.46 px; band = one plane; before 154 mm RMS / 13 deg shear -> after 3.27 mm RMS / 0.01 deg (reports + photos in `HardwareTest~/`)
+- [x] Unity EditMode full suite 280 tests, 0 failures (5 explicit demos skipped)
+- [x] Repeatability: noise 1.5 mm RMS; systematic 7.5 mm RMS bowl toward the band ends (lens model), not a noise floor
+- [x] Projector radial distortion checked offline: negligible (k1 0.008); not added (D-053)
+- [x] Measured 3D points in `PMSDKSurfaceGeometry` (+ off-surface rejection); rebuilt map 3.14 mm RMS self-measured (old map 8.27 mm)
+- [x] Independent check from a 2nd position (C): B-built map reads 8.48 mm RMS (6.68 mm interior) - 3.14 mm not confirmed
+- [ ] Ground truth: tape-measure calibration-grid cells on the POP (centre and both ends) to decide which calibration is right
+- [ ] Reduce calibration disagreement: joint calibration from two camera positions, or a known length for scale instead of the OAK depth median
+- [x] Lower fold edge: off-surface map texels left dark, tolerance 15 mm (D-054); user guide `docs/auto-adjust-user-guide.md`
+- [ ] Independent ground truth: tape-measure several cells on the POP (centre vs both ends) with the calibration grid shown
+- [ ] Mount the OAK rigidly (it was bumped once; recalibrate after any move)
+- [ ] The skin footprint includes a thin side face under the band's right edge (ragged grid there): trim the mark or let the geometry exclude non-root facets
+- [ ] Rebuild the EXE and repeat in it; click the new buttons with a mouse
+- [x] Phone photo check (3rd viewpoint): lines straight (1.7 px), horizontal spacing uniform within ~0.03 cell; vertical spacing not resolvable from that photo
+
+## One-click calibration of hand-drawn skins (2026-11-17, D-055) - simulation done, hardware tomorrow
+
+- [x] Polygon / Freeform warp maps (UV1 raster, shader enable, ContentToRaster)
+- [x] Camera region from the skin's own capture; moved-rig detection (epipolar error); probe never saved/loaded
+- [x] Panel: Calibrate all skins / Calibrate selected skin (+ Advanced section label); guide `docs/auto-adjust-user-guide.md` (incl. hardware checklist)
+- [x] Sim tests: polygon build path, polygon physical map, stale detection, probe capture
+- [ ] Hardware: checklist in the user guide section 7 (drawn Rectangle + Polygon, Calibrate all skins, photo + tape, bump test)
+- [ ] Panel flow exercised end to end only on hardware (synthetic camera cannot self-calibrate)
+- [x] Fix (2026-11-18): panel still greyed out Build warp map / Measure on surface for Polygon/Freeform skins
+  (`PMSDKAutoAdjustPanel.Bind`); hint text no longer says "Rectangle and Ellipse only". Auto adjust stays Rectangle/Ellipse.

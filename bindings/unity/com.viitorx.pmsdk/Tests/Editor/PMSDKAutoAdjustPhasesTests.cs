@@ -463,6 +463,73 @@ namespace vxpmsdk.Tests
             Assert.IsFalse(skin.SuppressWarpMap);
         }
 
+        [Test]
+        public void PhysicalSpacingBuildOnAHandDrawnPolygonSkin()
+        {
+            // D-055 user flow: a hand-drawn Polygon skin, no marked camera region, Build warp map with physical spacing
+            // (the "Calibrate skins" buttons run exactly this per skin). Depth here comes from the simulated camera.
+            RequireNative();
+            PMSDKSyntheticProjection room = FoldedRoom(0f);
+            room.Albedo.Clear();
+            room.ProvideDepth = true;
+            room.DepthPlanes.Add(new KeyValuePair<Vector2[], Vector4>(
+                new[] { new Vector2(0f, 0f), new Vector2(CamW, 0f), new Vector2(CamW, CamH), new Vector2(0f, CamH) },
+                Plane(0f, 0f, -1f, 0f, 0f, 2000f)));
+            List<Vector2> outline = new List<Vector2> {
+                new Vector2(0.12f, 0.15f), new Vector2(0.5f, 0.3f), new Vector2(0.85f, 0.12f), new Vector2(0.88f, 0.8f),
+                new Vector2(0.5f, 0.62f), new Vector2(0.15f, 0.85f),
+            };
+            PMSDKSkin skin = controller.SpawnSkinFromSnapshot(PMSDKSkinShapeKind.Polygon, outline, "drawn-polygon", "Drawn polygon");
+            controller.RefreshSkinList();
+            PMSDKWarpMapBuilder builder = new GameObject("Builder").AddComponent<PMSDKWarpMapBuilder>();
+            try {
+                builder.SettleFrames = 0;
+                builder.PatternResolution = 128;
+                builder.MapSize = 96;
+                builder.OutputFolder = tempFolder;
+                builder.Target = PMSDKWarpMapTarget.PhysicalSpacing;
+                builder.SetReportGrid(8, 8);
+                List<PMSDKSkin> all = new List<PMSDKSkin>(controller.Skins);
+
+                PMSDKWarpMapResult result = null;
+                PMSDKSyntheticProjection.Drive(builder.BuildWarpMap(skin, room, all, delegate(PMSDKWarpMapResult r) { result = r; }));
+                Assert.IsNotNull(result);
+                TestContext.WriteLine(result.Message);
+                Assert.IsTrue(result.Success, result.Message);
+                Assert.IsFalse(result.CalibrationStale);
+                Assert.IsTrue(skin.HasWarpMap, "the polygon skin now carries a warp map");
+                Assert.IsNotNull(result.Surface);
+                Assert.IsTrue(result.Surface.Valid, result.Surface.Message);
+                TestContext.WriteLine(result.Surface.ToText());
+                // 1 camera pixel is ~7 mm here (280 px focal at 2 m): require the grid within ~1.5 camera pixels.
+                Assert.Less(result.Surface.RmsMm, 1.5f * 2000f / PMSDKSyntheticProjection.Focal);
+                Assert.Less(Mathf.Abs(result.Surface.ShearDeg), 1f);
+
+                // The measurement button works on the same skin, also without a marked region.
+                PMSDKSurfaceReport report = null;
+                PMSDKSyntheticProjection.Drive(builder.MeasureSurface(skin, room, all, delegate(PMSDKSurfaceReport r) { report = r; }));
+                Assert.IsNotNull(report);
+                Assert.IsTrue(report.Valid, report.Message);
+                Assert.AreEqual(1, controller.Skins.Count, "no skin was created or left behind");
+            } finally {
+                Object.DestroyImmediate(builder.gameObject);
+            }
+        }
+
+        [Test]
+        public void TemporaryProbeSkinIsNeverSaved()
+        {
+            Spawn(new Vector2(0.1f, 0.1f), new Vector2(0.4f, 0.1f), new Vector2(0.4f, 0.4f), new Vector2(0.1f, 0.4f));
+            controller.SpawnSkinFromSnapshot(PMSDKSkinShapeKind.Rectangle, new List<Vector2> {
+                new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f),
+            }, PMSDKSurfaceFinder.ProbeId, "Surface probe");
+            controller.RefreshSkinList();
+            Assert.AreEqual(2, controller.Skins.Count);
+            PMSDKSkinSetJson.Set set = PMSDKSkinSetJson.Capture(controller);
+            Assert.AreEqual(1, set.skins.Count, "the probe is not captured");
+            Assert.AreNotEqual(PMSDKSurfaceFinder.ProbeId, set.skins[0].id);
+        }
+
         // ------------------------------------------------------------------ Phase 4
 
         [Test]
@@ -533,7 +600,240 @@ namespace vxpmsdk.Tests
             }
         }
 
+        [Test]
+        public void Phase4_MapsASurfaceMarkedInTheCameraImage()
+        {
+            PMSDKSyntheticProjection room = new PMSDKSyntheticProjection(null, CamW, CamH, RasterInCamera, 0f);
+            room.Background = projectorCamera;
+            // L-shaped mark (camera pixels, row 0 = top): the notch at the top right must stay unlit.
+            Vector2[] mark = {
+                new Vector2(70f, 190f), new Vector2(230f, 190f), new Vector2(230f, 130f), new Vector2(140f, 130f),
+                new Vector2(140f, 60f), new Vector2(70f, 60f),
+            };
+            byte[] mask = new byte[CamW * CamH];
+            for (int y = 0; y < CamH; y++) {
+                for (int x = 0; x < CamW; x++) {
+                    mask[y * CamW + x] = Inside(mark, new Vector2(x, y)) ? (byte)255 : (byte)0;
+                }
+            }
+
+            PMSDKSurfaceFinder finder = new GameObject("Finder").AddComponent<PMSDKSurfaceFinder>();
+            string maskFile = null;
+            try {
+                finder.SettleFrames = 0;
+                finder.PatternResolution = 128;
+                PMSDKSurfaceFinderResult result = null;
+                PMSDKSyntheticProjection.Drive(finder.MapMarkedSurface(controller, room, mask, CamW, CamH, "Marked",
+                    delegate(PMSDKSurfaceFinderResult r) { result = r; }));
+                TestContext.WriteLine(result.Message);
+                Assert.IsTrue(result.Success, result.Message);
+                Assert.AreEqual(1, controller.Skins.Count, "only the marked skin remains (probe removed)");
+                PMSDKSkin skin = result.Created[0];
+                Assert.AreEqual(PMSDKSkinShapeKind.Rectangle, skin.Kind);
+                maskFile = PMSDKSkinStore.ResolveMaskPath(skin.AlphaMaskPath);
+                Assert.IsTrue(File.Exists(maskFile));
+
+                Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+                Vector2 max = new Vector2(float.MinValue, float.MinValue);
+                foreach (Vector2 m in mark) {
+                    Vector2 r = room.CameraToRaster(m);
+                    min = Vector2.Min(min, r);
+                    max = Vector2.Max(max, r);
+                }
+                Assert.Less(Vector2.Distance(skin.Vertices[0], min), 0.03f, "bottom-left");
+                Assert.Less(Vector2.Distance(skin.Vertices[2], max), 0.03f, "top-right");
+
+                Texture2D texture = new Texture2D(2, 2);
+                try {
+                    Assert.IsTrue(texture.LoadImage(File.ReadAllBytes(maskFile)));
+                    Assert.Greater(MaskAt(texture, skin, room.CameraToRaster(new Vector2(100f, 160f))), 0.9f, "inside the L");
+                    Assert.Greater(MaskAt(texture, skin, room.CameraToRaster(new Vector2(200f, 160f))), 0.9f, "inside the L foot");
+                    Assert.Less(MaskAt(texture, skin, room.CameraToRaster(new Vector2(200f, 80f))), 0.1f, "the notch stays dark");
+                } finally {
+                    Object.DestroyImmediate(texture);
+                }
+            } finally {
+                Object.DestroyImmediate(finder.gameObject);
+                if (maskFile != null && File.Exists(maskFile)) {
+                    File.Delete(maskFile);
+                }
+            }
+        }
+
+        [Test]
+        public void Phase4_MarkedSurfaceDropsStrayGrayCodeSamples()
+        {
+            // Dense samples over raster [0.3, 0.6] x [0.4, 0.7] plus scattered bit-error samples (seen on hardware).
+            PMSDKGrayCaptureResult map = new PMSDKGrayCaptureResult();
+            int camW = 200;
+            int camH = 200;
+            for (int y = 0; y < camH; y++) {
+                for (int x = 0; x < camW; x++) {
+                    map.CameraPixels.Add(new Vector2(x, y));
+                    map.ContentUvs.Add(new Vector2(0.3f + 0.3f * x / (camW - 1), 0.4f + 0.3f * y / (camH - 1)));
+                }
+            }
+            System.Random random = new System.Random(7);
+            for (int i = 0; i < 300; i++) {
+                int index = random.Next(map.ContentUvs.Count);
+                map.ContentUvs[index] = new Vector2((float)random.NextDouble(), (float)random.NextDouble());
+            }
+            byte[] mask = new byte[camW * camH];
+            for (int i = 0; i < mask.Length; i++) {
+                mask[i] = 255;
+            }
+
+            PMSDKSurfaceFinder finder = new GameObject("Finder").AddComponent<PMSDKSurfaceFinder>();
+            string maskFile = null;
+            try {
+                string message;
+                PMSDKSkin skin = finder.PlaceMarkedSkin(controller, mask, camW, map, "Marked", out message);
+                TestContext.WriteLine(message);
+                Assert.IsNotNull(skin, message);
+                maskFile = PMSDKSkinStore.ResolveMaskPath(skin.AlphaMaskPath);
+                // A stray landing within a texel of the surface edge is indistinguishable from an edge sample, so the
+                // box may grow by about one first-pass texel (~0.005 here); far strays must not stretch it.
+                Assert.Less(Vector2.Distance(skin.Vertices[0], new Vector2(0.3f, 0.4f)), 0.02f, "bottom-left");
+                Assert.Less(Vector2.Distance(skin.Vertices[2], new Vector2(0.6f, 0.7f)), 0.02f, "top-right");
+                StringAssert.Contains("stray dropped", message);
+            } finally {
+                Object.DestroyImmediate(finder.gameObject);
+                if (maskFile != null && File.Exists(maskFile)) {
+                    File.Delete(maskFile);
+                }
+            }
+        }
+
+        [Test]
+        public void CameraMarkReadsARedOutlineOnAnUpscaledPhoto()
+        {
+            // 2x upscaled 64 x 48 photo (Unity order, row 0 = bottom) with a 1-pixel red rectangle outline.
+            int cw = 64;
+            int ch = 48;
+            int w = cw * 2;
+            int h = ch * 2;
+            Color32[] pixels = new Color32[w * h];
+            for (int i = 0; i < pixels.Length; i++) {
+                pixels[i] = new Color32(90, 90, 90, 255);
+            }
+            // Camera rows 10..29 (top-down) and columns 20..49 -> image rows (from the top) 20..59, columns 40..99.
+            for (int yTop = 20; yTop <= 59; yTop++) {
+                for (int x = 40; x <= 99; x++) {
+                    bool edge = yTop == 20 || yTop == 59 || x == 40 || x == 99;
+                    if (edge) {
+                        pixels[(h - 1 - yTop) * w + x] = new Color32(255, 0, 0, 255);
+                    }
+                }
+            }
+            byte[] mask;
+            string error;
+            Assert.IsTrue(PMSDKCameraMark.TryMakeMask(pixels, w, h, cw, ch, out mask, out error), error);
+            Assert.AreEqual(255, mask[20 * cw + 35], "inside (camera row 20, col 35)");
+            Assert.AreEqual(0, mask[5 * cw + 35], "above the outline");
+            Assert.AreEqual(0, mask[20 * cw + 55], "right of the outline");
+            int marked = 0;
+            foreach (byte b in mask) {
+                marked += b > 0 ? 1 : 0;
+            }
+            Assert.AreEqual(20 * 30, marked, 30, "about the outlined area");
+        }
+
+        [Test]
+        public void CameraMarkReadsABlackAndWhiteMaskAndRejectsBadInput()
+        {
+            int cw = 32;
+            int ch = 16;
+            Color32[] pixels = new Color32[cw * ch];
+            for (int y = 0; y < ch; y++) {
+                for (int x = 0; x < cw; x++) {
+                    // White left half; row 0 here is the bottom of the image.
+                    byte v = x < cw / 2 ? (byte)255 : (byte)0;
+                    pixels[y * cw + x] = new Color32(v, v, v, 255);
+                }
+            }
+            byte[] mask;
+            string error;
+            Assert.IsTrue(PMSDKCameraMark.TryMakeMask(pixels, cw, ch, cw, ch, out mask, out error), error);
+            Assert.AreEqual(255, mask[3 * cw + 2]);
+            Assert.AreEqual(0, mask[3 * cw + 30]);
+
+            Assert.IsFalse(PMSDKCameraMark.TryMakeMask(pixels, cw, ch, 20, 10, out mask, out error));
+            StringAssert.Contains("whole-number upscale", error);
+            Color32[] empty = new Color32[cw * ch];
+            Assert.IsFalse(PMSDKCameraMark.TryMakeMask(empty, cw, ch, cw, ch, out mask, out error));
+            StringAssert.Contains("Nothing is marked", error);
+        }
+
+        [Test]
+        public void CameraRegionRoundTripsPerSkin()
+        {
+            PMSDKSkin skin = Spawn(new Vector2(0.1f, 0.1f), new Vector2(0.5f, 0.1f), new Vector2(0.5f, 0.5f), new Vector2(0.1f, 0.5f));
+            string path = PMSDKSkinStore.ResolveMaskPath(PMSDKCameraMark.RegionFileFor(skin));
+            try {
+                byte[] region;
+                int w;
+                int h;
+                string error;
+                Assert.IsFalse(PMSDKCameraMark.TryLoadRegion(skin, out region, out w, out h, out error), "no region yet");
+                Assert.AreEqual("", error);
+                byte[] mask = new byte[40 * 30];
+                mask[2 * 40 + 5] = 255; // row 2 from the top
+                PMSDKCameraMark.SaveRegion(skin, mask, 40, 30);
+                Assert.IsTrue(PMSDKCameraMark.TryLoadRegion(skin, out region, out w, out h, out error), error);
+                Assert.AreEqual(40, w);
+                Assert.AreEqual(30, h);
+                Assert.AreEqual(255, region[2 * 40 + 5]);
+                Assert.AreEqual(0, region[27 * 40 + 5]);
+            } finally {
+                if (File.Exists(path)) {
+                    File.Delete(path);
+                }
+            }
+        }
+
+        [Test]
+        public void Phase4_MarkedSurfaceRejectsAMarkOfTheWrongSize()
+        {
+            PMSDKSyntheticProjection room = new PMSDKSyntheticProjection(null, CamW, CamH, RasterInCamera, 0f);
+            room.Background = projectorCamera;
+            PMSDKSurfaceFinder finder = new GameObject("Finder").AddComponent<PMSDKSurfaceFinder>();
+            try {
+                PMSDKSurfaceFinderResult result = null;
+                PMSDKSyntheticProjection.Drive(finder.MapMarkedSurface(controller, room, new byte[64 * 48], 64, 48, "Marked",
+                    delegate(PMSDKSurfaceFinderResult r) { result = r; }));
+                Assert.IsFalse(result.Success);
+                StringAssert.Contains("camera delivers", result.Message);
+                Assert.AreEqual(0, controller.Skins.Count);
+                Assert.IsTrue(room.Ended, "the camera is released");
+            } finally {
+                Object.DestroyImmediate(finder.gameObject);
+            }
+        }
+
         // ------------------------------------------------------------------ helpers
+
+        private static bool Inside(Vector2[] polygon, Vector2 point)
+        {
+            bool inside = false;
+            for (int i = 0, j = polygon.Length - 1; i < polygon.Length; j = i++) {
+                Vector2 a = polygon[i];
+                Vector2 b = polygon[j];
+                if ((a.y > point.y) != (b.y > point.y) && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x) {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        }
+
+        // Mask value at a raster point; the marked skin is an axis-aligned box, so UV is a plain rescale.
+        private static float MaskAt(Texture2D texture, PMSDKSkin skin, Vector2 raster)
+        {
+            Vector2 min = skin.Vertices[0];
+            Vector2 max = skin.Vertices[2];
+            float u = (raster.x - min.x) / (max.x - min.x);
+            float v = (raster.y - min.y) / (max.y - min.y);
+            return texture.GetPixelBilinear(u, v).r;
+        }
 
         private static void RequireNative()
         {

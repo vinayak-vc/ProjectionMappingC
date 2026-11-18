@@ -215,6 +215,19 @@ namespace vxpmsdk.Tests
         // Content UV under raster position for a skin (corner pin + correction), false when outside it.
         private static bool InverseWarp(PMSDKSkin skin, Vector2 raster, out Vector2 uv)
         {
+            if (skin.Kind == PMSDKSkinShapeKind.Polygon || skin.Kind == PMSDKSkinShapeKind.Freeform) {
+                // Mirrors PMSDKSkinMeshBuilder.BuildPolygon: raster-space outline, UV = its bounding box.
+                Vector2[] outline = skin.Vertices.ToArray();
+                Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+                Vector2 max = new Vector2(float.MinValue, float.MinValue);
+                foreach (Vector2 v in outline) {
+                    min = Vector2.Min(min, v);
+                    max = Vector2.Max(max, v);
+                }
+                Vector2 size = Vector2.Max(max - min, new Vector2(1e-6f, 1e-6f));
+                uv = new Vector2((raster.x - min.x) / size.x, (raster.y - min.y) / size.y);
+                return Inside(outline, raster);
+            }
             float[] h = QuadToHomography(skin.Vertices.ToArray());
             uv = Apply(Invert(h), raster);
             if (skin.HasCorrection) {

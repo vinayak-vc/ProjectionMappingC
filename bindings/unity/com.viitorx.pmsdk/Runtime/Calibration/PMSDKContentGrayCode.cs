@@ -41,6 +41,14 @@ namespace vxpmsdk.Components
         public static IEnumerator Capture(PMSDKSkin skin, PMSDKCalibrationDisplay display, IPMSDKCalibrationCamera camera, int resolution,
             int settleFrames, int minContrast, int sampleStep, Action<PMSDKGrayCaptureResult> onDone)
         {
+            return Capture(skin, display, camera, resolution, settleFrames, minContrast, sampleStep, false, onDone);
+        }
+
+        /// <param name="throughWarpMap">Project through the skin's warp map, so the decoded UV is the content as it
+        /// is actually shown (measuring a built map); false decodes the corner-pinned content without the map.</param>
+        public static IEnumerator Capture(PMSDKSkin skin, PMSDKCalibrationDisplay display, IPMSDKCalibrationCamera camera, int resolution,
+            int settleFrames, int minContrast, int sampleStep, bool throughWarpMap, Action<PMSDKGrayCaptureResult> onDone)
+        {
             PMSDKGrayCaptureResult result = new PMSDKGrayCaptureResult();
             int size = Mathf.Clamp(resolution, 16, 2048);
             int step = Mathf.Max(1, sampleStep);
@@ -54,7 +62,7 @@ namespace vxpmsdk.Components
             byte[][] captures = new byte[patterns][];
             byte[][] inverses = new byte[patterns][];
             try {
-                display.ShowPattern(skin, texture);
+                display.ShowPattern(skin, texture, throughWarpMap);
                 for (int frame = 0; frame < 2 + 2 * patterns; frame++) {
                     if (frame == 0) {
                         Fill(gray, 255);

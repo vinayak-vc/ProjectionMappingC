@@ -717,3 +717,187 @@ the whole-skin error went 13.3 -> 16.5 px max while the checker score went 1.03 
 13.3 -> 3.3 px, checker interior 0.24 px RMS. **Unverified on hardware:** real margin contrast and how close the
 OAK sees the border to other lit surfaces.
 
+
+## D-049 2026-11-17 - Map a surface marked in the camera image (hook for the AI cutout)
+
+**Context (first hardware run, OAK-D + soffit):** the user wants to choose the surface on a camera photo; today
+by hand (red outline on the raw OAK frame), later by an AI cutout of the object. The marked soffit band spans
+several facets, so a plane fit (Find surfaces) or a plain corner-pinned quad cannot describe it.
+**Decisions:**
+1. Input is a camera-space mask (raw OAK size, row 0 = top, > 127 = surface). This is the single hook: a
+   hand-drawn mark and an AI cutout produce the same thing, nothing downstream changes.
+2. `PMSDKSurfaceFinder.MapMarkedSurface` projects Gray code through a temporary full-raster skin (same probe as
+   Find surfaces), keeps the decoded samples inside the mask, and creates ONE Rectangle skin = raster bounding
+   box of those samples, cut to their raster footprint by an alpha mask (mesh UV is a plain rescale of raster
+   position). Folds need no model. Gray-code bit errors (~0.1 % of samples on hardware) land as isolated specks:
+   the footprint's small islands (< 2 % of the largest, found on the raw splat before gap closing) are dropped.
+3. `PMSDKWarpMapBuilder.SetCameraRegion` restricts the warp map to the same camera mask. Without it a reflection
+   of the surface (the glass doors under the soffit) decodes to the same projector positions from other camera
+   pixels and the map turns to speckle.
+4. Probe skins use `ZOrder` = one above every skin. The old 100000 put the probe 50 units in front of the
+   projector camera, outside its clip range, so Find surfaces / mapping projected nothing on hardware (the sim
+   ignores depth, so tests never saw it).
+**Hardware facts (2026-11-17):** auto exposure swings between the white and black frames (means 116 vs 211) and
+breaks decoding; with exposure locked (3000 us, ISO 400) inside the mark white 243 / black 73. With that,
+117,598 of 117,664 marked pixels decoded, 99 strays dropped, skin made in 13.8 s; warp map from 29,390 samples
+in 12.3 s; the grid then reads straight and evenly spaced across the fold from the camera. The default settle (3
+Unity frames + 3 camera frames) was enough at 15 fps.
+
+## D-050 2026-11-17 - Workspace: locked exposure, marked-surface buttons, camera region kept per skin
+
+**Context:** hardware run 1 (D-049) was driven from code; the user asked for buttons and a default exposure lock.
+**Decisions:**
+1. The Auto Adjust panel creates every OAK camera with a locked exposure: field "Exposure ms (0 = auto)",
+   default 3 ms at ISO 400 (`PMSDKAutoAdjustPanel.DefaultExposureMs`), the value that worked on the soffit. No
+   native change (the plugin already had `pmoak_set_manual_exposure`); locking the auto value in place would
+   need a DLL rebuild and stays a follow-up.
+2. File hand-off, no in-app drawing: "Camera photo" saves the raw OAK frame to
+   `persistentDataPath/CameraMarks/camera.png` and opens the folder; the user (or an AI cutout) saves
+   `camera_marked.png` next to it; "Map marked surface" reads it (`PMSDKCameraMark`). Accepted: a copy of the
+   photo outlined or filled in pure red (filled at the file's own resolution so a thin outline stays closed), or
+   a black-and-white mask (white = surface, the AI format). Same size as the photo or a whole-number upscale.
+3. The camera region is kept per skin by name, `<skinId>_camera.png` in SkinMasks (no JSON schema change);
+   "Build warp map" uses it automatically when present (`SetCameraRegion`), otherwise every lit pixel as before.
+4. Warp-map default pattern stays 512: with the camera region it gave a clean map on hardware (the earlier 512
+   speckle was the glass reflection).
+
+## D-051 2026-11-17 - Physical grid spacing: surface-aware validation and a physical-spacing warp-map target
+
+**Question (user, with photo `HardwareTest~/result_grid_warpmap.png`):** cells look stretched / compressed between POP
+facets and some lines look bent; find the root cause and make the grid physically uniform on each facet.
+**Findings (code + hardware):**
+1. No UV-island layer exists: a skin is a 2D projector-raster quad whose mesh UV is the unit square (16 x 16
+   subdivided). UV layout / "Average Islands Scale" cannot be the cause.
+2. Camera lens distortion is already removed before every fit (factory intrinsics, 14 coefficients). The reference
+   photo is the RAW frame: undistorted (`HardwareTest~/result_grid_warpmap_undistorted.png`) its lines are straight
+   across the fold. The visible bending was the lens.
+3. Root cause of the physical non-uniformity: the warp-map target (D-046, decision O1 "viewer perspective") is ONE
+   best-fit homography of the undistorted camera image over the whole skin, i.e. "looks flat from the camera". On a
+   folded POP band that forces different physical cell sizes on differently oriented facets (sim: -35 % / +57 %).
+   This is by design of O1, not a bug in the mesh, the projector warp or the camera model.
+4. No projector intrinsics/extrinsics exist; projector geometry is measured densely by Gray code instead, which
+   already includes projector lens and keystone.
+**Decisions:**
+1. `PMSDKSurfaceGeometry`: facets from depth planes, every camera pixel assigned (outline, then measured depth near
+   folds), facets unfolded about their fold lines into one mm frame (distances along the surface).
+2. `PMSDKSurfaceMetrics` + `PMSDKSurfaceReport`: a physically correct projection maps content UV to the unfolded
+   surface by one affine map; per facet spacing error (%), cell size, max cell-dimension error, straightness (mm),
+   shear, fold transitions (jump mm, spacing change %), overall RMS / P95 / max after decode-outlier rejection,
+   PASS / FAIL against `PMSDKSurfaceTolerance` (default RMS 3 mm, P95 6 mm, facet spacing 2 %, shear 1 deg, fold
+   jump 5 mm). Camera pixels never enter the error terms.
+3. `PMSDKWarpMapTarget.PhysicalSpacing` in `PMSDKWarpMapBuilder` (camera perspective stays the default): target UV =
+   unfolded mm (trimmed extent, optional `ContentAspect`), then measured through the map and corrected in closed loop
+   (`RefinePasses`, a pass is kept only if RMS drops >= 5 %). Both targets now drop isolated Gray-code decode errors
+   (a sample must agree with 2 camera neighbours).
+4. Diagnostics: `PMSDKCalibrationGrid` (labelled "column.row" grid), `PMSDKSurfaceDiagnostics` PNG (facet tint,
+   expected vs measured intersections, error vectors), reports in `persistentDataPath/SurfaceReports`.
+5. Panel: "Physical spacing (depth)" toggle, "Content aspect", "Show calibration grid", "Measure on surface (depth)".
+6. `PMSDKSurfaceGeometry` refuses when < 60 % of the surface region lies on measured facets, instead of flattening
+   the surface onto wrong planes.
+**Hardware result (2026-11-17, OAK-D Pro W, soffit 1.6-2.9 m away):** depth is 85-97 % valid but cannot resolve the
+facets: inside the marked band RANSAC finds parallel slabs with one normal (~60 deg view angle, 13-17 mm RMS),
+16 px patch noise 9-15 mm, projected random dots do not help; the native detector finds 0-1 planes. The physical
+target therefore cannot be built from OAK stereo depth on this installation; the guard reports it. Simulation:
+camera-perspective map RMS 326 mm FAIL -> physical-spacing map RMS 1.39 mm PASS; lens model required (no model: RMS
+103 mm FAIL); closed loop converges in one pass. **Next:** metric projector-camera calibration + native
+`pmsdk_decoder_decode_and_triangulate` (large baseline, mm-level geometry) as the geometry source for
+`PMSDKSurfaceGeometry` - or the camera much closer / OAK IR dot projector (native change) for depth.
+
+## D-052 2026-11-17 - Projector-camera self-calibration and triangulated depth for physical spacing
+
+**Context:** D-051 needs facet geometry; OAK stereo cannot resolve the POP at ~2 m. With the OAK on top of the
+projector (baseline ~1/25 of the distance) projector-camera triangulation was just as coarse (~100 mm per Gray step).
+The user moved the OAK ~1 m to the right of the projector.
+**Decisions:**
+1. `PMSDKProjectorCalibration` (managed, no DLL change): camera intrinsics known; projector = pinhole, square pixels,
+   cx = raster centre, unknown f and cy. Normalised 8-point fundamental matrix with RANSAC (Sampson, 2 px), self-
+   calibration from the equal-singular-value constraint of Kp^T F Kc (grid + local refinement), pose from E
+   (cheirality), midpoint triangulation, metric scale from the OAK depth median. Refuses single-plane scenes
+   (homography explains >= 90 % of F inliers) and poor fits (median reprojection > 2.5 px). Output includes a
+   triangulated depth image of everything the projector lights, saved in `persistentDataPath/ProjectorCalibration`.
+2. `PMSDKSurfaceFinder.CalibrateProjector` (full-raster Gray code, 1024 cells) also rewrites the camera region of every
+   marked skin from its projector-space quad + alpha mask (largest piece), so moving the camera needs no re-marking.
+3. `PMSDKWarpMapBuilder.ProjectorCalibration`: when set (same camera size) its depth replaces OAK stereo for the
+   physical-spacing target and measurements; depth outside the camera region is ignored for plane detection.
+4. Panel: "Calibrate projector" + status line; the saved calibration is loaded at start. Valid only while camera and
+   projector stay put.
+5. Editor `Open On Primary` keeps the preview topmost (the chat window had covered a capture).
+**Hardware (2026-11-17, OAK ~1 m right of the projector):** calibration f 901 px @1920 (throw ratio 0.47), cy 1.04 H,
+baseline 913 mm, median reprojection 0.46 px, 77 % inliers; first camera position gave 885 px / 1.02 H independently.
+Triangulated patch noise ~3.5 mm. The marked band is ONE plane (view angle ~38 deg); the zig-zag is its outline.
+Measured on the surface: camera-perspective map RMS 154 mm, P95 311 mm, shear 13 deg -> physical-spacing map RMS
+3.27 mm, P95 5.89 mm, shear 0.01 deg, straightness 3.0 mm RMS. Formally FAIL on RMS (limit 3 mm); the closed-loop pass
+could not improve it (rolled back), consistent with the ~3 mm measurement noise floor. Limits were not changed.
+
+**D-052 addendum (2026-11-17, repeatability):** the OAK was bumped after the first calibration (frames differ by
+~119 px); recalibrated (f 905 px, cy 1.04 H, baseline 892 mm, 0.39 px - third estimate, all within 2 %), no drift
+during the runs (0.05 px). Two measurements of the SAME physical-spacing map: noise 1.5 mm RMS per run (P95 3.6 mm);
+systematic 7.5 mm RMS (P95 12.7 mm, max 29 mm), a smooth bowl rising toward the band ends
+(`HardwareTest~/repeatability_systematic_error.png`). The earlier 3.27 mm was self-consistent (same calibration built
+and measured the map), not a noise floor - that claim is withdrawn. The bowl matches unmodelled lens distortion
+(projector modelled as a distortion-free pinhole; UST lenses distort toward the edges). Next: projector radial
+distortion in the calibration (non-linear refinement) and an independent tape-measure check of cells on the POP.
+
+## D-053 2026-11-17 - Measured 3D points instead of ideal planes; projector distortion not added
+
+**Evidence:** (1) offline LM fit of projector radial distortion on the real correspondences: k1 0.008, k2 -0.003,
+reprojection 0.31 -> 0.25 px, band flatness unchanged - distortion does not explain the 7.5 mm systematic error, so it
+was NOT added (the user had asked for it on my earlier hypothesis). (2) The triangulated band deviates from its best
+plane by +-5 mm (ridge along the inner corner and the lower edge, `HardwareTest~/band_flatness.png`); placing pixels where
+their ray meets the IDEAL plane shifts them sideways by deviation x tan(view angle ~42 deg) = 4.5 mm RMS, 9 mm P95,
+different per camera position - matching the measured systematic error.
+**Decision:** `PMSDKSurfaceGeometry.TryBuild(..., useMeasuredPoints)`: with precise dense depth (projector triangulation)
+each pixel uses its measured 3D point (depth box-filtered 9 px), flattened into its facet's unfolded frame; planes still
+define facets and folds. Points > 20 mm off their facet's plane (side faces, smoothing across edges) are dropped.
+`PMSDKWarpMapBuilder` enables it whenever the projector calibration supplies the depth. OAK stereo keeps ray-plane.
+**Hardware (camera position B, verified still since calibration: 0.03 px):** old map (built at A with ideal planes)
+measured with points: 8.27 mm RMS / 15 mm P95. Rebuilt with points: 3.14 mm RMS / 5.5 mm P95 / shear 0.01 deg /
+straightness 2.85 mm - self-consistent (same calibration builds and measures); independent confirmation still open.
+
+**D-053 addendum (2026-11-17, independent check):** OAK moved 30 cm further right (position C; the band's left end is
+near the image edge, seen at a grazing angle). Calibration C: f 900 px, cy 1.05 H, baseline 1089 mm, 0.41 px (4th
+estimate, all within 2 %). The map built at B (3.14 mm self-measured) measured from C: 8.48 mm RMS / 14.3 mm P95 on
+the full region (largest vectors at the band's lower fold edge), 6.68 mm RMS / 11.7 mm P95 with the region eroded by
+15 px. Cell size B 205.8 x 115.1 mm vs C 199.0 x 111.5 mm (3 % scale difference from the OAK-depth scale). The
+self-consistent 3.14 mm is NOT confirmed; two calibrations disagree by ~7 mm inside the band. Which one is closer to
+reality needs ground truth (tape measure). Candidates: calibration drift between positions (self-calibration has no
+redundancy beyond 2 unknowns), camera lens model at the image edge, depth-median scale.
+
+**D-053 addendum (2026-11-17, phone photo, calibration-independent):** user photo from a third viewpoint
+(`HardwareTest~/Media (4).jfif`, analysis `phone_photo_check.py`). Grid lines straight to 1.7 px median / 3.8 px P95
+(~line width). Cross-ratio of 4 consecutive lines (= 4/3 for equal spacing in any perspective): along the band 63
+quadruples, median spacing error -0.03 cell (~6 mm of a ~200 mm cell), no trend from end to end; across the band
+inconclusive (rows 8-15 px tall in the photo, label boxes interfere). Consistent with the 3-8 mm camera measurements
+and with the user's visual judgement; absolute scale and vertical spacing still want a tape check.
+
+## D-054 2026-11-17 - Leave off-surface areas dark in physical-spacing warp maps; user guide
+
+**Problem:** the marked skin's footprint included a thin side face below the band's lower fold. Its pixels were
+rejected as off-surface, but the warp map's gap filling still spread content there (ragged grid fragments).
+**Decision:** `PMSDKWarpMapBuilder.BlankOffSurface` marks map texels invalid where off-surface samples outnumber surface
+samples (after the first build and after every correction pass; `MapSamples.OffSurfaceRaster`), so the shader leaves
+them dark. The off-surface tolerance is 15 mm (~3x the band's noise + relief) instead of 20 mm. The skin outline
+itself is unchanged. Hardware (position C): rebuilt band map 3.07 mm RMS / 5.7 mm P95 self-measured; side face dark
+(`HardwareTest~/edge_fix_before_after.png`). User guide: `docs/auto-adjust-user-guide.md`.
+
+## D-055 2026-11-17 - One-click "Calibrate skins" for hand-drawn skins (Polygon included)
+
+**User requirement:** draw skins by hand (Rectangle or Polygon), press one button, and the camera makes the content
+equal-sized on the surface - no new skins, no photo marking. Hardware run showed: warp maps refused Polygon skins
+(buttons greyed), Find surfaces / Map marked surface created unexpected skins, and a leftover "Surface probe" was saved.
+**Decisions:**
+1. Warp maps on Polygon / Freeform skins: the polygon mesh carries its raster position in UV1
+   (`PMSDKSkinMeshBuilder.BuildPolygonMesh`), `PMSDKSkin` enables `_WarpMap` for them, and
+   `PMSDKWarpMapBuilder.ContentToRaster` maps content UV (= outline bounding box) to raster.
+2. No marked region needed: without a region file the camera region is the largest connected piece of the pixels the
+   skin itself lit during its capture (kept for that run only).
+3. Moved-rig detection: `PMSDKProjectorCalibration.MedianEpipolarErrorPx` of the skin's correspondences against the
+   stored calibration; > 3 px -> `PMSDKWarpMapResult.CalibrationStale`.
+4. Panel: **Calibrate all skins** / **Calibrate selected skin** run: projector calibration if none, then a physical-spacing
+   warp map per skin; on a stale calibration it recalibrates once and retries. Other tools are listed under "Advanced".
+5. The temporary probe skin (`PMSDKSurfaceFinder.ProbeId`) is skipped when a set is captured, applied or loaded.
+**Verification (simulation only, hardware tomorrow):** polygon physical map through the real build path (synthetic
+camera + depth, no region): 5.0 mm RMS / shear 0.1 deg (<1 camera px at 7 mm/px); polygon map on exact geometry: PASS;
+stale detection: < 1 px still, > 3 px bumped; probe never captured. The panel button wiring itself is not exercised in
+simulation (the synthetic camera is not 3D-consistent, so projector calibration cannot run there); every step it calls
+is tested.

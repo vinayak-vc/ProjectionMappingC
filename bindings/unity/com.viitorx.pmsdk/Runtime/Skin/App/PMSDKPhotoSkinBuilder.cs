@@ -167,18 +167,25 @@ namespace vxpmsdk.Components
         /// Unity textures are bottom-to-top, so rows are flipped.</summary>
         public static void WriteMaskPng(string path, PMSDKPhotoPart part)
         {
+            WriteMaskPng(path, part.Mask, part.MaskWidth, part.MaskHeight, true);
+        }
+
+        /// <summary>Writes a grayscale mask PNG. <paramref name="topRowFirst"/>: row 0 of
+        /// <paramref name="mask"/> is the top of the image (photo order); otherwise the bottom (UV order).</summary>
+        public static void WriteMaskPng(string path, byte[] mask, int width, int height, bool topRowFirst)
+        {
             string directory = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(directory)) {
                 Directory.CreateDirectory(directory);
             }
-            Texture2D texture = new Texture2D(part.MaskWidth, part.MaskHeight, TextureFormat.RGBA32, false, true);
+            Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false, true);
             try {
-                Color32[] pixels = new Color32[part.MaskWidth * part.MaskHeight];
-                for (int y = 0; y < part.MaskHeight; y++) {
-                    int sourceRow = part.MaskHeight - 1 - y;
-                    for (int x = 0; x < part.MaskWidth; x++) {
-                        byte v = part.Mask[sourceRow * part.MaskWidth + x];
-                        pixels[y * part.MaskWidth + x] = new Color32(v, v, v, 255);
+                Color32[] pixels = new Color32[width * height];
+                for (int y = 0; y < height; y++) {
+                    int sourceRow = topRowFirst ? height - 1 - y : y;
+                    for (int x = 0; x < width; x++) {
+                        byte v = mask[sourceRow * width + x];
+                        pixels[y * width + x] = new Color32(v, v, v, 255);
                     }
                 }
                 texture.SetPixels32(pixels);

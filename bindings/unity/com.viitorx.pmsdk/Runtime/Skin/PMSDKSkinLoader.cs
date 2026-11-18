@@ -119,6 +119,8 @@ namespace vxpmsdk.Components
             var bindings = GetComponent<PMSDKSkinBindings>();
             foreach (var data in ordered)
             {
+                // A temporary calibration probe saved by an older build is dropped on load.
+                if (PMSDKSurfaceFinder.IsTemporarySkin(data.id)) continue;
                 var skin = SpawnOne(data);
                 if (skin == null) continue;
                 spawned.Add(skin);

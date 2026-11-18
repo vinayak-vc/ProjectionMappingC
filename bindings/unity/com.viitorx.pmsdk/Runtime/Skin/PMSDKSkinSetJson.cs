@@ -139,7 +139,8 @@ namespace vxpmsdk.Components
             };
             foreach (var s in controller.Skins)
             {
-                if (s == null) continue;
+                // Temporary calibration probes are never part of a saved set.
+                if (s == null || PMSDKSurfaceFinder.IsTemporarySkin(s.SkinId)) continue;
                 set.skins.Add(CaptureSkin(s));
             }
             return set;
@@ -232,6 +233,7 @@ namespace vxpmsdk.Components
             var keep = new HashSet<string>();
             foreach (var sk in set.skins)
             {
+                if (PMSDKSurfaceFinder.IsTemporarySkin(sk.id)) continue;
                 keep.Add(sk.id);
                 if (byId.TryGetValue(sk.id, out var existing) && existing != null)
                 {

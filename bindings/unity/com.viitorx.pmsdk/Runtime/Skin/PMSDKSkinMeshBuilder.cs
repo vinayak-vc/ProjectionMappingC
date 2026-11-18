@@ -198,6 +198,14 @@ namespace vxpmsdk.Components
             var m = new Mesh { name = "PMSDKSkin_Polygon" };
             m.SetVertices(p);
             m.SetUVs(0, u);
+            // UV1 = raster position (the positions are raster space): the Auto Adjust warp map is sampled there
+            // (PMSDK/UnlitWarp, D-055), as quad skins get it from PMSDKMeshWarp.
+            Vector2[] raster = new Vector2[p.Length];
+            for (int i = 0; i < p.Length; i++)
+            {
+                raster[i] = new Vector2(p[i].x, p[i].y);
+            }
+            m.SetUVs(1, raster);
             m.SetTriangles(t, 0);
             var colors = new Color[p.Length];
             for (int i = 0; i < colors.Length; i++) colors[i] = Color.white;

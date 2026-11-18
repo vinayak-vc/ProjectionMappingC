@@ -901,3 +901,55 @@ camera + depth, no region): 5.0 mm RMS / shear 0.1 deg (<1 camera px at 7 mm/px)
 stale detection: < 1 px still, > 3 px bumped; probe never captured. The panel button wiring itself is not exercised in
 simulation (the synthetic camera is not 3D-consistent, so projector calibration cannot run there); every step it calls
 is tested.
+
+## D-056 2026-11-18 - Despeckled warp maps and spike-robust measured depth
+
+**Hardware finding:** first "Calibrate all skins" run on the user's Polygon skin over the POP: the button chain worked,
+but the projected content showed coloured specks and black dots. The saved map (`051066dd_warp.pmwm`) had isolated
+texels 0.1-0.2 UV (2-3 grid cells) off their neighbours and 1-2-texel holes inside the surface; the build report was
+FAIL (211 mm RMS, driven by those outliers). The triangulated depth is ~1 mm on the faces, with 1-2 % spike pixels and
+bad values along edges.
+**Decisions:**
+1. `PMSDKWarpMapBuilder.DespeckleMap` runs after `BlankOffSurface` on every built / corrected map: a valid texel more
+   than 0.02 UV from the median of its valid 8-neighbours (>= 5) takes that median; an invalid texel with >= 6 valid
+   neighbours is filled; up to 4 passes (clusters). Outlines and blanked side faces (>= 2 texels wide) are kept.
+   On the real map: 5316 -> 119 rough texels.
+2. `BlankOffSurface` blanks a texel only when off-surface samples also dominate its 3x3 neighbourhood (no lone dots).
+3. `PMSDKSurfaceGeometry.SmoothDepth` replaces pixels > 30 mm from their 3x3 median by that median before the 9 px box
+   mean (replace, not drop, so the window stays symmetric on steep surfaces). Sim: 2 % spikes of 300-1500 mm move
+   points < 2 mm and drop < 0.5 %; on the real depth the gain is small (the depth there was mostly clean).
+**Not verified:** a new hardware build with these changes; the source of the wrong samples is not proven (decode errors
+through the content or edge depth) - the despeckle treats the symptom generically.
+
+## D-057 2026-11-18 - Reuse the projector lens when only the camera moved
+
+**Hardware finding:** after the camera was moved, "Calibrate all skins" recalibrated the projector and self-calibration
+returned a degenerate lens (focal 249 px, lens centre 0.40 H, baseline 2.26 m; earlier runs: ~900-923 px, ~1.02-1.05 H,
+~1.1-1.2 m). The map then evened out cells in a distorted space (report self-consistent at 4.5 mm, but cells 335 x 130 mm
+and visibly stretched squares).
+**Decisions:**
+1. `PMSDKProjectorCalibration.TrySolve(..., previous, ...)`: a plausible earlier lens (focal, principal y) is reused and
+   only the pose is solved (`LensReused`); self-calibration runs only without one or when it no longer fits (median
+   reprojection > 2.5 px, e.g. zoom changed). `PMSDKSurfaceFinder.CalibrateProjector` loads the saved calibration as
+   `previous` before overwriting it.
+2. `IsPlausibleLens`: throw ratio 0.3-4, lens centre y -0.5..1.5 H; an implausible self-calibrated lens is refused with
+   an error instead of being saved.
+**Note:** the calibration saved at 10:35 has the degenerate lens, so it is not reused; the next calibration
+self-calibrates again (and now fails loudly if it is degenerate).
+
+## D-058 2026-11-18 - Fixed projector lens and a simplified inspector
+
+**Hardware finding:** after D-057, recalibrating from the moved camera self-calibrated again and found another wrong
+lens (focal 674 px, centre y 0.68 H vs ~900-923 px / ~1.02-1.05 H); the map had 688 x 309 mm "cells" and large blanked
+(black) areas. Self-calibration of the lens is not reliable from every camera position; the lens never changes.
+**Decisions:**
+1. The projector lens can be fixed: `PMSDKProjectorCalibration.SaveLens / TryLoadLens / ClearLens`
+   (`ProjectorCalibration/lens.json`). When set, `CalibrateProjector` solves only the camera pose
+   (`TrySolve(..., lockLens: true)`) and fails with a message when the lens does not fit - no silent self-calibration.
+2. The inspector shows only Calibrate all / selected skin, Calibrate projector, Clear selected skin, Show calibration
+   grid and the status lines; exposure, projector lens, content aspect, Build warp map, Measure, Physical spacing, the
+   older checker tools and the skin-creating tools are under "Show advanced settings".
+3. The calibration distance is an output, never an input: the tape distance is only a check of the reported baseline.
+**Verification:** simulation (fixed lens used / wrong fixed lens refused / lens file round trip). Office lens values
+(923 / 1103) come from the 10:22 calibration and agree with the four earlier ones within ~3 %; not yet confirmed from
+the new camera position on hardware.

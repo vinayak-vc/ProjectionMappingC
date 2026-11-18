@@ -180,6 +180,147 @@ namespace vxpmsdk.Tests
             Assert.IsTrue(withPatch.TryToSurface(new Vector2(200f, 60f), new Vector2(200f, 60f), out mmPatch, out planePatch), "surface point kept");
         }
 
+        [Test]
+        public void DepthSpikesDoNotMoveOrDropMeasuredPoints()
+        {
+            // Hardware case (2026-11-18): triangulated depth accurate to ~1 mm, but ~2 % of pixels are decode spikes
+            // hundreds of mm off. A plain box mean spread them into speckle (moved points) and black dots (rejected).
+            float tilt = 40f * Mathf.Deg2Rad;
+            Vector3 normal = new Vector3(Mathf.Sin(tilt), 0f, -Mathf.Cos(tilt));
+            Vector3 anchor = new Vector3(0f, 0f, DepthMm);
+            ushort[] clean = new ushort[CamW * CamH];
+            for (int y = 0; y < CamH; y++) {
+                for (int x = 0; x < CamW; x++) {
+                    Vector3 ray = new Vector3((x - CamW * 0.5f) / Focal, (y - CamH * 0.5f) / Focal, 1f);
+                    Vector3 p = ray * (Vector3.Dot(normal, anchor) / Vector3.Dot(normal, ray));
+                    clean[y * CamW + x] = (ushort)Mathf.RoundToInt(p.z);
+                }
+            }
+            ushort[] spiky = (ushort[])clean.Clone();
+            System.Random random = new System.Random(11);
+            for (int i = 0; i < spiky.Length; i++) {
+                if (random.NextDouble() < 0.02) {
+                    int offset = random.Next(300, 1500) * (random.Next(2) == 0 ? -1 : 1);
+                    spiky[i] = (ushort)Mathf.Clamp(spiky[i] + offset, 1, 65535);
+                }
+            }
+            PMSDKDetectedPlane plane = new PMSDKDetectedPlane {
+                Normal = normal, D = -Vector3.Dot(normal, anchor),
+                Polygon = new[] { new Vector2(0f, 0f), new Vector2(CamW - 1f, 0f), new Vector2(CamW - 1f, CamH - 1f), new Vector2(0f, CamH - 1f) },
+            };
+            PMSDKCameraIntrinsics intrinsics = new PMSDKCameraIntrinsics { Fx = Focal, Fy = Focal, Cx = CamW * 0.5f, Cy = CamH * 0.5f };
+            List<PMSDKDetectedPlane> planes = new List<PMSDKDetectedPlane> { plane };
+            PMSDKSurfaceGeometry reference;
+            PMSDKSurfaceGeometry noisy;
+            string error;
+            Assert.IsTrue(PMSDKSurfaceGeometry.TryBuild(planes, intrinsics, CamW, CamH, clean, null, true, out reference, out error), error);
+            Assert.IsTrue(PMSDKSurfaceGeometry.TryBuild(planes, intrinsics, CamW, CamH, spiky, null, true, out noisy, out error), error);
+
+            int total = 0;
+            int dropped = 0;
+            float worst = 0f;
+            for (int y = 6; y < CamH - 6; y += 3) {
+                for (int x = 6; x < CamW - 6; x += 3) {
+                    Vector2 pixel = new Vector2(x, y);
+                    Vector2 expected;
+                    Vector2 measured;
+                    int ignored;
+                    if (!reference.TryToSurface(pixel, pixel, out expected, out ignored)) {
+                        continue;
+                    }
+                    total++;
+                    if (!noisy.TryToSurface(pixel, pixel, out measured, out ignored)) {
+                        dropped++;
+                        continue;
+                    }
+                    worst = Mathf.Max(worst, (measured - expected).magnitude);
+                }
+            }
+            TestContext.WriteLine("spiky depth: worst shift " + worst + " mm, dropped " + dropped + " of " + total);
+            Assert.Greater(total, 5000);
+            Assert.Less(worst, 2f, "spikes must not move surface points");
+            Assert.Less(dropped, total / 200, "spikes must not reject surface points");
+        }
+
+        [Test]
+        public void IsolatedOffSurfaceTexelIsNotBlanked()
+        {
+            int size = 16;
+            float[] rgba = new float[size * size * 4];
+            for (int i = 0; i < size * size; i++) {
+                rgba[i * 4 + 3] = 1f;
+            }
+            Rect rect = new Rect(0f, 0f, 1f, 1f);
+            List<Vector2> surface = new List<Vector2>();
+            for (int y = 0; y < 32; y++) {
+                for (int x = 0; x < 32; x++) {
+                    Vector2 r = new Vector2((x + 0.5f) / 32f, (y + 0.5f) / 32f);
+                    // Texel (8, 8) holds only stray off-surface samples.
+                    if (Mathf.FloorToInt(r.x * size) != 8 || Mathf.FloorToInt(r.y * size) != 8) {
+                        surface.Add(r);
+                    }
+                }
+            }
+            Vector2[] stray = { new Vector2(8.3f / size, 8.3f / size), new Vector2(8.7f / size, 8.6f / size) };
+            PMSDKWarpMapBuilder.BlankOffSurface(rgba, size, rect, surface.ToArray(), stray);
+            Assert.AreEqual(1f, rgba[(8 * size + 8) * 4 + 3], "a lone stray texel inside the surface stays valid");
+        }
+
+        [Test]
+        public void DespeckleFixesWrongTexelsAndHolesButKeepsBlankedFaces()
+        {
+            // Hardware case (2026-11-18): texels 0.1-0.2 UV off their neighbours (coloured specks) and lone invalid
+            // texels (black dots) inside a polygon skin's map.
+            int size = 32;
+            float[] rgba = new float[size * size * 4];
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    int i = (y * size + x) * 4;
+                    // ~0.008 UV per texel, like a 256-texel map of a skin with a 16-cell grid.
+                    rgba[i] = 0.3f + x / 128f;
+                    rgba[i + 1] = 0.3f + y / 128f;
+                    rgba[i + 3] = 1f;
+                }
+            }
+            float[] truth = (float[])rgba.Clone();
+            // 2 x 2 cluster of wrong texels.
+            for (int y = 10; y < 12; y++) {
+                for (int x = 10; x < 12; x++) {
+                    rgba[(y * size + x) * 4] += 0.2f;
+                    rgba[(y * size + x) * 4 + 1] -= 0.15f;
+                }
+            }
+            // Lone hole.
+            rgba[(20 * size + 20) * 4 + 3] = 0f;
+            // Blanked side face: rows 26..28, full width.
+            for (int y = 26; y <= 28; y++) {
+                for (int x = 0; x < size; x++) {
+                    int i = (y * size + x) * 4;
+                    rgba[i] = 0f;
+                    rgba[i + 1] = 0f;
+                    rgba[i + 3] = 0f;
+                }
+            }
+            PMSDKWarpMapBuilder.DespeckleMap(rgba, size, 0.02f);
+            for (int y = 10; y < 12; y++) {
+                for (int x = 10; x < 12; x++) {
+                    int i = (y * size + x) * 4;
+                    Assert.AreEqual(truth[i], rgba[i], 0.02f, "cluster u");
+                    Assert.AreEqual(truth[i + 1], rgba[i + 1], 0.02f, "cluster v");
+                }
+            }
+            int hole = (20 * size + 20) * 4;
+            Assert.AreEqual(1f, rgba[hole + 3], "hole filled");
+            Assert.AreEqual(truth[hole], rgba[hole], 0.02f);
+            Assert.AreEqual(truth[hole + 1], rgba[hole + 1], 0.02f);
+            for (int x = 0; x < size; x++) {
+                Assert.AreEqual(0f, rgba[(27 * size + x) * 4 + 3], "blanked side face stays dark");
+            }
+            int smooth = (5 * size + 25) * 4;
+            Assert.AreEqual(truth[smooth], rgba[smooth], 1e-6f, "correct texels untouched");
+            Assert.AreEqual(truth[smooth + 1], rgba[smooth + 1], 1e-6f);
+        }
+
         // ------------------------------------------------------------------ metrics
 
         [Test]

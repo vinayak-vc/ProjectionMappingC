@@ -27,6 +27,8 @@ namespace vxpmsdk.Components
         private const float ParallelEpsilon = 1e-3f;
         // Box filter (pixels) applied to measured depth before it is used for positions (removes Gray-code steps).
         private const int PointDepthSmoothing = 9;
+        // A pixel this far (mm) from its 3x3 median is a decode spike; real relief is a few mm, spikes 100+ mm.
+        private const float SpikeToleranceMm = 30f;
         // Measured points farther than this from their facet's plane belong to another surface (real relief ~ +-6 mm, noise ~3.5 mm).
         private const float OffSurfaceToleranceMm = 15f;
         // At least this share of the surface region must lie on measured facets.
@@ -235,8 +237,55 @@ namespace vxpmsdk.Components
             return true;
         }
 
-        /// <summary>Box-filtered depth over valid pixels only (0 stays 0); integral images, O(pixels).</summary>
-        private static float[] SmoothDepth(ushort[] depth, int width, int height, int size)
+        /// <summary>
+        /// Box-filtered depth over valid pixels only (0 stays 0), robust to decode spikes: a few percent of
+        /// triangulated pixels are hundreds of mm off (wrong Gray-code bits), and a plain mean lets each one drag its
+        /// whole window by tens of mm. Spikes are replaced by their 3x3 median first (replaced, not dropped, so the
+        /// window stays symmetric on steeply inclined surfaces), then the box mean averages away quantisation.
+        /// </summary>
+        public static float[] SmoothDepth(ushort[] depth, int width, int height, int size)
+        {
+            ushort[] median = Median3x3(depth, width, height);
+            ushort[] despiked = new ushort[width * height];
+            for (int i = 0; i < despiked.Length; i++) {
+                despiked[i] = Mathf.Abs(depth[i] - median[i]) > SpikeToleranceMm ? median[i] : depth[i];
+            }
+            return BoxMean(despiked, width, height, size);
+        }
+
+        /// <summary>Median of the valid pixels in each 3x3 window (0 where the pixel itself is invalid).</summary>
+        private static ushort[] Median3x3(ushort[] depth, int width, int height)
+        {
+            ushort[] result = new ushort[width * height];
+            ushort[] window = new ushort[9];
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    if (depth[y * width + x] == 0) {
+                        continue;
+                    }
+                    int n = 0;
+                    for (int wy = Mathf.Max(0, y - 1); wy <= Mathf.Min(height - 1, y + 1); wy++) {
+                        for (int wx = Mathf.Max(0, x - 1); wx <= Mathf.Min(width - 1, x + 1); wx++) {
+                            ushort z = depth[wy * width + wx];
+                            if (z == 0) {
+                                continue;
+                            }
+                            int k = n++;
+                            while (k > 0 && window[k - 1] > z) {
+                                window[k] = window[k - 1];
+                                k--;
+                            }
+                            window[k] = z;
+                        }
+                    }
+                    result[y * width + x] = window[n / 2];
+                }
+            }
+            return result;
+        }
+
+        /// <summary>Box mean of valid pixels (0 stays 0); integral images, O(pixels).</summary>
+        private static float[] BoxMean(ushort[] depth, int width, int height, int size)
         {
             int half = Mathf.Max(0, size / 2);
             double[] sum = new double[(width + 1) * (height + 1)];

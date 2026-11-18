@@ -928,3 +928,13 @@ Phase C (save/undo, done 2026-08-20; interim JSON schema; UPM sample deferred):
 - [ ] Panel flow exercised end to end only on hardware (synthetic camera cannot self-calibrate)
 - [x] Fix (2026-11-18): panel still greyed out Build warp map / Measure on surface for Polygon/Freeform skins
   (`PMSDKAutoAdjustPanel.Bind`); hint text no longer says "Rectangle and Ellipse only". Auto adjust stays Rectangle/Ellipse.
+- [x] Hardware run 2026-11-18: Calibrate all skins works; specks / black dots in the map -> D-056 despeckle + robust depth (sim + offline on the real map)
+- [ ] Hardware: re-run Calibrate all skins on the POP polygon with D-056 and check the build report (was FAIL 211 mm RMS)
+- [ ] Find the source of the wrong samples: re-run gave a blotchy strip along the band / upper-face fold (FAIL 335 mm);
+  sample dump (`<id>_decoded.csv`, `<id>_samples.csv`) added - analyse it after the next run
+- [x] D-057: reuse the previous projector lens when the camera moved; reject impossible lenses (sim 6/6)
+- [x] Hardware: recalibrated at the new camera position - self-calibration wrong again (674 px)
+- [x] D-058: fixed projector lens (Advanced) + simplified inspector (sim tests)
+- [ ] Hardware: enter lens 923 / 1103, Calibrate projector (check baseline vs tape), Calibrate selected skin
+- [ ] Black edge patches: extend content into unmeasured edge gaps instead of leaving them dark (keep real side faces dark)
+- [ ] Idea from user: two cameras (left / right, overlapping centre) - not designed yet

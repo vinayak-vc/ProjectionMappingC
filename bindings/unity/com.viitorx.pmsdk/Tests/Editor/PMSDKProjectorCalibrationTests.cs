@@ -81,6 +81,96 @@ namespace vxpmsdk.Tests
         }
 
         [Test]
+        public void PreviousLensIsReusedAndAWrongOneFallsBackToSelfCalibration()
+        {
+            RequireNative();
+            List<Vector2> camera;
+            List<Vector2> raster;
+            ushort[] depth;
+            Build(false, out camera, out raster, out depth);
+            string error;
+
+            // Camera moved, projector unchanged: the earlier lens is reused and the depth stays right.
+            PMSDKProjectorCalibration previous = new PMSDKProjectorCalibration { FocalPx = ProjectorFocal, PrincipalX = 960f, PrincipalY = ProjectorCy };
+            PMSDKProjectorCalibration reused;
+            Assert.IsTrue(PMSDKProjectorCalibration.TrySolve(camera, raster, Intrinsics(), CamW, CamH, depth, previous, out reused, out error), error);
+            TestContext.WriteLine("reused: " + reused.Describe());
+            Assert.IsTrue(reused.LensReused);
+            Assert.AreEqual(ProjectorFocal, reused.FocalPx, 0.01f);
+            Assert.AreEqual(ProjectorCentre.magnitude, reused.BaselineMm, ProjectorCentre.magnitude * 0.03f, "baseline");
+            Assert.Less(MedianDepthError(reused, depth), 6f, "median depth error (mm)");
+
+            // Zoom changed: the old lens no longer fits, self-calibration takes over.
+            PMSDKProjectorCalibration zoomed = new PMSDKProjectorCalibration { FocalPx = ProjectorFocal * 1.4f, PrincipalX = 960f, PrincipalY = ProjectorCy * 0.7f };
+            PMSDKProjectorCalibration solved;
+            Assert.IsTrue(PMSDKProjectorCalibration.TrySolve(camera, raster, Intrinsics(), CamW, CamH, depth, zoomed, out solved, out error), error);
+            TestContext.WriteLine("fallback: " + solved.Describe());
+            Assert.IsFalse(solved.LensReused);
+            Assert.AreEqual(ProjectorFocal, solved.FocalPx, ProjectorFocal * 0.03f);
+        }
+
+        [Test]
+        public void FixedLensIsUsedOrFailsButNeverFallsBack()
+        {
+            RequireNative();
+            List<Vector2> camera;
+            List<Vector2> raster;
+            ushort[] depth;
+            Build(false, out camera, out raster, out depth);
+            string error;
+            PMSDKProjectorCalibration fixedLens = new PMSDKProjectorCalibration { FocalPx = ProjectorFocal, PrincipalX = 960f, PrincipalY = ProjectorCy };
+            PMSDKProjectorCalibration solved;
+            Assert.IsTrue(PMSDKProjectorCalibration.TrySolve(camera, raster, Intrinsics(), CamW, CamH, depth, fixedLens, true, out solved, out error), error);
+            Assert.IsTrue(solved.LensReused);
+            Assert.Less(MedianDepthError(solved, depth), 6f);
+
+            PMSDKProjectorCalibration wrongLens = new PMSDKProjectorCalibration { FocalPx = ProjectorFocal * 1.4f, PrincipalX = 960f, PrincipalY = ProjectorCy * 0.7f };
+            Assert.IsFalse(PMSDKProjectorCalibration.TrySolve(camera, raster, Intrinsics(), CamW, CamH, depth, wrongLens, true, out solved, out error));
+            StringAssert.Contains("does not fit", error);
+        }
+
+        [Test]
+        public void LensFileRoundTrips()
+        {
+            string folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "pmsdk-lens-" + System.Guid.NewGuid().ToString("N"));
+            try {
+                float focal;
+                float centre;
+                Assert.IsFalse(PMSDKProjectorCalibration.TryLoadLens(folder, out focal, out centre));
+                PMSDKProjectorCalibration.SaveLens(folder, 923f, 1103f);
+                Assert.IsTrue(PMSDKProjectorCalibration.TryLoadLens(folder, out focal, out centre));
+                Assert.AreEqual(923f, focal, 1e-3f);
+                Assert.AreEqual(1103f, centre, 1e-3f);
+                PMSDKProjectorCalibration.ClearLens(folder);
+                Assert.IsFalse(PMSDKProjectorCalibration.TryLoadLens(folder, out focal, out centre));
+            } finally {
+                if (System.IO.Directory.Exists(folder)) {
+                    System.IO.Directory.Delete(folder, true);
+                }
+            }
+        }
+
+        [Test]
+        public void ImpossibleProjectorLensIsRejected()
+        {
+            // Hardware 2026-11-18: self-calibration from a new camera position returned focal 249 px, lens centre 0.40 H.
+            Assert.IsFalse(PMSDKProjectorCalibration.IsPlausibleLens(248.6, 436.0));
+            Assert.IsTrue(PMSDKProjectorCalibration.IsPlausibleLens(923.1, 1102.8));
+        }
+
+        private static float MedianDepthError(PMSDKProjectorCalibration calibration, ushort[] truthDepth)
+        {
+            List<float> errors = new List<float>();
+            for (int i = 0; i < truthDepth.Length; i += 7) {
+                if (calibration.Depth[i] > 0 && truthDepth[i] > 0) {
+                    errors.Add(Mathf.Abs(calibration.Depth[i] - truthDepth[i]));
+                }
+            }
+            errors.Sort();
+            return errors.Count > 0 ? errors[errors.Count / 2] : float.MaxValue;
+        }
+
+        [Test]
         public void SingleFlatWallIsRefused()
         {
             RequireNative();

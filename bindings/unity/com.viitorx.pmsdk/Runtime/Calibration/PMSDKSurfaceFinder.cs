@@ -309,8 +309,20 @@ namespace vxpmsdk.Components
                     SetStatus("Solving projector geometry from " + map.CameraPixels.Count + " samples...");
                     yield return null;
                     string error;
+                    PMSDKProjectorCalibration previous = null;
+                    bool lockLens = false;
+                    float lensFocal;
+                    float lensCentreY;
+                    string loadError;
+                    if (!string.IsNullOrEmpty(folder) && PMSDKProjectorCalibration.TryLoadLens(folder, out lensFocal, out lensCentreY)) {
+                        // The user's fixed lens: only the camera pose is solved.
+                        previous = new PMSDKProjectorCalibration { FocalPx = lensFocal, PrincipalX = PMSDKProjectorCalibration.RasterWidth * 0.5f, PrincipalY = lensCentreY };
+                        lockLens = true;
+                    } else if (!string.IsNullOrEmpty(folder) && !PMSDKProjectorCalibration.TryLoad(folder, out previous, out loadError) && !string.IsNullOrEmpty(loadError)) {
+                        Debug.LogWarning("[PMSDK] Previous projector calibration not used: " + loadError);
+                    }
                     if (!PMSDKProjectorCalibration.TrySolve(map.CameraPixels, map.ContentUvs, intrinsics, camera.Width, camera.Height, depth,
-                        out calibration, out error)) {
+                        previous, lockLens, out calibration, out error)) {
                         message = error;
                         break;
                     }

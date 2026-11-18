@@ -1,5 +1,32 @@
 # AI Agent Handoff Document
 
+## Fixed projector lens + simplified inspector (2026-11-18, D-058)
+
+Second recalibration self-calibrated a wrong lens again (674 px). Added a user-set fixed lens (`lens.json`, Advanced >
+Projector lens; office: 923 / 1103) used by `CalibrateProjector` (pose-only, fails if it does not fit). Panel main
+section reduced to Calibrate all/selected, Calibrate projector, Clear selected skin, grid; rest under "Show advanced
+settings". Next: user enters the lens, Calibrate projector, Calibrate selected skin; then analyse
+`051066dd_decoded.csv` / `_samples.csv` for the fold strip and the black edge patches. Nothing committed.
+
+## Projector lens reuse (2026-11-18, D-057)
+
+Camera moved -> self-calibration gave focal 249 px (real ~900-923): stretched squares. `TrySolve` now reuses a plausible
+previous lens (pose-only solve) and refuses implausible lenses; `CalibrateProjector` passes the saved calibration.
+Saved `projector.json` (10:35) holds the bad lens and is not reused. Last good lens: 10:22 run, focal 923.1 px,
+principal y 1102.8 (cy 1.02 H). Tests: PMSDKProjectorCalibrationTests 6/6. Nothing committed.
+
+## Despeckled warp maps (2026-11-18, D-056)
+
+Hardware: Calibrate all skins ran on the user's POP polygon; content showed specks and black dots (map outliers,
+report FAIL 211 mm RMS). Changed `PMSDKWarpMapBuilder` (`DespeckleMap` after every build/correction, 3x3 rule in
+`BlankOffSurface`), `PMSDKSurfaceGeometry` (spike-robust `SmoothDepth`, now public), tests in `PMSDKSurfaceMetricsTests`.
+Offline on the saved map: 5316 -> 119 rough texels. Next: user re-runs Calibrate all skins and sends the new
+`SurfaceReports\<id>_build.txt/.png`. Nothing committed.
+Re-run 10:23: specks gone, but a blotchy strip of mixed cells along the band / upper-face fold remains (report FAIL
+335 mm RMS, fold jumps 450 / 1808 mm). Source unproven; `WriteSamples` now dumps `<id>_decoded.csv` (all decoded
+capture samples) and `<id>_samples.csv` (samples behind the map: uv now, target, facet, raster) to SurfaceReports.
+Next: user re-runs Calibrate selected skin, then analyse the CSVs (decode noise vs target noise near the fold).
+
 ## One-click calibration for drawn skins (2026-11-17, D-055) - hardware test tomorrow
 
 User flow: draw skins (Rectangle/Polygon) -> **Calibrate all skins** -> projector calibration if needed + physical-spacing

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 
 namespace vxpmsdk.Components
@@ -85,6 +86,12 @@ namespace vxpmsdk.Components
         private bool regionDerived;
         // Median epipolar error (projector px) above which the projector calibration no longer fits the rig.
         private const float StaleCalibrationPx = 3f;
+        // Map despeckling (hardware 2026-11-18): neighbouring texels differ by ~0.005 UV; 0.02 is a third of a
+        // 16-cell grid cell, far above that and far below the 0.1-0.2 jumps of wrong samples.
+        private const float DespeckleToleranceUv = 0.02f;
+        private const int MinDespeckleNeighbours = 5;
+        private const int EnclosedHoleNeighbours = 6;
+        private const int DespecklePasses = 4;
         private PMSDKSurfaceTolerance tolerance = PMSDKSurfaceTolerance.Default();
 
         public bool IsRunning { get; private set; }
@@ -417,8 +424,10 @@ namespace vxpmsdk.Components
             if (!PMSDKAutoAdjustNative.TryBuildWarpMap(raster, targetUv, rect, mapSize, mapSize, maxFillDistancePx, out rgba, out coverage, out error)) {
                 return false;
             }
+            WriteSamples(skin, capture, rawPixels, currentUv, targetUv, raster, geometry);
             Vector2[] offSurfaceRaster = offSurfaceUv.Length > 0 ? ContentToRaster(skin, offSurfaceUv) : new Vector2[0];
             BlankOffSurface(rgba, mapSize, rect, raster, offSurfaceRaster);
+            DespeckleMap(rgba, mapSize, DespeckleToleranceUv);
             string fileName;
             if (!TrySaveMap(skin, rect, rgba, out fileName, out error)) {
                 return false;
@@ -464,6 +473,7 @@ namespace vxpmsdk.Components
                     break;
                 }
                 BlankOffSurface(rgba, mapSize, best.Rect, best.Raster, best.OffSurfaceRaster);
+                DespeckleMap(rgba, mapSize, DespeckleToleranceUv);
                 string fileName;
                 if (!TrySaveMap(skin, best.Rect, rgba, out fileName, out error)) {
                     break;
@@ -859,13 +869,105 @@ namespace vxpmsdk.Components
             Count(surfaceRaster, size, rect, on);
             Count(offSurfaceRaster, size, rect, off);
             for (int i = 0; i < on.Length; i++) {
-                if (off[i] > on[i]) {
+                // The 3x3 neighbourhood must agree too: a lone texel of stray off-surface samples inside the surface
+                // would otherwise become a black dot.
+                if (off[i] > on[i] && SumAround(off, size, i) > SumAround(on, size, i)) {
                     rgba[i * 4] = 0f;
                     rgba[i * 4 + 1] = 0f;
                     rgba[i * 4 + 2] = 0f;
                     rgba[i * 4 + 3] = 0f;
                 }
             }
+        }
+
+        /// <summary>
+        /// Removes single-texel defects from a built map: a valid texel whose content UV jumps more than
+        /// <paramref name="toleranceUv"/> from the median of its valid 8-neighbours (a wrongly decoded or wrongly
+        /// measured sample - a coloured speck on the surface) takes that median, and an invalid texel enclosed by at
+        /// least <see cref="EnclosedHoleNeighbours"/> valid neighbours (a black dot) is filled with it. Outlines and
+        /// blanked side faces have fewer valid neighbours and stay as they are. Wrong samples come in small clusters,
+        /// so the pass repeats (up to <see cref="DespecklePasses"/>) until nothing changes. Returns the texels changed.
+        /// </summary>
+        public static int DespeckleMap(float[] rgba, int size, float toleranceUv)
+        {
+            int total = 0;
+            for (int pass = 0; pass < DespecklePasses; pass++) {
+                int changed = DespecklePass(rgba, size, toleranceUv);
+                total += changed;
+                if (changed == 0) {
+                    break;
+                }
+            }
+            return total;
+        }
+
+        private static int DespecklePass(float[] rgba, int size, float toleranceUv)
+        {
+            float[] source = (float[])rgba.Clone();
+            float[] us = new float[8];
+            float[] vs = new float[8];
+            int changed = 0;
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    int n = 0;
+                    for (int dy = -1; dy <= 1; dy++) {
+                        for (int dx = -1; dx <= 1; dx++) {
+                            int nx = x + dx;
+                            int ny = y + dy;
+                            if ((dx == 0 && dy == 0) || nx < 0 || ny < 0 || nx >= size || ny >= size) {
+                                continue;
+                            }
+                            int k = (ny * size + nx) * 4;
+                            if (source[k + 3] > 0.5f) {
+                                us[n] = source[k] / source[k + 3];
+                                vs[n] = source[k + 1] / source[k + 3];
+                                n++;
+                            }
+                        }
+                    }
+                    int i = (y * size + x) * 4;
+                    bool valid = source[i + 3] > 0.5f;
+                    if (n < (valid ? MinDespeckleNeighbours : EnclosedHoleNeighbours)) {
+                        continue;
+                    }
+                    float mu = Median(us, n);
+                    float mv = Median(vs, n);
+                    if (valid) {
+                        float u = source[i] / source[i + 3];
+                        float v = source[i + 1] / source[i + 3];
+                        if (Mathf.Abs(u - mu) <= toleranceUv && Mathf.Abs(v - mv) <= toleranceUv) {
+                            continue;
+                        }
+                    }
+                    rgba[i] = mu;
+                    rgba[i + 1] = mv;
+                    rgba[i + 2] = 0f;
+                    rgba[i + 3] = 1f;
+                    changed++;
+                }
+            }
+            return changed;
+        }
+
+        private static float Median(float[] values, int count)
+        {
+            float[] sorted = new float[count];
+            Array.Copy(values, sorted, count);
+            Array.Sort(sorted);
+            return count % 2 == 1 ? sorted[count / 2] : 0.5f * (sorted[count / 2 - 1] + sorted[count / 2]);
+        }
+
+        private static int SumAround(int[] counts, int size, int index)
+        {
+            int cx = index % size;
+            int cy = index / size;
+            int total = 0;
+            for (int y = Mathf.Max(0, cy - 1); y <= Mathf.Min(size - 1, cy + 1); y++) {
+                for (int x = Mathf.Max(0, cx - 1); x <= Mathf.Min(size - 1, cx + 1); x++) {
+                    total += counts[y * size + x];
+                }
+            }
+            return total;
         }
 
         private static void Count(Vector2[] raster, int size, Rect rect, int[] counts)
@@ -1022,6 +1124,51 @@ namespace vxpmsdk.Components
                 }
             } catch (Exception ex) {
                 Debug.LogWarning("[PMSDK] Could not write the surface report: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Diagnostics for offline analysis (2026-11-18 hardware speckle): every decoded capture sample
+        /// (<c>_decoded.csv</c>: camera px, py, content u, v) and every sample the map was built from
+        /// (<c>_samples.csv</c>: camera px, py, content u, v now, target u, v, facet, raster x, y).
+        /// </summary>
+        private void WriteSamples(PMSDKSkin skin, PMSDKGrayCaptureResult capture, Vector2[] rawPixels, Vector2[] currentUv, Vector2[] targetUv,
+            Vector2[] raster, PMSDKSurfaceGeometry geometry)
+        {
+            if (string.IsNullOrEmpty(ReportFolder)) {
+                return;
+            }
+            try {
+                System.IO.Directory.CreateDirectory(ReportFolder);
+                string stem = System.IO.Path.Combine(ReportFolder, SanitizeId(skin.SkinId));
+                System.Text.StringBuilder decoded = new System.Text.StringBuilder(capture.CameraPixels.Count * 32);
+                decoded.AppendLine("px,py,u,v");
+                for (int i = 0; i < capture.CameraPixels.Count; i++) {
+                    Vector2 p = capture.CameraPixels[i];
+                    Vector2 uv = capture.ContentUvs[i];
+                    decoded.Append(p.x.ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
+                        .Append(p.y.ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
+                        .Append(uv.x.ToString("0.######", CultureInfo.InvariantCulture)).Append(',')
+                        .Append(uv.y.ToString("0.######", CultureInfo.InvariantCulture)).AppendLine();
+                }
+                System.IO.File.WriteAllText(stem + "_decoded.csv", decoded.ToString());
+                System.Text.StringBuilder kept = new System.Text.StringBuilder(rawPixels.Length * 64);
+                kept.AppendLine("px,py,u,v,targetU,targetV,facet,rasterX,rasterY");
+                for (int i = 0; i < rawPixels.Length; i++) {
+                    int facet = geometry != null ? geometry.LabelAt(rawPixels[i]) : -1;
+                    kept.Append(rawPixels[i].x.ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
+                        .Append(rawPixels[i].y.ToString("0.##", CultureInfo.InvariantCulture)).Append(',')
+                        .Append(currentUv[i].x.ToString("0.######", CultureInfo.InvariantCulture)).Append(',')
+                        .Append(currentUv[i].y.ToString("0.######", CultureInfo.InvariantCulture)).Append(',')
+                        .Append(targetUv[i].x.ToString("0.######", CultureInfo.InvariantCulture)).Append(',')
+                        .Append(targetUv[i].y.ToString("0.######", CultureInfo.InvariantCulture)).Append(',')
+                        .Append(facet.ToString(CultureInfo.InvariantCulture)).Append(',')
+                        .Append(raster[i].x.ToString("0.######", CultureInfo.InvariantCulture)).Append(',')
+                        .Append(raster[i].y.ToString("0.######", CultureInfo.InvariantCulture)).AppendLine();
+                }
+                System.IO.File.WriteAllText(stem + "_samples.csv", kept.ToString());
+            } catch (Exception ex) {
+                Debug.LogWarning("[PMSDK] Could not write the sample dump: " + ex.Message);
             }
         }
 

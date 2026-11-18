@@ -33,6 +33,8 @@ namespace vxpmsdk.Components
         private const int MaxFitSamples = 20000;
         private const float MinInlierFraction = 0.2f;
         private const float MaxMedianReprojectionPx = 2.5f;
+        private const double MinThrowRatio = 0.3;
+        private const double MaxThrowRatio = 4.0;
 
         public float FocalPx;
         public float PrincipalX;
@@ -49,6 +51,8 @@ namespace vxpmsdk.Components
         public int CameraWidth;
         public int CameraHeight;
         public string CreatedUtc = "";
+        /// <summary>True when the lens (focal, principal point) came from the previous calibration and only the pose was solved.</summary>
+        public bool LensReused;
 
         /// <summary>Triangulated distance (z, mm) per camera pixel, 0 = none. Not serialised to JSON (saved next to it).</summary>
         [NonSerialized] public ushort[] Depth;
@@ -57,7 +61,8 @@ namespace vxpmsdk.Components
         {
             return "projector focal " + FocalPx.ToString("0") + " px (throw ratio " + (FocalPx / RasterWidth).ToString("0.00") + "), lens centre y " +
                    (PrincipalY / RasterHeight).ToString("0.00") + " H, baseline " + BaselineMm.ToString("0") + (Metric ? " mm" : " units") +
-                   ", reprojection " + MedianReprojectionPx.ToString("0.00") + " px, " + (InlierFraction * 100f).ToString("0") + " % inliers";
+                   ", reprojection " + MedianReprojectionPx.ToString("0.00") + " px, " + (InlierFraction * 100f).ToString("0") + " % inliers" +
+                   (LensReused ? ", lens from the previous calibration" : "");
         }
 
         // ------------------------------------------------------------------ solve
@@ -69,7 +74,35 @@ namespace vxpmsdk.Components
         public static bool TrySolve(IList<Vector2> cameraPixels, IList<Vector2> raster, PMSDKCameraIntrinsics intrinsics, int cameraWidth, int cameraHeight,
             ushort[] cameraDepthMm, out PMSDKProjectorCalibration calibration, out string error)
         {
+            return TrySolve(cameraPixels, raster, intrinsics, cameraWidth, cameraHeight, cameraDepthMm, null, out calibration, out error);
+        }
+
+        /// <param name="previous">
+        /// An earlier calibration of the same projector (hardware 2026-11-18). Moving the camera does not change the
+        /// projector's lens, so its focal length and lens offset are reused and only the pose is solved; that is far
+        /// more robust than self-calibration, which found a degenerate lens (249 px instead of ~900 px) from a new
+        /// camera position. Self-calibration is used only when there is no plausible earlier lens or it no longer
+        /// fits (zoom changed).
+        /// </param>
+        public static bool TrySolve(IList<Vector2> cameraPixels, IList<Vector2> raster, PMSDKCameraIntrinsics intrinsics, int cameraWidth, int cameraHeight,
+            ushort[] cameraDepthMm, PMSDKProjectorCalibration previous, out PMSDKProjectorCalibration calibration, out string error)
+        {
+            return TrySolve(cameraPixels, raster, intrinsics, cameraWidth, cameraHeight, cameraDepthMm, previous, false, out calibration, out error);
+        }
+
+        /// <param name="lockLens">
+        /// <paramref name="previous"/>'s lens is the projector's fixed lens (entered by the user): it is always used and
+        /// self-calibration never runs; when it does not fit the correspondences the calibration fails.
+        /// </param>
+        public static bool TrySolve(IList<Vector2> cameraPixels, IList<Vector2> raster, PMSDKCameraIntrinsics intrinsics, int cameraWidth, int cameraHeight,
+            ushort[] cameraDepthMm, PMSDKProjectorCalibration previous, bool lockLens, out PMSDKProjectorCalibration calibration, out string error)
+        {
             calibration = null;
+            if (lockLens && (previous == null || !IsPlausibleLens(previous.FocalPx, previous.PrincipalY))) {
+                error = "The fixed projector lens is not a real projector lens (focal " + (previous != null ? previous.FocalPx.ToString("0") : "-") +
+                        " px). Check the Projector lens fields under Advanced.";
+                return false;
+            }
             if (cameraPixels == null || raster == null || cameraPixels.Count != raster.Count || cameraPixels.Count < 100) {
                 error = "Too few camera-projector correspondences.";
                 return false;
@@ -111,12 +144,51 @@ namespace vxpmsdk.Components
                 return false;
             }
 
-            // 2. Self-calibration of the projector.
+            // 2. Projector lens: the earlier one when plausible, else self-calibration.
             double[] kc = { intrinsics.Fx, 0, intrinsics.Cx, 0, intrinsics.Fy, intrinsics.Cy, 0, 0, 1 };
             double cx = RasterWidth * 0.5;
+            if (previous != null && IsPlausibleLens(previous.FocalPx, previous.PrincipalY)) {
+                string reusedError;
+                if (TryFinish(cameraPixels, undistorted, projector, intrinsics, cameraWidth, cameraHeight, cameraDepthMm, f, kc, cx,
+                    previous.FocalPx, previous.PrincipalY, inliers, inlierFraction, out calibration, out reusedError)) {
+                    calibration.LensReused = true;
+                    error = "";
+                    return true;
+                }
+                if (lockLens) {
+                    error = "The fixed projector lens (focal " + previous.FocalPx.ToString("0") + " px, lens centre y " +
+                            (previous.PrincipalY / RasterHeight).ToString("0.00") + " H) does not fit this capture: " + reusedError +
+                            " Check the Projector lens fields under Advanced, or clear them if the projector zoom changed.";
+                    return false;
+                }
+            }
             double focal;
             double principalY;
             SelfCalibrate(f, kc, cx, out focal, out principalY);
+            if (!IsPlausibleLens(focal, principalY)) {
+                error = "Could not determine the projector lens from this camera position (solved focal " + focal.ToString("0") +
+                        " px, lens centre y " + (principalY / RasterHeight).ToString("0.00") + " H are not a real projector). Let the " +
+                        "full-screen pattern hit more surfaces at different distances, or move the camera further to the side of the projector.";
+                return false;
+            }
+            return TryFinish(cameraPixels, undistorted, projector, intrinsics, cameraWidth, cameraHeight, cameraDepthMm, f, kc, cx,
+                focal, principalY, inliers, inlierFraction, out calibration, out error);
+        }
+
+        /// <summary>Real projectors: throw ratio (focal / raster width) 0.3 .. 4, lens centre y within -0.5 .. 1.5 H.</summary>
+        public static bool IsPlausibleLens(double focal, double principalY)
+        {
+            return focal >= MinThrowRatio * RasterWidth && focal <= MaxThrowRatio * RasterWidth &&
+                   principalY >= -0.5 * RasterHeight && principalY <= 1.5 * RasterHeight;
+        }
+
+        /// <summary>Pose, triangulation, scale and the result for a given projector lens.</summary>
+        private static bool TryFinish(IList<Vector2> cameraPixels, Vector2[] undistorted, Vector2[] projector, PMSDKCameraIntrinsics intrinsics,
+            int cameraWidth, int cameraHeight, ushort[] cameraDepthMm, double[] f, double[] kc, double cx, double focal, double principalY,
+            List<int> inliers, float inlierFraction, out PMSDKProjectorCalibration calibration, out string error)
+        {
+            calibration = null;
+            int count = cameraPixels.Count;
 
             // 3. Pose.
             double[] kp = { focal, 0, cx, 0, focal, principalY, 0, 0, 1 };
@@ -261,6 +333,54 @@ namespace vxpmsdk.Components
                 byte[] bytes = new byte[Depth.Length * 2];
                 Buffer.BlockCopy(Depth, 0, bytes, 0, bytes.Length);
                 File.WriteAllBytes(Path.Combine(folder, "depth_u16.bin"), bytes);
+            }
+        }
+
+        [Serializable]
+        private sealed class LensData
+        {
+            public float FocalPx;
+            public float PrincipalY;
+        }
+
+        private const string LensFileName = "lens.json";
+
+        /// <summary>
+        /// The projector's fixed lens (focal length and lens centre y, raster pixels at 1920 x 1080), set by the user
+        /// once (hardware 2026-11-18: self-calibration from some camera positions finds a wrong lens). False when none.
+        /// </summary>
+        public static bool TryLoadLens(string folder, out float focalPx, out float principalY)
+        {
+            focalPx = 0f;
+            principalY = 0f;
+            string path = Path.Combine(folder, LensFileName);
+            if (!File.Exists(path)) {
+                return false;
+            }
+            try {
+                LensData data = JsonUtility.FromJson<LensData>(File.ReadAllText(path));
+                focalPx = data.FocalPx;
+                principalY = data.PrincipalY;
+                return IsPlausibleLens(focalPx, principalY);
+            } catch (Exception ex) {
+                Debug.LogWarning("[PMSDK] Could not read the projector lens: " + ex.Message);
+                return false;
+            }
+        }
+
+        public static void SaveLens(string folder, float focalPx, float principalY)
+        {
+            Directory.CreateDirectory(folder);
+            LensData data = new LensData { FocalPx = focalPx, PrincipalY = principalY };
+            File.WriteAllText(Path.Combine(folder, LensFileName), JsonUtility.ToJson(data, true));
+        }
+
+        /// <summary>Removes the fixed lens: the next calibration self-calibrates (projector zoom changed).</summary>
+        public static void ClearLens(string folder)
+        {
+            string path = Path.Combine(folder, LensFileName);
+            if (File.Exists(path)) {
+                File.Delete(path);
             }
         }
 

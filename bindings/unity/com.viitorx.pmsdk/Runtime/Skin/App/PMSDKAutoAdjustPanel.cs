@@ -51,6 +51,9 @@ namespace vxpmsdk.Components
         private readonly Button calibrateSelectedButton;
         private bool flowRunning;
         private readonly Text calibrationLabel;
+        private readonly RectTransform advancedRoot;
+        private readonly InputField lensFocalField;
+        private readonly InputField lensCentreField;
         private Texture2D gridTexture;
         private PMSDKSkin gridSkin;
         private readonly Toggle snapToggle;
@@ -101,55 +104,65 @@ namespace vxpmsdk.Components
             ContentSizeFitter fit = root.gameObject.AddComponent<ContentSizeFitter>();
             fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            PMSDKUi.AddDimLabel(root, "Measures the projection with the OAK-D and corrects it.");
-            PMSDKUi.AddDimLabel(root, "Fix the camera, dim the room, close OAK Viewer.");
-
-            RectTransform exposureRow = NewRow(root, "Exposure Row");
-            PMSDKUi.AddDimLabel(exposureRow, "Exposure ms (0 = auto)");
-            exposureField = PMSDKUi.AddInputField(exposureRow, exposureMs.ToString("0.##", CultureInfo.InvariantCulture), "ms", OnExposureEdited);
-
-            PMSDKUi.AddDimLabel(root, "Calibrate: draw your skins, then let the camera make the content equal-sized on the surface.");
+            // Everyday flow (D-058): draw skins, Calibrate; after moving the camera, Calibrate projector first.
+            PMSDKUi.AddDimLabel(root, "1. Draw your skins.  2. Press Calibrate.");
+            PMSDKUi.AddDimLabel(root, "Camera moved? Press Calibrate projector first.");
             RectTransform flowRow = NewRow(root, "Calibrate Skins Row");
             calibrateAllButton = AddRowButton(flowRow, "Calibrate all skins", OnCalibrateAllClicked);
             calibrateSelectedButton = AddRowButton(flowRow, "Calibrate selected skin", OnCalibrateSelectedClicked);
-            PMSDKUi.AddDimLabel(root, "Advanced:");
+            RectTransform rowE = NewRow(root, "Projector Calibration Row");
+            calibrateButton = AddRowButton(rowE, "Calibrate projector", OnCalibrateClicked);
+            clearButton = AddRowButton(rowE, "Clear selected skin", OnClearClicked);
+            gridToggle = PMSDKUi.AddToggle(root, "Show calibration grid", false, OnGridToggled);
+            calibrationLabel = PMSDKUi.AddDimLabel(root, CalibrationText());
+            correctionLabel = PMSDKUi.AddDimLabel(root, "");
+            statusLabel = PMSDKUi.AddDimLabel(root, "");
 
-            RectTransform rowA = NewRow(root, "Auto Adjust Row");
+            PMSDKUi.AddToggle(root, "Show advanced settings", false, OnAdvancedToggled);
+            advancedRoot = PMSDKUi.NewRect("Advanced", root);
+            PMSDKUi.AddVertical(advancedRoot.gameObject, 0, 4f);
+
+            RectTransform exposureRow = NewRow(advancedRoot, "Exposure Row");
+            PMSDKUi.AddDimLabel(exposureRow, "Exposure ms (0 = auto)");
+            exposureField = PMSDKUi.AddInputField(exposureRow, exposureMs.ToString("0.##", CultureInfo.InvariantCulture), "ms", OnExposureEdited);
+
+            PMSDKUi.AddDimLabel(advancedRoot, "Projector lens (empty = measure it; set it if the projector calibration is wrong):");
+            RectTransform lensRow = NewRow(advancedRoot, "Projector Lens Row");
+            float lensFocal;
+            float lensCentreY;
+            bool hasLens = PMSDKProjectorCalibration.TryLoadLens(PMSDKProjectorCalibration.Folder, out lensFocal, out lensCentreY);
+            PMSDKUi.AddDimLabel(lensRow, "Focal / centre y px");
+            lensFocalField = PMSDKUi.AddInputField(lensRow, hasLens ? lensFocal.ToString("0.#", CultureInfo.InvariantCulture) : "", "focal", OnLensEdited);
+            lensCentreField = PMSDKUi.AddInputField(lensRow, hasLens ? lensCentreY.ToString("0.#", CultureInfo.InvariantCulture) : "", "centre y", OnLensEdited);
+
+            RectTransform aspectRow = NewRow(advancedRoot, "Content Aspect Row");
+            PMSDKUi.AddDimLabel(aspectRow, "Content aspect (0 = fill)");
+            aspectField = PMSDKUi.AddInputField(aspectRow, warpMapBuilder.ContentAspect.ToString("0.###", CultureInfo.InvariantCulture), "w / h", OnAspectEdited);
+
+            RectTransform rowB = NewRow(advancedRoot, "Warp Map Row");
+            warpButton = AddRowButton(rowB, "Build warp map", OnWarpClicked);
+            measureButton = AddRowButton(rowB, "Measure on surface (depth)", OnMeasureClicked);
+            physicalToggle = PMSDKUi.AddToggle(advancedRoot, "Physical spacing (depth): equal mm on every facet", warpMapBuilder.Target == PMSDKWarpMapTarget.PhysicalSpacing,
+                delegate(bool on) { warpMapBuilder.Target = on ? PMSDKWarpMapTarget.PhysicalSpacing : PMSDKWarpMapTarget.CameraPerspective; });
+
+            PMSDKUi.AddDimLabel(advancedRoot, "Older tools (flat rectangles):");
+            RectTransform rowA = NewRow(advancedRoot, "Auto Adjust Row");
             runButton = AddRowButton(rowA, "Auto adjust", OnRunClicked);
             allButton = AddRowButton(rowA, "Adjust all", OnAllClicked);
-            snapToggle = PMSDKUi.AddToggle(root, "Snap corners to facet edges", false, delegate(bool on) { autoAdjust.SnapToFacetEdges = on; });
-
-            RectTransform sizeRow = NewRow(root, "Facet Size Row");
+            snapToggle = PMSDKUi.AddToggle(advancedRoot, "Snap corners to facet edges", false, delegate(bool on) { autoAdjust.SnapToFacetEdges = on; });
+            RectTransform sizeRow = NewRow(advancedRoot, "Facet Size Row");
             PMSDKUi.AddDimLabel(sizeRow, "Size mm");
             widthField = PMSDKUi.AddInputField(sizeRow, "", "width", OnSizeEdited);
             heightField = PMSDKUi.AddInputField(sizeRow, "", "height", OnSizeEdited);
 
-            RectTransform rowB = NewRow(root, "Warp Map Row");
-            warpButton = AddRowButton(rowB, "Build warp map", OnWarpClicked);
-            clearButton = AddRowButton(rowB, "Clear", OnClearClicked);
-            physicalToggle = PMSDKUi.AddToggle(root, "Physical spacing (depth): equal mm on every facet", warpMapBuilder.Target == PMSDKWarpMapTarget.PhysicalSpacing,
-                delegate(bool on) { warpMapBuilder.Target = on ? PMSDKWarpMapTarget.PhysicalSpacing : PMSDKWarpMapTarget.CameraPerspective; });
-            RectTransform aspectRow = NewRow(root, "Content Aspect Row");
-            PMSDKUi.AddDimLabel(aspectRow, "Content aspect (0 = fill)");
-            aspectField = PMSDKUi.AddInputField(aspectRow, warpMapBuilder.ContentAspect.ToString("0.###", CultureInfo.InvariantCulture), "w / h", OnAspectEdited);
-            gridToggle = PMSDKUi.AddToggle(root, "Show calibration grid", false, OnGridToggled);
-
-            RectTransform rowC = NewRow(root, "Find Surfaces Row");
+            PMSDKUi.AddDimLabel(advancedRoot, "These create NEW skins:");
+            RectTransform rowC = NewRow(advancedRoot, "Find Surfaces Row");
             findButton = AddRowButton(rowC, "Find surfaces (depth)", OnFindClicked);
-            measureButton = AddRowButton(rowC, "Measure on surface (depth)", OnMeasureClicked);
-
-            RectTransform rowE = NewRow(root, "Projector Calibration Row");
-            calibrateButton = AddRowButton(rowE, "Calibrate projector", OnCalibrateClicked);
-            calibrationLabel = PMSDKUi.AddDimLabel(root, CalibrationText());
-
-            PMSDKUi.AddDimLabel(root, "Marked surface: take a photo, outline the surface in red (or save an AI mask)");
-            PMSDKUi.AddDimLabel(root, "as " + PMSDKCameraMark.MarkedFileName + " next to it, then map it.");
-            RectTransform rowD = NewRow(root, "Marked Surface Row");
+            PMSDKUi.AddDimLabel(advancedRoot, "Marked surface: take a photo, outline the surface in red as " + PMSDKCameraMark.MarkedFileName + ", then map it.");
+            RectTransform rowD = NewRow(advancedRoot, "Marked Surface Row");
             photoButton = AddRowButton(rowD, "Camera photo", OnPhotoClicked);
             markedButton = AddRowButton(rowD, "Map marked surface", OnMarkedClicked);
-
-            correctionLabel = PMSDKUi.AddDimLabel(root, "");
-            statusLabel = PMSDKUi.AddDimLabel(root, "");
+            advancedRoot.gameObject.SetActive(false);
             Bind(null);
         }
 
@@ -582,6 +595,48 @@ namespace vxpmsdk.Components
                 exposureMs = Mathf.Min(ms, 33f);
             }
             exposureField.SetTextWithoutNotify(exposureMs.ToString("0.##", CultureInfo.InvariantCulture));
+        }
+
+        private void OnAdvancedToggled(bool on)
+        {
+            advancedRoot.gameObject.SetActive(on);
+        }
+
+        /// <summary>Both lens fields valid and plausible: the lens is fixed for every projector calibration; both
+        /// empty: it is measured (self-calibration). Anything else is rejected with a message.</summary>
+        private void OnLensEdited(string value)
+        {
+            if (suppress) {
+                return;
+            }
+            string focalText = lensFocalField.text.Trim();
+            string centreText = lensCentreField.text.Trim();
+            if (focalText.Length == 0 && centreText.Length == 0) {
+                PMSDKProjectorCalibration.ClearLens(PMSDKProjectorCalibration.Folder);
+                statusLabel.text = "Projector lens cleared: the next Calibrate projector measures it.";
+                return;
+            }
+            float focal;
+            float centre;
+            if (!float.TryParse(focalText, NumberStyles.Float, CultureInfo.InvariantCulture, out focal) ||
+                !float.TryParse(centreText, NumberStyles.Float, CultureInfo.InvariantCulture, out centre)) {
+                statusLabel.text = "Enter both lens values (focal px and centre y px), or clear both.";
+                return;
+            }
+            if (!PMSDKProjectorCalibration.IsPlausibleLens(focal, centre)) {
+                statusLabel.text = "Lens values out of range: focal " + (0.3f * PMSDKProjectorCalibration.RasterWidth).ToString("0") + " - " +
+                                   (4f * PMSDKProjectorCalibration.RasterWidth).ToString("0") + " px, centre y " +
+                                   (-0.5f * PMSDKProjectorCalibration.RasterHeight).ToString("0") + " - " +
+                                   (1.5f * PMSDKProjectorCalibration.RasterHeight).ToString("0") + " px.";
+                return;
+            }
+            try {
+                PMSDKProjectorCalibration.SaveLens(PMSDKProjectorCalibration.Folder, focal, centre);
+                statusLabel.text = "Projector lens fixed (focal " + focal.ToString("0") + " px, centre y " + centre.ToString("0") +
+                                   " px). Press Calibrate projector to use it.";
+            } catch (Exception ex) {
+                statusLabel.text = "Could not save the projector lens: " + ex.Message;
+            }
         }
 
         private PMSDKOakCalibrationCamera CreateOakCamera(bool depth)

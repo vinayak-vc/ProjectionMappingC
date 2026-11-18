@@ -13,13 +13,20 @@ lines, equal cells, no stretching). Background and decisions: D-049 .. D-055 in 
 
 ## 2. The normal flow (what you will use)
 
+The inspector section **Auto adjust (camera)** shows only: Calibrate all skins / Calibrate selected skin, Calibrate
+projector / Clear selected skin, Show calibration grid. Everything else is under **Show advanced settings** (D-058).
+
+0. **Once per projector (D-058):** under **Show advanced settings > Projector lens**, enter the projector's focal and
+   centre y (office projector: **923** and **1103**). Then every projector calibration only finds where the camera is,
+   which is reliable from any camera position. Leave both empty only to let the software measure the lens (needs a
+   camera ~1 m to the side and a pattern that hits several surfaces; it failed from the 2026-11-18 positions).
 1. Unity: open the `SkinEditor` scene, press **Play**, then **Tools > Projection Mapping > Fullscreen Previews >
    Open On Primary** (projector shows only the output; stays on top; close with **Ctrl+Shift+-** or the same menu
    **> Close**).
 2. **Draw your skins** as usual - Rectangle or **Polygon** - and drag the corners / points onto the surfaces. The
    camera never moves your points.
-3. Workspace inspector, section **Auto adjust (camera)**: leave **Exposure ms** at 3, set **Content aspect** if needed
-   (`0` fill the skin; `1` square cells; `1.78` keeps 16:9 video proportions).
+3. **Camera moved since last time?** Click **Calibrate projector** (~30 s). The status line shows the baseline (camera
+   to projector distance): it should match a tape measurement within ~5 %. Nothing has to be typed in.
 4. Click **Calibrate all skins** (or **Calibrate selected skin**).
    - First time (or after the camera/projector moved) it calibrates the projector (~30 s, full-screen stripes - they
      must also hit something besides your surfaces, e.g. the ceiling).
